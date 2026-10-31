@@ -1,6 +1,12 @@
 // Root Layout — Broken Design
 import type { Metadata } from 'next';
+import { Chakra_Petch, Michroma, Share_Tech_Mono } from 'next/font/google';
+import Navbar from '@/components/Navbar';
 import './globals.css';
+
+const chakra = Chakra_Petch({ subsets: ['latin'], weight: ['400', '500', '600'], display: 'swap' });
+const michroma = Michroma({ subsets: ['latin'], weight: '400', display: 'swap', variable: '--font-display' });
+const shareTechMono = Share_Tech_Mono({ subsets: ['latin'], weight: '400', display: 'swap', variable: '--font-mono' });
 
 export const metadata: Metadata = {
   title: 'Broken Design',
@@ -9,7 +15,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body className={`${chakra.className} ${michroma.variable} ${shareTechMono.variable}`}>
+        <Navbar />
+        {children}
+      </body>
     </html>
   );
 }

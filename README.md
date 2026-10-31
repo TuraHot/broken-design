@@ -17,7 +17,26 @@
 
 ---
 
-## 2. โครงสร้างโฟลเดอร์โปรเจกต์ (Project Structure)
+## 2. เทคโนโลยีที่ใช้พัฒนา (Tech Stack)
+
+- **Frontend & 3D WebGL (`frontend/`)**
+  - **Framework & Styling**: Next.js 15 (App Router), React 19, TypeScript 5, Tailwind CSS 3, Lucide React
+  - **3D Rendering & Embed**: `@google/model-viewer` v4, Three.js, Web Components (`<vm-model>`), มาตรฐานไฟล์ Binary glTF 2.0 (`.glb`)
+- **Backend — Core API (`services/core-api/`)**
+  - **Runtime & Framework**: Node.js 22, Express 5, TypeScript 5 (`tsx`)
+  - **Auth, Validation & Security**: JSON Web Token (`jsonwebtoken`), `bcrypt`, `zod`, `express-rate-limit`, `cors`
+  - **Payments**: Stripe SDK (`stripe`) และระบบ Mock Checkout
+- **Backend — Asset CDN & Storage (`services/cdn-service/`)**
+  - **Upload & File Streaming**: `multer`, Node.js Streams (`fs` / `stream`), HTTP Range Requests, Cross-Origin Resource Sharing (CORS) & Cache-Control
+  - **Storage & Asset Integrity**: Content-Addressable Storage (`sha256` บน `LocalDiskStorage`), GLB Magic Bytes Validator, Constant-Time Key Check (`crypto.timingSafeEqual`)
+- **Database (`supabase/`)**
+  - **Database & Driver**: Supabase (PostgreSQL), `pg` (`node-postgres`), `pgcrypto` (`UUID`), GIN Index สำหรับค้นหา `tags` (`TEXT[]`)
+- **DevOps & Containerization**
+  - **Containers**: Docker (`node:22-alpine`), Docker Compose (Multi-container & Docker Volumes)
+
+---
+
+## 3. โครงสร้างโฟลเดอร์โปรเจกต์ (Project Structure)
 
 ```text
 broken-design/
@@ -82,7 +101,7 @@ broken-design/
 
 ---
 
-## 3. การแบ่งงานภายในทีม 6 คน (Team Vertical Slicing)
+## 4. การแบ่งงานภายในทีม 6 คน (Team Vertical Slicing)
 
 แต่ละคนรับผิดชอบฟีเจอร์แบบครบวงจรตั้งแต่ฐานข้อมูล เซอร์วิสที่เกี่ยวข้อง ไปจนถึงหน้าบ้านโดยไม่ทับซ้อนไฟล์กัน:
 
@@ -97,7 +116,7 @@ broken-design/
 
 ---
 
-## 4. วิธีเริ่มต้นใช้งานโปรเจกต์ (Getting Started)
+## 5. วิธีเริ่มต้นใช้งานโปรเจกต์ (Getting Started)
 
 1. **Clone Dependencies**:
    Clone โปรเจกต์จาก GitHub ลงเครื่อง (`git clone <repository-url>` แล้ว `cd broken-design`) หากต้องการรันแบบ Local (ไม่ใช้ Docker) ให้รัน `npm install` ในแต่ละโฟลเดอร์ (`services/core-api`, `services/cdn-service`, และ `frontend`)

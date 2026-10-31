@@ -28,11 +28,15 @@
   - **Payments**: Stripe SDK (`stripe`) และระบบ Mock Checkout
 - **Backend — Asset CDN & Storage (`services/cdn-service/`)**
   - **Upload & File Streaming**: `multer`, Node.js Streams (`fs` / `stream`), HTTP Range Requests, Cross-Origin Resource Sharing (CORS) & Cache-Control
-  - **Storage & Asset Integrity**: Content-Addressable Storage (`sha256` บน `LocalDiskStorage`), GLB Magic Bytes Validator, Constant-Time Key Check (`crypto.timingSafeEqual`)
-- **Database (`supabase/`)**
+  - **Storage & Asset Integrity**: Content-Addressable Storage (`sha256` ผ่าน `StorageAdapter` — รองรับทั้ง `LocalDiskStorage` และ Supabase Storage), GLB Magic Bytes Validator, Constant-Time Key Check (`crypto.timingSafeEqual`)
+- **Database & Cloud Storage (`supabase/`)**
   - **Database & Driver**: Supabase (PostgreSQL), `pg` (`node-postgres`), `pgcrypto` (`UUID`), GIN Index สำหรับค้นหา `tags` (`TEXT[]`)
-- **DevOps & Containerization**
-  - **Containers**: Docker (`node:22-alpine`), Docker Compose (Multi-container & Docker Volumes)
+  - **Object Storage**: Supabase Storage (เก็บไฟล์ `.glb` และ `poster.webp` แบบถาวรเมื่อ Deploy บน Cloud Free Tier)
+- **DevOps, Cloud Hosting & Deployment**
+  - **Frontend Hosting**: **Vercel** (Next.js App Router & Global Edge CDN สำหรับ `embed.js`)
+  - **Backend Hosting**: **Render** (Web Services สำหรับรัน `core-api` และ `cdn-service`)
+  - **Database & Storage Hosting**: **Supabase** (Managed PostgreSQL & Supabase Storage)
+  - **Local Containerization**: Docker (`node:22-alpine`), Docker Compose (Multi-container & Docker Volumes)
 
 ---
 

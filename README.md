@@ -99,8 +99,8 @@ broken-design/
 
 ## 4. วิธีเริ่มต้นใช้งานโปรเจกต์ (Getting Started)
 
-1. **สร้างไฟล์ตั้งต้นด้วย AI Agent**:
-   เปิดโปรเจกต์ใน Cursor / Windsurf / Copilot แล้วสั่งให้ AI Agent รันตามคำสั่งในไฟล์ `AGENT_PROMPT.md`
+1. **Clone Dependencies**:
+   Clone โปรเจกต์จาก GitHub ลงเครื่อง (`git clone <repository-url>` แล้ว `cd broken-design`) หากต้องการรันแบบ Local (ไม่ใช้ Docker) ให้รัน `npm install` ในแต่ละโฟลเดอร์ (`services/core-api`, `services/cdn-service`, และ `frontend`)
 2. **ตั้งค่าฐานข้อมูล Supabase**:
    นำโค้ดใน `supabase/schema.sql` ไปรันใน SQL Editor ของ Supabase
 3. **คัดลอกไฟล์ `.env`**:

@@ -10,14 +10,28 @@
 
 | เซอร์วิส / โฟลเดอร์ | พอร์ต | เทคโนโลยีหลัก | หน้าที่รับผิดชอบ |
 | :--- | :---: | :--- | :--- |
-| **`frontend/`** | `3000` | Next.js (App Router), Tailwind CSS, `@google/model-viewer` | หน้าเว็บ Gallery, Embed Playground, หน้า `/embed/[id]` สำหรับ Iframe และสคริปต์ `public/embed.js` (`<vm-model>`) |
-| **`services/core-api/`** | `4000` | Express 5, TypeScript, JWT, bcrypt, Stripe | จัดการระบบสมาชิก (`auth`), ข้อมูลแคตตาล็อกและการค้นหา (`models`), ระบบซื้อขายและสร้างคีย์ (`payments`), รวมถึงการกดถูกใจและความคิดเห็น (`interactions`) |
+| **`frontend/`** | `3000` | Next.js (App Router), Tailwind CSS, `@google/model-viewer` | หน้าเว็บ Gallery, Embed Playground, หน้า `/embed/[id]` สำหรับ Iframe, สคริปต์ `public/embed.js` (`<vm-model>`), แดชบอร์ดคนขาย และแดชบอร์ดแอดมิน |
+| **`services/core-api/`** | `4000` | Express 5, TypeScript, JWT, bcrypt | จัดการระบบสมาชิก (`auth`), ข้อมูลแคตตาล็อกและการค้นหา (`models`), ระบบซื้อขายแบบจำลองและสร้างคีย์ (`payments`), ส่วนคนขาย (`seller`) และส่วนแอดมิน (`admin`) |
 | **`services/cdn-service/`** | `4001` | Express 5, TypeScript, Multer, Node Streams | รับอัปโหลดไฟล์ `.glb` (สูงสุด 50 MB), ตรวจ Magic Bytes (`glTF` v2), เก็บไฟล์ด้วย `sha256` ลง `LocalDiskStorage` และสตรีมไฟล์ผ่าน `/cdn/*` (รองรับ CORS, Cache, HTTP Range) |
 | **`supabase/`** | `5432` | Supabase PostgreSQL | ฐานข้อมูลกลางสำหรับเก็บตาราง `users`, `models` (`tags text[]`), `purchases`, `likes`, และ `comments` |
 
 ---
 
-## 2. เทคโนโลยีที่ใช้พัฒนา (Tech Stack)
+## 2. บทบาทผู้ใช้ (Roles)
+
+ลูกค้าและคนขายเป็น **บัญชีเดียวกัน** ส่วนแอดมินมีไว้ดูแลเว็บเท่านั้น
+
+| บทบาท | วิธีได้สิทธิ์ | เห็นและทำอะไรได้ |
+| :--- | :--- | :--- |
+| **ลูกค้า** | สมัครสมาชิก | ดู Gallery, ซื้อโมเดล, ดาวน์โหลด, ขอโค้ดฝัง, หน้า `/me` (โมเดลที่ซื้อ + `embed_key`) |
+| **คนขาย** (Creator) | กดเปิด "โหมดคนขาย" ในบัญชีเดิม | ทุกอย่างของลูกค้า + แดชบอร์ดคนขาย (`/seller`: โมเดลของฉัน ยอดขาย) + อัปโหลด/ลบโมเดลของตัวเอง |
+| **แอดมิน** | ตั้งในฐานข้อมูลเท่านั้น สมัครเองไม่ได้ | แดชบอร์ดแอดมิน (`/admin/*`): ภาพรวม, ซ่อน/คืนโมเดล, ระงับ/คืนบัญชี, ดูรายการซื้อขายทั้งระบบ ซื้อและขายเองไม่ได้ |
+
+หลักการ: การตรวจสิทธิ์ทำที่ **Backend เสมอ** (ไม่ใช่แค่ซ่อนปุ่มบนหน้าเว็บ) โมเดลที่ถูกซ่อนหรือเจ้าของถูกระงับต้องหยุดถูกส่งไฟล์ผ่าน CDN ทันที
+
+---
+
+## 3. เทคโนโลยีที่ใช้พัฒนา (Tech Stack)
 
 - **Frontend & 3D WebGL (`frontend/`)**
   - **Framework & Styling**: Next.js 15 (App Router), React 19, TypeScript 5, Tailwind CSS 3, Lucide React
@@ -25,7 +39,7 @@
 - **Backend — Core API (`services/core-api/`)**
   - **Runtime & Framework**: Node.js 22, Express 5, TypeScript 5 (`tsx`)
   - **Auth, Validation & Security**: JSON Web Token (`jsonwebtoken`), `bcrypt`, `zod`, `express-rate-limit`, `cors`
-  - **Payments**: Stripe SDK (`stripe`) และระบบ Mock Checkout
+  - **Payments**: เวอร์ชันแรกใช้ **Mock Checkout (จ่ายเงินจำลอง)** ผ่านตัวแปร `PAYMENT_PROVIDER=mock` ส่วน Stripe SDK (`stripe`) ติดตั้งไว้สำหรับเฟสถัดไป (ยังไม่เปิดใช้)
 - **Backend — Asset CDN & Storage (`services/cdn-service/`)**
   - **Upload & File Streaming**: `multer`, Node.js Streams (`fs` / `stream`), HTTP Range Requests, Cross-Origin Resource Sharing (CORS) & Cache-Control
   - **Storage & Asset Integrity**: Content-Addressable Storage (`sha256` ผ่าน `StorageAdapter` — รองรับทั้ง `LocalDiskStorage` และ Supabase Storage), GLB Magic Bytes Validator, Constant-Time Key Check (`crypto.timingSafeEqual`)
@@ -40,7 +54,9 @@
 
 ---
 
-## 3. โครงสร้างโฟลเดอร์โปรเจกต์ (Project Structure)
+## 4. โครงสร้างโฟลเดอร์โปรเจกต์ (Project Structure)
+
+รายการที่ติดป้าย **(ใหม่)** คือโฟลเดอร์หรือไฟล์ที่ยังไม่มีในโครง ต้องสร้างเพิ่ม
 
 ```text
 broken-design/
@@ -48,12 +64,14 @@ broken-design/
 │   ├── core-api/                         # [Microservice 1] Core Business Logic API (Port 4000)
 │   │   ├── src/
 │   │   │   ├── config/                   # ตั้งค่าการเชื่อมต่อ Supabase DB และ Environment Variables
-│   │   │   ├── middlewares/              # JWT Auth Middleware และ Standard Error Handler
+│   │   │   ├── middlewares/              # JWT Auth, ตรวจบทบาท (requireSeller / requireAdmin), Error Handler  [แฮม]
 │   │   │   ├── modules/
-│   │   │   │   ├── auth/                 # [Member 1] สมัครสมาชิก, ล็อกอิน (bcrypt + JWT)
-│   │   │   │   ├── models/               # [Member 3, 4] CRUD ข้อมูลโมเดล, Search, Filter, Pagination
-│   │   │   │   ├── payments/             # [Member 6] Checkout, Stripe/Mock Webhook, Regenerate embed_key
-│   │   │   │   └── interactions/         # [Member 6] ระบบกดถูกใจ (Likes) และความคิดเห็น (Comments)
+│   │   │   │   ├── auth/                 # สมัครสมาชิก, ล็อกอิน (bcrypt + JWT), เปิดโหมดคนขาย  [ต้า]
+│   │   │   │   ├── models/               # ดึงรายการ, ค้นหา, กรอง, แบ่งหน้า, รายละเอียดโมเดล  [เป้ก]
+│   │   │   │   ├── payments/             # Checkout จำลอง, สร้าง/Regenerate embed_key, รายการที่ซื้อ  [ภีม]
+│   │   │   │   ├── seller/               # (ใหม่) ยอดขายและโมเดลของคนขาย  [ภีม]
+│   │   │   │   ├── admin/                # (ใหม่) ภาพรวม, ซ่อน/คืนโมเดล, ระงับ/คืนบัญชี, รายการซื้อขาย  [ต้า: ผู้ใช้ / เป้ก: โมเดลและรายการซื้อ]
+│   │   │   │   └── interactions/         # ถูกใจและความคิดเห็น (Likes/Comments) — เฟสถัดไป ยังไม่มีผู้รับผิดชอบ
 │   │   │   └── app.ts                    # Entry point ของ Core API (/api/*)
 │   │   ├── .env.example
 │   │   ├── Dockerfile
@@ -62,11 +80,11 @@ broken-design/
 │   └── cdn-service/                      # [Microservice 2] High-I/O Upload & 3D Streaming CDN (Port 4001)
 │       ├── src/
 │       │   ├── config/                   # ตั้งค่าขนาดไฟล์สูงสุดและโฟลเดอร์ Storage
-│       │   ├── storage/                  # [Member 2] StorageAdapter Interface & LocalDiskStorage (sha256)
-│       │   ├── utils/                    # [Member 2] ตัวตรวจ Magic Bytes ของไฟล์ .glb (glTF v2)
+│       │   ├── storage/                  # StorageAdapter Interface & LocalDiskStorage (sha256)  [แฮม]
+│       │   ├── utils/                    # ตัวตรวจ Magic Bytes ของไฟล์ .glb (glTF v2)  [แฮม]
 │       │   ├── modules/
-│       │   │   ├── upload/               # [Member 2] รับไฟล์ .glb, preview, poster และบันทึกลง Storage
-│       │   │   └── cdn/                  # [Member 5] สตรีมไฟล์ .glb/.webp, ตรวจ embed_key, HTTP Range
+│       │   │   ├── upload/               # รับไฟล์ .glb, preview, poster และบันทึกลง Storage  [แฮม]
+│       │   │   └── cdn/                  # สตรีมไฟล์ .glb/.webp, ตรวจ embed_key, HTTP Range, หยุดส่งโมเดลที่ถูกซ่อน  [นนท์]
 │       │   └── app.ts                    # Entry point ของ CDN Service (/api/models upload & /cdn/*)
 │       ├── storage_data/                 # โฟลเดอร์เก็บไฟล์จริงตามค่า Hash (อยู่ใน .gitignore)
 │       ├── tmp_uploads/                  # โฟลเดอร์พักไฟล์ขณะคำนวณ sha256 (อยู่ใน .gitignore)
@@ -74,21 +92,28 @@ broken-design/
 │       ├── Dockerfile
 │       └── package.json
 │
-├── frontend/                             # Next.js Frontend & WebGL Viewer (Port 3000)
+├── frontend/                             # Next.js Frontend & WebGL Viewer (Port 3000) — ทั้งหมดเป็นของ เจี๊ยบ (ยกเว้นหน้าที่ระบุ)
 │   ├── public/
-│   │   └── embed.js                      # [Member 5] Web Component <vm-model>
+│   │   └── embed.js                      # Web Component <vm-model>
 │   ├── src/
 │   │   ├── app/
-│   │   │   ├── page.tsx                  # [Member 4] หน้าแรก Gallery ค้นหาและกรองโมเดล
-│   │   │   ├── login/page.tsx            # [Member 1] หน้าเข้าสู่ระบบและสมัครสมาชิก
-│   │   │   ├── upload/page.tsx           # [Member 2] หน้าอัปโหลด .glb + สร้างภาพ Poster ด้วย .toBlob()
-│   │   │   ├── me/page.tsx               # [Member 3, 6] แดชบอร์ด Creator, ประวัติการซื้อ, ปุ่ม Regenerate Key
-│   │   │   ├── models/[id]/page.tsx      # [Member 5, 6] หน้ารายละเอียด + Embed Playground + ปุ่มซื้อ
-│   │   │   └── embed/[id]/page.tsx       # [Member 5] หน้า Viewer สำหรับ Iframe (CSP frame-ancestors *)
+│   │   │   ├── page.tsx                  # หน้าแรก Gallery ค้นหาและกรองโมเดล
+│   │   │   ├── login/page.tsx            # หน้าเข้าสู่ระบบและสมัครสมาชิก
+│   │   │   ├── upload/page.tsx           # หน้าอัปโหลด .glb + สร้างภาพ Poster ด้วย .toBlob() (เฉพาะคนขาย)
+│   │   │   ├── me/page.tsx               # รายการที่ซื้อ, embed_key, ปุ่ม Regenerate Key
+│   │   │   ├── models/[id]/page.tsx      # หน้ารายละเอียด + Embed Playground + ปุ่มซื้อ/ดาวน์โหลด
+│   │   │   ├── embed/[id]/page.tsx       # หน้า Viewer สำหรับ Iframe (CSP frame-ancestors *)
+│   │   │   ├── pay/mock/[id]/page.tsx    # (ใหม่) หน้าจ่ายเงินจำลอง  [ภีม]
+│   │   │   ├── seller/page.tsx           # (ใหม่) แดชบอร์ดคนขาย + ปุ่มเปิดโหมดคนขาย  [ภีม]
+│   │   │   └── admin/                    # (ใหม่) แดชบอร์ดแอดมิน
+│   │   │       ├── page.tsx              #   ภาพรวมตัวเลขสรุป
+│   │   │       ├── models/page.tsx       #   ตารางโมเดล + ปุ่มซ่อน/คืน
+│   │   │       ├── users/page.tsx        #   ตารางผู้ใช้ + ปุ่มระงับ/คืนบัญชี
+│   │   │       └── orders/page.tsx       #   รายการซื้อขายทั้งระบบ
 │   │   ├── components/
-│   │   │   ├── gallery/                  # [Member 4] การ์ดโมเดลพร้อม IntersectionObserver Lazy-load
-│   │   │   ├── viewer/                   # [Member 5] 3D Canvas Viewer
-│   │   │   └── playground/               # [Member 5] แผงปรับแต่งโมเดลและสร้างโค้ด HTML/React/Vue/WP
+│   │   │   ├── gallery/                  # การ์ดโมเดลพร้อม IntersectionObserver Lazy-load
+│   │   │   ├── viewer/                   # 3D Canvas Viewer
+│   │   │   └── playground/               # แผงปรับแต่งโมเดลและสร้างโค้ด HTML/React/Vue/WP
 │   │   └── lib/
 │   │       └── api.ts                    # ตัวแปรเชื่อมต่อไปยัง CORE_API_URL และ CDN_SERVICE_URL
 │   ├── next.config.ts
@@ -105,29 +130,32 @@ broken-design/
 
 ---
 
-## 4. การแบ่งงานภายในทีม 6 คน (Team Vertical Slicing)
+## 5. การแบ่งงานภายในทีม 6 คน
 
-แต่ละคนรับผิดชอบฟีเจอร์แบบครบวงจรตั้งแต่ฐานข้อมูล เซอร์วิสที่เกี่ยวข้อง ไปจนถึงหน้าบ้านโดยไม่ทับซ้อนไฟล์กัน:
+| สมาชิก | งานที่รับผิดชอบ | พื้นที่ในโปรเจกต์ |
+| :--- | :--- | :--- |
+| **เจี๊ยบ** (คู่ภีม) | หน้าเว็บทั้งหมด: Web Component `<vm-model>` และหน้าฝัง Iframe, หน้าแรก Gallery, หน้ารายละเอียด + Embed Playground, หน้าอัปโหลด + สร้าง Poster, หน้าล็อกอิน/สมัคร, หน้า `/me`, **แดชบอร์ดแอดมินทั้ง 4 หน้า** | `frontend/` (ยกเว้น `pay/mock/` และ `seller/`) | หลังบ้านแอดมิน |
+| **ภีม** (คู่เจี๊ยบ) | ระบบซื้อจำลอง (checkout, ยืนยันจ่าย, สร้าง/Regenerate `embed_key`, รายการที่ซื้อ), หน้าจ่ายเงินจำลอง, แดชบอร์ดคนขาย (โมเดลของฉัน ยอดขาย ปุ่มเปิดโหมดคนขาย) | `core-api/src/modules/payments/`, `seller/`<br>`frontend/src/app/pay/`, `seller/` |
+| **นนท์** (คู่เป้ก) | ระบบ CDN: ส่งไฟล์โมเดล/ภาพปก, ตรวจ `embed_key`, ดาวน์โหลดเฉพาะผู้มีสิทธิ์, HTTP Range, Cache, Rate limit, หยุดส่งโมเดลที่ถูกซ่อนหรือเจ้าของถูกระงับ | `cdn-service/src/modules/cdn/` |
+| **แฮม** (คู่ต้า) | **ส่งภายในวันแรก:** ปรับ `schema.sql` (บทบาท, `is_seller`, `suspended_at`, `hidden_at`) และ middleware ตรวจผู้ใช้/บทบาท/รูปแบบ error จากนั้น: StorageAdapter, ตรวจไฟล์ GLB, รับอัปโหลด (เฉพาะคนขาย), ลบโมเดล (เจ้าของเท่านั้น, soft delete) | `supabase/`<br>`core-api/src/middlewares/`<br>`cdn-service/src/storage/`, `utils/`, `modules/upload/` |
+| **ต้า** (คู่แฮม) | สมัครสมาชิก/ล็อกอิน (bcrypt + JWT, บัญชีที่ถูกระงับล็อกอินไม่ได้), เปิดโหมดคนขาย, ฝั่ง Backend ของหน้าผู้ใช้ในแดชบอร์ดแอดมิน (ดึงรายชื่อ ระงับ/คืนบัญชี) | `core-api/src/modules/auth/`<br>`core-api/src/modules/admin/` (ส่วนผู้ใช้) |
+| **เป้ก** (คู่นนท์) | ดึงรายการ/ค้นหา/กรอง/แบ่งหน้า/รายละเอียดโมเดล (ไม่แสดงโมเดลที่ซ่อนหรือลบ และไม่ส่งลิงก์ไฟล์เต็มของโมเดลเสียเงิน) | `core-api/src/modules/models/`<br>`core-api/src/modules/admin/` (ส่วนโมเดลและรายการซื้อ) |
 
-| สมาชิก | ฟีเจอร์ที่รับผิดชอบ | โฟลเดอร์ Backend ที่รับผิดชอบ | โฟลเดอร์ Frontend ที่รับผิดชอบ |
-| :---: | :--- | :--- | :--- |
-| **Member 1** | ระบบผู้ใช้และยืนยันตัวตน (Auth & JWT) | `services/core-api/src/modules/auth/` | `frontend/src/app/login/` |
-| **Member 2** | ระบบอัปโหลด ตรวจไฟล์ GLB และ Storage | `services/cdn-service/src/storage/`<br>`services/cdn-service/src/modules/upload/` | `frontend/src/app/upload/` |
-| **Member 3** | ระบบจัดการข้อมูลโมเดลและแดชบอร์ด Creator | `services/core-api/src/modules/models/` (CRUD) | `frontend/src/app/me/` (ส่วนผลงานของฉัน) |
-| **Member 4** | ระบบค้นหา กรองแท็ก และหน้าแกลเลอรี | `services/core-api/src/modules/models/` (Search API) | `frontend/src/app/page.tsx`<br>`frontend/src/components/gallery/` |
-| **Member 5** | ระบบ 3D CDN Streaming, Embed & Playground | `services/cdn-service/src/modules/cdn/` | `frontend/public/embed.js`<br>`frontend/src/app/embed/[id]/`<br>`frontend/src/components/playground/` |
-| **Member 6** | ระบบชำระเงิน, `embed_key`, Likes, Comments และสถิติการใช้งาน | `services/core-api/src/modules/payments/`<br>`services/core-api/src/modules/interactions/` | `frontend/src/app/models/[id]/` (ส่วนซื้อขาย/โซเชียล)<br>`frontend/src/app/me/` (ส่วนรายการที่ซื้อ) |
+**ข้อควรระวัง**
+- ระบบจ่ายเงินจำลองต้องเปิดได้เฉพาะเมื่อตั้ง `PAYMENT_PROVIDER=mock` และห้ามเปิดใน production
+- การตรวจสิทธิ์คนขาย/แอดมินต้องทำที่ Backend เสมอ
+- ถ้าเวลาไม่พอ ตัดตามลำดับ: หน้า `/me` → snippet หลายภาษาใน Playground → หน้าภาพรวมแอดมิน (เหลือตารางล้วน)
 
 ---
 
-## 5. วิธีเริ่มต้นใช้งานโปรเจกต์ (Getting Started)
+## 6. วิธีเริ่มต้นใช้งานโปรเจกต์ (Getting Started)
 
 1. **Clone Dependencies**:
    Clone โปรเจกต์จาก GitHub ลงเครื่อง (`git clone <repository-url>` แล้ว `cd broken-design`) หากต้องการรันแบบ Local (ไม่ใช้ Docker) ให้รัน `npm install` ในแต่ละโฟลเดอร์ (`services/core-api`, `services/cdn-service`, และ `frontend`)
 2. **ตั้งค่าฐานข้อมูล Supabase**:
    นำโค้ดใน `supabase/schema.sql` ไปรันใน SQL Editor ของ Supabase
 3. **คัดลอกไฟล์ `.env`**:
-   คัดลอกไฟล์ `.env.example` เป็น `.env` ในทั้ง 3 โฟลเดอร์ (`services/core-api`, `services/cdn-service`, และ `frontend`) แล้วใส่ค่า `DATABASE_URL` ของ Supabase
+   คัดลอกไฟล์ `.env.example` เป็น `.env` ในทั้ง 3 โฟลเดอร์ (`services/core-api`, `services/cdn-service`, และ `frontend`) แล้วใส่ค่า `DATABASE_URL` ของ Supabase (ห้าม commit ไฟล์ `.env`)
 4. **รันระบบทั้งหมด**:
    สามารถรันผ่าน Docker Compose ได้ทันที:
    ```bash

@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Environment variables (NEVER COMMIT SECRETS)
+.env
+.env.*
+!.env.example
+services/core-api/.env
+services/cdn-service/.env
+frontend/.env
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+
+# Local Disk Storage & Temp Uploads (Managed by cdn-service)
+services/cdn-service/storage_data/*
+!services/cdn-service/storage_data/.gitkeep
+services/cdn-service/tmp_uploads/*
+!services/cdn-service/tmp_uploads/.gitkeep
+
+# Logs & OS
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+

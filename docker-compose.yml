@@ -1,0 +1,40 @@
+version: '3.9'
+
+services:
+  core-api:
+    build: ./services/core-api
+    container_name: broken-design-core-api
+    ports:
+      - "4000:4000"
+    env_file:
+      - ./services/core-api/.env.example
+    restart: unless-stopped
+
+  cdn-service:
+    build: ./services/cdn-service
+    container_name: broken-design-cdn-service
+    ports:
+      - "4001:4001"
+    env_file:
+      - ./services/cdn-service/.env.example
+    volumes:
+      - broken_design_storage:/app/storage_data
+      - broken_design_tmp:/app/tmp_uploads
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: broken-design-frontend
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./frontend/.env.example
+    depends_on:
+      - core-api
+      - cdn-service
+    restart: unless-stopped
+
+volumes:
+  broken_design_storage:
+  broken_design_tmp:
+

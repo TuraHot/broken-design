@@ -1,6 +1,6 @@
 'use client';
 
-// Top navigation — logo, Gallery / Docs, search box (UI only, searches nothing yet), Log in / Sign up
+// Top navigation — logo, Gallery / Docs, search box (UI only, searches nothing yet), Log in
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { FormEvent, useState } from 'react';
@@ -74,14 +74,11 @@ export default function Navbar() {
           >
             {mobileSearch ? <X className="h-5 w-5" /> : <Search className="h-5 w-5" />}
           </button>
-          <Link href="/login" className="hidden whitespace-nowrap text-white/65 transition-colors hover:text-white sm:inline">
-            Log in
-          </Link>
           <Link
-            href="/login?mode=signup"
+            href="/login"
             className="whitespace-nowrap rounded-lg bg-white px-3 py-1.5 sm:px-3.5 font-medium text-black transition-colors hover:bg-white/85"
           >
-            Sign up
+            Log in
           </Link>
         </div>
       </nav>

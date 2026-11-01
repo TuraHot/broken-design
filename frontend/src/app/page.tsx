@@ -70,7 +70,7 @@ export default async function HomePage() {
               </p>
               <div className="mt-5 flex flex-wrap items-center gap-3">
                 <Link
-                  href="/login?mode=signup"
+                  href="/login"
                   className="inline-flex items-center gap-2 rounded-lg bg-white px-3.5 py-1.5 text-[15px] font-medium text-black transition-colors hover:bg-white/85"
                 >
                   Get started
@@ -133,7 +133,7 @@ export default async function HomePage() {
               </p>
             </div>
             <Link
-              href="/login?mode=signup"
+              href="/login"
               className="inline-flex shrink-0 items-center gap-2 self-start rounded-lg bg-white px-3.5 py-1.5 text-[15px] font-medium text-black transition-colors hover:bg-white/85 md:self-auto"
             >
               Get started

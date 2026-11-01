@@ -16,8 +16,7 @@ const GROUPS = [
   {
     title: 'Account',
     links: [
-      { href: '/login', label: 'Log in' },
-      { href: '/login?mode=signup', label: 'Sign up' },
+      { href: '/login', label: 'Log in or sign up' },
     ],
   },
 ];

@@ -1,6 +1,7 @@
 // Root Layout — Broken Design
 import type { Metadata } from 'next';
 import { Chakra_Petch, Michroma, Share_Tech_Mono } from 'next/font/google';
+import Footer from '@/components/Footer';
 import Navbar from '@/components/Navbar';
 import './globals.css';
 
@@ -18,6 +19,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={`${chakra.className} ${michroma.variable} ${shareTechMono.variable}`}>
         <Navbar />
         {children}
+        <Footer />
       </body>
     </html>
   );

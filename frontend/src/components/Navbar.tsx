@@ -1,10 +1,11 @@
 'use client';
 
-// Top navigation — logo, Gallery / Docs, search (→ /gallery?q=), Log in / Sign up
+// Top navigation — logo, Gallery / Docs, search box (UI only, searches nothing yet), Log in / Sign up
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { FormEvent, useState } from 'react';
 import { Search, X } from 'lucide-react';
+import { isAuthPath } from '@/lib/auth-paths';
 
 const LINKS = [
   { href: '/gallery', label: 'Gallery' },
@@ -13,16 +14,15 @@ const LINKS = [
 
 export default function Navbar() {
   const pathname = usePathname();
-  const router = useRouter();
   const [query, setQuery] = useState('');
   const [mobileSearch, setMobileSearch] = useState(false);
 
+  // Search is visual only for now: submitting does nothing.
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    const q = query.trim();
-    router.push(q ? `/gallery?q=${encodeURIComponent(q)}` : '/gallery');
-    setMobileSearch(false);
   };
+
+  if (isAuthPath(pathname)) return null;
 
   const searchField = (
     <form onSubmit={submit} role="search" className="relative w-full">
@@ -40,12 +40,12 @@ export default function Navbar() {
 
   return (
     <header className="fixed inset-x-0 top-0 z-50 border-b border-white/10 bg-black/90 backdrop-blur">
-      <nav aria-label="Main" className="mx-auto flex h-16 max-w-[1400px] items-center gap-5 px-4 md:px-6">
-        <Link href="/" className="font-semibold tracking-wide text-white">
+      <nav aria-label="Main" className="mx-auto flex h-16 max-w-[1400px] items-center gap-2 px-4 sm:gap-5 md:px-6">
+        <Link href="/" className="whitespace-nowrap font-semibold tracking-wide text-white">
           Broken Design
         </Link>
 
-        <ul className="flex items-center gap-5 text-[15px]">
+        <ul className="flex items-center gap-3 text-[15px] sm:gap-5">
           {LINKS.map(({ href, label }) => {
             const active = pathname === href || pathname.startsWith(`${href}/`);
             return (
@@ -70,16 +70,16 @@ export default function Navbar() {
             onClick={() => setMobileSearch((v) => !v)}
             aria-label={mobileSearch ? 'Close search' : 'Open search'}
             aria-expanded={mobileSearch}
-            className="grid h-9 w-9 place-items-center rounded-lg text-white/80 hover:text-white md:hidden"
+            className="grid h-9 w-8 place-items-center rounded-lg text-white/80 hover:text-white md:hidden"
           >
             {mobileSearch ? <X className="h-5 w-5" /> : <Search className="h-5 w-5" />}
           </button>
-          <Link href="/login" className="text-white/65 transition-colors hover:text-white">
+          <Link href="/login" className="hidden whitespace-nowrap text-white/65 transition-colors hover:text-white sm:inline">
             Log in
           </Link>
           <Link
             href="/login?mode=signup"
-            className="rounded-lg bg-white px-3.5 py-1.5 font-medium text-black transition-colors hover:bg-white/85"
+            className="whitespace-nowrap rounded-lg bg-white px-3 py-1.5 sm:px-3.5 font-medium text-black transition-colors hover:bg-white/85"
           >
             Sign up
           </Link>

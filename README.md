@@ -1,12 +1,14 @@
-# Broken Design — 3D Asset Repository & WebGL CDN Platform
+# Lixyte — 3D Asset Repository & WebGL CDN Platform
 
-**Broken Design** คือแพลตฟอร์ม **"Google Fonts สำหรับโลก 3 มิติ"** ศูนย์กลางในการจัดเก็บ ค้นหา และสตรีมไฟล์โมเดล 3 มิติมาตรฐาน `.glb` (Binary glTF) สำหรับนักพัฒนาเว็บและครีเอเตอร์ รองรับการฝังโมเดลลงบนเว็บไซต์ภายนอก (Embed) ผ่าน `<iframe>` และ Web Component `<vm-model>` แบบข้ามโดเมน (Cross-Origin CDN) โดยไม่ต้องดาวน์โหลดหรือโฮสต์ไฟล์เอง
+**Lixyte** คือแพลตฟอร์ม **"คลังโมเดล 3 มิติที่ฝังลงเว็บไซต์ได้ด้วยโค้ดบรรทัดเดียว"** (แนวคิดคล้าย Google Fonts แต่เป็นโมเดล 3 มิติ) เป็นศูนย์กลางในการจัดเก็บ ค้นหา และสตรีมไฟล์โมเดล 3 มิติมาตรฐาน `.glb` (Binary glTF) สำหรับนักพัฒนาเว็บและครีเอเตอร์ รองรับการฝังโมเดลลงบนเว็บไซต์ภายนอก (Embed) ผ่าน `<iframe>` และ Web Component `<vm-model>` แบบข้ามโดเมน (Cross-Origin CDN) โดยไม่ต้องดาวน์โหลดหรือโฮสต์ไฟล์เอง
+
+[`docs/PRD.md`](docs/PRD.md) (ขอบเขตและฟีเจอร์) · [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) (สถาปัตยกรรมและปัญหาที่ทราบ) · [`docs/DESIGN_SYSTEM.md`](docs/DESIGN_SYSTEM.md) (กฎการออกแบบหน้าเว็บ)
 
 ---
 
 ## 1. สถาปัตยกรรมระบบแบบ Microservices (System Architecture)
 
-โปรเจกต์ **Broken Design** แยกส่วน Backend ออกเป็น **2 Microservices** ตามลักษณะการใช้ทรัพยากร เพื่อป้องกันไม่ให้การอัปโหลดและสตรีมไฟล์ 3 มิติขนาดใหญ่กระทบต่อความเร็วของระบบ API หลัก:
+โปรเจกต์ **Lixyte** แยกส่วน Backend ออกเป็น **2 Microservices** ตามลักษณะการใช้ทรัพยากร เพื่อป้องกันไม่ให้การอัปโหลดและสตรีมไฟล์ 3 มิติขนาดใหญ่กระทบต่อความเร็วของระบบ API หลัก:
 
 | เซอร์วิส / โฟลเดอร์ | พอร์ต | เทคโนโลยีหลัก | หน้าที่รับผิดชอบ |
 | :--- | :---: | :--- | :--- |
@@ -79,7 +81,7 @@ broken-design/
 │   │
 │   └── cdn-service/                      # [Microservice 2] High-I/O Upload & 3D Streaming CDN (Port 4001)
 │       ├── src/
-│       │   ├── config/                   # ตั้งค่าขนาดไฟล์สูงสุดและโฟลเดอร์ Storage
+│       │   ├── config/                   # ตั้งค่าขนาดไฟล์สูงสุด, โฟลเดอร์ Storage และ Supabase Storage client (supabase.ts)
 │       │   ├── storage/                  # StorageAdapter Interface & LocalDiskStorage (sha256)  [แฮม]
 │       │   ├── utils/                    # ตัวตรวจ Magic Bytes ของไฟล์ .glb (glTF v2)  [แฮม]
 │       │   ├── modules/
@@ -97,11 +99,15 @@ broken-design/
 │   │   └── embed.js                      # Web Component <vm-model>
 │   ├── src/
 │   │   ├── app/
-│   │   │   ├── page.tsx                  # หน้าแรก Gallery ค้นหาและกรองโมเดล
-│   │   │   ├── login/page.tsx            # หน้าเข้าสู่ระบบและสมัครสมาชิก
-│   │   │   ├── upload/page.tsx           # หน้าอัปโหลด .glb + สร้างภาพ Poster ด้วย .toBlob() (เฉพาะคนขาย)
-│   │   │   ├── me/page.tsx               # รายการที่ซื้อ, embed_key, ปุ่ม Regenerate Key
-│   │   │   ├── models/[id]/page.tsx      # หน้ารายละเอียด + Embed Playground + ปุ่มซื้อ/ดาวน์โหลด
+│   │   │   ├── page.tsx                  # หน้าแรก (Landing: ดอกลิลลี่ 3 มิติ, โมเดลยอดนิยม, หมวดหมู่, มาใหม่)
+│   │   │   ├── gallery/                  # Gallery แบ่งหน้า (48 รายการ/หน้า) — ค้นหา/กรองเป็นแค่ UI ยังไม่ทำงาน
+│   │   │   ├── creator/page.tsx          # หน้า Creator Landing (แนะนำสิ่งที่ครีเอเตอร์ทำได้) พร้อมผีเสื้อ 3 มิติ
+│   │   │   ├── creators/[handle]/page.tsx # โปรไฟล์ Creator (อ่านอย่างเดียว) + กล่อง Donate (ยังไม่เชื่อมจ่ายเงิน)
+│   │   │   ├── login/page.tsx            # หน้าเข้าสู่ระบบและสมัครสมาชิก (กรอกอีเมลก่อน → รหัสผ่าน/สมัคร → OTP) ยังเป็น UI
+│   │   │   ├── forgot-password/page.tsx  # หน้ารีเซ็ตรหัสผ่าน (UI)
+│   │   │   ├── upload/page.tsx           # หน้าอัปโหลด .glb + สร้างภาพ Poster ด้วย .toBlob() (เฉพาะคนขาย) — ยังเป็น scaffold
+│   │   │   ├── me/page.tsx               # รายการที่ซื้อ, embed_key, ปุ่ม Regenerate Key — ยังเป็น scaffold
+│   │   │   ├── models/[id]/page.tsx      # หน้ารายละเอียดโมเดล: คำอธิบาย, เจ้าของ, กฎ License, วิธีฝัง (ปุ่มซื้อ/ดาวน์โหลดยังไม่เชื่อมระบบ; Embed Playground ยังไม่ทำ)
 │   │   │   ├── embed/[id]/page.tsx       # หน้า Viewer สำหรับ Iframe (CSP frame-ancestors *)
 │   │   │   ├── pay/mock/[id]/page.tsx    # (ใหม่) หน้าจ่ายเงินจำลอง  [ภีม]
 │   │   │   ├── seller/page.tsx           # (ใหม่) แดชบอร์ดคนขาย + ปุ่มเปิดโหมดคนขาย  [ภีม]
@@ -111,11 +117,17 @@ broken-design/
 │   │   │       ├── users/page.tsx        #   ตารางผู้ใช้ + ปุ่มระงับ/คืนบัญชี
 │   │   │       └── orders/page.tsx       #   รายการซื้อขายทั้งระบบ
 │   │   ├── components/
-│   │   │   ├── gallery/                  # การ์ดโมเดลพร้อม IntersectionObserver Lazy-load
-│   │   │   ├── viewer/                   # 3D Canvas Viewer
-│   │   │   └── playground/               # แผงปรับแต่งโมเดลและสร้างโค้ด HTML/React/Vue/WP
+│   │   │   ├── Navbar.tsx, Footer.tsx    # แถบเมนูและท้ายหน้า (ซ่อนในหน้า login)
+│   │   │   ├── gallery/                  # การ์ดโมเดล (lazy-load), แถบกรอง, การแบ่งหน้า
+│   │   │   ├── landing/                  # ส่วนของหน้าแรก (Popular, Categories, หัวข้อส่วน)
+│   │   │   ├── model/                    # หน้ารายละเอียดโมเดล: โค้ดฝัง, กฎ License, ปุ่มซื้อ
+│   │   │   ├── profile/                  # โปรไฟล์ Creator: ส่วนหัว, กล่อง Donate
+│   │   │   ├── auth/                     # ฟอร์ม login / สมัคร / รีเซ็ตรหัสผ่าน
+│   │   │   ├── viewer/                   # ฉาก 3D (Three.js): ลิลลี่ในหน้าแรก, ผีเสื้อในหน้า Creator
+│   │   │   └── playground/               # แผงปรับแต่งโมเดลและสร้างโค้ด HTML/React/Vue/WP — ยังไม่ทำ
 │   │   └── lib/
-│   │       └── api.ts                    # ตัวแปรเชื่อมต่อไปยัง CORE_API_URL และ CDN_SERVICE_URL
+│   │       ├── api.ts                    # ตัวแปรเชื่อมต่อไปยัง CORE_API_URL และ CDN_SERVICE_URL + ฟังก์ชันดึงข้อมูล (ใช้ข้อมูล mock เป็นค่าเริ่มต้น)
+│   │       └── …                         # mock-models, pagination (มีเทสต์), creators, licenses, format, auth (mock)
 │   ├── next.config.ts
 │   ├── .env.example
 │   ├── Dockerfile
@@ -134,7 +146,7 @@ broken-design/
 
 | สมาชิก | งานที่รับผิดชอบ | พื้นที่ในโปรเจกต์ |
 | :--- | :--- | :--- |
-| **เจี๊ยบ** (คู่ภีม) | หน้าเว็บทั้งหมด: Web Component `<vm-model>` และหน้าฝัง Iframe, หน้าแรก Gallery, หน้ารายละเอียด + Embed Playground, หน้าอัปโหลด + สร้าง Poster, หน้าล็อกอิน/สมัคร, หน้า `/me`, **แดชบอร์ดแอดมินทั้ง 4 หน้า** | `frontend/` (ยกเว้น `pay/mock/` และ `seller/`) | หลังบ้านแอดมิน |
+| **เจี๊ยบ** (คู่ภีม) | หน้าเว็บทั้งหมด: Web Component `<vm-model>` และหน้าฝัง Iframe, หน้าแรก (Landing) และ Gallery, หน้า Creator Landing และโปรไฟล์ Creator, หน้ารายละเอียด + Embed Playground, หน้าอัปโหลด + สร้าง Poster, หน้าล็อกอิน/สมัคร, หน้า `/me`, **แดชบอร์ดแอดมินทั้ง 4 หน้า** | `frontend/` (ยกเว้น `pay/mock/` และ `seller/`) |
 | **ภีม** (คู่เจี๊ยบ) | ระบบซื้อจำลอง (checkout, ยืนยันจ่าย, สร้าง/Regenerate `embed_key`, รายการที่ซื้อ), หน้าจ่ายเงินจำลอง, แดชบอร์ดคนขาย (โมเดลของฉัน ยอดขาย ปุ่มเปิดโหมดคนขาย) | `core-api/src/modules/payments/`, `seller/`<br>`frontend/src/app/pay/`, `seller/` |
 | **นนท์** (คู่เป้ก) | ระบบ CDN: ส่งไฟล์โมเดล/ภาพปก, ตรวจ `embed_key`, ดาวน์โหลดเฉพาะผู้มีสิทธิ์, HTTP Range, Cache, Rate limit, หยุดส่งโมเดลที่ถูกซ่อนหรือเจ้าของถูกระงับ | `cdn-service/src/modules/cdn/` |
 | **แฮม** (คู่ต้า) | **ส่งภายในวันแรก:** ปรับ `schema.sql` (บทบาท, `is_seller`, `suspended_at`, `hidden_at`) และ middleware ตรวจผู้ใช้/บทบาท/รูปแบบ error จากนั้น: StorageAdapter, ตรวจไฟล์ GLB, รับอัปโหลด (เฉพาะคนขาย), ลบโมเดล (เจ้าของเท่านั้น, soft delete) | `supabase/`<br>`core-api/src/middlewares/`<br>`cdn-service/src/storage/`, `utils/`, `modules/upload/` |
@@ -155,10 +167,12 @@ broken-design/
 2. **ตั้งค่าฐานข้อมูล Supabase**:
    นำโค้ดใน `supabase/schema.sql` ไปรันใน SQL Editor ของ Supabase
 3. **คัดลอกไฟล์ `.env`**:
-   คัดลอกไฟล์ `.env.example` เป็น `.env` ในทั้ง 3 โฟลเดอร์ (`services/core-api`, `services/cdn-service`, และ `frontend`) แล้วใส่ค่า `DATABASE_URL` ของ Supabase (ห้าม commit ไฟล์ `.env`)
+   คัดลอกไฟล์ `.env.example` เป็น `.env` ในทั้ง 3 โฟลเดอร์ (`services/core-api`, `services/cdn-service`, และ `frontend`) แล้วใส่ค่า `DATABASE_URL` ของ Supabase (ห้าม commit ไฟล์ `.env`) ถ้าเก็บไฟล์บน Supabase Storage ให้ตั้ง `STORAGE_PROVIDER=supabase` พร้อม `SUPABASE_URL`, `SUPABASE_KEY`, `SUPABASE_STORAGE_BUCKET` ใน `cdn-service`
 4. **รันระบบทั้งหมด**:
    สามารถรันผ่าน Docker Compose ได้ทันที:
    ```bash
    docker compose up --build
    ```
    หรือรันแยกแต่ละเซอร์วิสในโหมดพัฒนา (`npm run dev`) บนพอร์ต `3000`, `4000` และ `4001`
+
+   **รันเฉพาะหน้าเว็บ (ไม่ต้องมี Backend/ฐานข้อมูล):** `cd frontend && npm install && npm run dev` แล้วเปิด http://localhost:3000 — หน้า Gallery, หน้าโมเดล และโปรไฟล์ Creator ใช้ข้อมูล mock เป็นค่าเริ่มต้น (ตั้ง `NEXT_PUBLIC_USE_MOCK=false` เพื่อเรียก core-api จริง) ตรวจชนิดข้อมูลด้วย `npx tsc --noEmit` และรันเทสต์ด้วย `npm test`

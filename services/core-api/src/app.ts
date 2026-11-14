@@ -1,12 +1,14 @@
 import express from 'express';
 import cors from 'cors';
 import { env } from './config/env';
+import { testDbConnection } from './config/db';
 import { authRouter } from './modules/auth/auth.routes';
 import { modelsRouter } from './modules/models/models.routes';
 import { paymentsRouter } from './modules/payments/payments.routes';
 import { interactionsRouter } from './modules/interactions/interactions.routes';
 import { sellerRouter } from './modules/seller/seller.routes';
 import { errorHandler } from './middlewares/error.middleware';
+
 
 export const app = express();
 

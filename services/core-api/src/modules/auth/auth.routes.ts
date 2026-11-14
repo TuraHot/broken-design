@@ -30,6 +30,37 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
+// ตรวจสอบรูปแบบ Email ก่อนนำไปค้นหาในฐานข้อมูล
+const checkEmailSchema = z.object({
+  email: z.string().trim().email().max(255),
+});
+
+// POST /api/auth/check-email
+// ตรวจสอบว่า Email มีบัญชีอยู่ในระบบแล้วหรือไม่
+authRouter.post('/check-email', async (req, res) => {
+  const parsed = checkEmailSchema.safeParse(req.body);
+
+  // ตรวจสอบว่า Email ถูกต้องตามรูปแบบหรือไม่
+  if (!parsed.success) {
+    throw new AppError(400, 'INVALID_INPUT', 'Invalid email address');
+  }
+
+  const email = parsed.data.email.toLowerCase();
+
+  // ค้นหาว่ามี Email นี้อยู่ในตาราง users หรือไม่
+  const result = await db.query(
+    `SELECT EXISTS (
+       SELECT 1 FROM users WHERE email = $1
+     ) AS exists`,
+    [email],
+  );
+
+  // ส่งผลลัพธ์กลับไปให้ Frontend
+  res.json({
+    exists: result.rows[0].exists,
+  });
+});
+
 // POST /api/auth/register
 authRouter.post('/register', async (req, res) => {
   const parsed = registerSchema.safeParse(req.body);

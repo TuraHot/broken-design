@@ -6,25 +6,22 @@
 import Link from 'next/link';
 import { FormEvent, useState } from 'react';
 import { AlertCircle, Eye, EyeOff } from 'lucide-react';
-import { checkEmail } from '@/lib/auth';
+import { checkEmail, login, register } from '@/lib/auth';
 import { EMAIL_RE, FIELD, Field } from './Field';
+import { useRouter } from 'next/navigation';
 
-type Step = 'email' | 'login' | 'signup' | 'otp';
+
+type Step = 'email' | 'login' | 'signup';
 
 interface Values {
   email: string;
   name: string;
   password: string;
-  code: string;
 }
 type Errors = Partial<Record<keyof Values, string>>;
 
 function validate(step: Step, v: Values): Errors {
   const errors: Errors = {};
-  if (step === 'otp') {
-    if (!/^\d{6}$/.test(v.code)) errors.code = 'Enter the 6-digit code.';
-    return errors;
-  }
   if (step === 'email') {
     if (!v.email.trim()) errors.email = 'Enter your email.';
     else if (!EMAIL_RE.test(v.email.trim())) errors.email = 'Enter a valid email address.';
@@ -35,6 +32,7 @@ function validate(step: Step, v: Values): Errors {
   else if (step === 'signup' && v.password.length < 8) errors.password = 'Use at least 8 characters.';
   return errors;
 }
+
 
 // Brand mark, so it is inline SVG rather than a lucide icon.
 function GoogleMark() {
@@ -64,11 +62,6 @@ const COPY = {
     lead: 'No account for this email yet. Set one up to publish and embed 3D models.',
     submit: 'Create account',
   },
-  otp: {
-    title: 'Verify it’s you',
-    lead: 'Enter the 6-digit code we sent to your email.',
-    submit: 'Verify',
-  },
 } as const;
 
 const PRIMARY =
@@ -76,15 +69,15 @@ const PRIMARY =
 
 export default function AuthForm() {
   const [step, setStep] = useState<Step>('email');
-  const [values, setValues] = useState<Values>({ email: '', name: '', password: '', code: '' });
+  const [values, setValues] = useState<Values>({ email: '', name: '', password: ''});
   const [flow, setFlow] = useState<'login' | 'signup'>('login');
-  const [resent, setResent] = useState(false);
   const [errors, setErrors] = useState<Errors>({});
   const [showPassword, setShowPassword] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [checking, setChecking] = useState(false);
   const [googleTried, setGoogleTried] = useState(false);
   const [done, setDone] = useState(false);
+  const router = useRouter();
 
   const copy = COPY[step];
 
@@ -95,11 +88,11 @@ export default function AuthForm() {
   };
 
   // Digits only.
-  const updateCode = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const next = { ...values, code: e.target.value.replace(/\D/g, '') };
-    setValues(next);
-    if (submitted) setErrors(validate(step, next));
-  };
+  // const updateCode = (e: React.ChangeEvent<HTMLInputElement>) => {
+  //   const next = { ...values, code: e.target.value.replace(/\D/g, '') };
+  //   setValues(next);
+  //   if (submitted) setErrors(validate(step, next));
+  // }; 
 
   const goTo = (next: Step) => {
     setStep(next);
@@ -108,8 +101,7 @@ export default function AuthForm() {
     setDone(false);
     setGoogleTried(false);
     setShowPassword(false);
-    setResent(false);
-    if (next === 'email') setValues((v) => ({ ...v, password: '', code: '' }));
+    if (next === 'email') setValues((v) => ({ ...v, password: '' }));
   };
 
   const onSubmit = async (e: FormEvent) => {
@@ -129,10 +121,37 @@ export default function AuthForm() {
       return;
     }
     if (step === 'login' || step === 'signup') {
-      setFlow(step);
-      goTo('otp');
-      return;
-    }
+  try {
+    setChecking(true);
+
+    const result =
+      step === 'login'
+        ? await login(values.email, values.password)
+        : await register(values.email, values.password, values.name);
+
+    // เก็บ Token สำหรับใช้ยืนยันตัวตนใน Request ถัดไป
+    localStorage.setItem('accessToken', result.token);
+
+if (step === 'login') {
+  router.push('/gallery');
+  return;
+}
+
+setFlow(step);
+setDone(true);
+  } catch (error) {
+    setErrors({
+      password:
+        error instanceof Error
+          ? error.message
+          : 'Authentication failed. Please try again.',
+    });
+  } finally {
+    setChecking(false);
+  }
+
+  return;
+}
     setDone(true);
   };
 
@@ -175,10 +194,6 @@ export default function AuthForm() {
       ? flow === 'login'
         ? "Sign-in isn't connected yet. Your details were not sent anywhere."
         : "Registration isn't connected yet. Your details were not sent anywhere."
-      : step === 'otp'
-        ? resent
-          ? "Resend isn't connected yet. No code was sent."
-          : "Verification isn't connected yet. No code was sent; any 6 digits will do for now."
         : '';
 
   return (
@@ -288,21 +303,14 @@ export default function AuthForm() {
           )}
 
           <button type="submit" disabled={checking} className={PRIMARY}>
-            {checking ? 'Checking…' : copy.submit}
-          </button>
+  {checking
+    ? step === 'email'
+      ? 'Checking…'
+      : 'Please wait…'
+    : copy.submit}
+</button>
 
-          {step === 'otp' && (
-            <p className="-mt-1 text-center text-sm text-white/65">
-              Didn&apos;t get it?{' '}
-              <button
-                type="button"
-                onClick={() => setResent(true)}
-                className="text-white underline-offset-4 hover:underline"
-              >
-                Resend code
-              </button>
-            </p>
-          )}
+          
 
           <div role="status" aria-live="polite">
             {statusText && (

@@ -140,7 +140,7 @@ Agent ทุกตัว **ห้ามละเมิด** กฎต่อไ�
 - **`purchases`**: `id (UUID)`, `user_id (FK users)`, `model_id (FK models)`, `status ('pending'|'paid')`, `amount_cents (INT)`, `currency (VARCHAR(10))`, `license_type (VARCHAR(50))`, `watermark_hash (VARCHAR(128))`, `paid_at (TIMESTAMPTZ)`, `provider_session_id`, `embed_key (VARCHAR(64) UNIQUE)`, `created_at`, `UNIQUE(user_id, model_id)`
 - **`likes`** & **`comments`**: ตารางสำหรับระบบถูกใจและคอมเมนต์
 - **Multi-Layer GLB Watermarking (`services/cdn-service/src/utils/glbWatermark.ts`):**
-  - **Layer 1 (Metadata Signature):** ฝัง `{ platform: 'Broken Design', modelId, ownerId, license, purchaseId, signature, issuedAt }` (HMAC-SHA256 ด้วย `WATERMARK_SECRET`) ลงใน `asset.extras` และ `asset.copyright`
+  - **Layer 1 (Metadata Signature):** ฝัง `{ platform: 'Lixyte', modelId, ownerId, license, purchaseId, signature, issuedAt }` (HMAC-SHA256 ด้วย `WATERMARK_SECRET`) ลงใน `asset.extras` และ `asset.copyright`
   - **Layer 2 (Vertex Steganography):** ฝังบิต 64 บิตแรกของ `signature` ลงในทศนิยมหลักที่ 4 ของพิกัดแกน X (`Math.round(x * 10000)`) ของจุดยอด 64 จุดแรกใน `POSITION` accessor ของ Mesh แรก
   - **`POST /cdn/verify-watermark` (หรือ `/verify-watermark`):** รับไฟล์ `.glb` เพื่อตรวจสอบทั้ง `isValidMetadata` และ `isValidVertexWatermark` (`vertexBitMatchRatio`) แม้ `asset.extras` ถูกลบออกจากการ Export ใหม่
 
@@ -191,7 +191,7 @@ Agent ทุกตัว **ห้ามละเมิด** กฎต่อไ�
    - `models.routes.ts` (`GET /api/models` ค้นหา/กรอง/แบ่งหน้า, `GET /api/models/:id` ซ่อนลิงก์ไฟล์เต็มของโมเดลเสียเงิน, และ `DELETE /api/models/:id` Soft Delete)
    - `payments.routes.ts` + `payments.test.ts` และ `seller.routes.ts` + `seller.test.ts` (ผ่าน **19/19 tests**)
 5. **Frontend Viewer, Gallery, Auth & Cross-Origin Embed (เจี๊ยบ, ต้า & นนท์):**
-   - หน้า `/`, `/gallery`, `/models/[id]`, `/creators/[handle]`, `/embed/[id]`, และ `public/embed.js` (`<vm-model>`) เชื่อมต่อกับ Supabase และ CDN Service เรียบร้อย
+   - หน้า `/`, `/gallery`, `/models/[id]`, `/creators/[handle]`, `/embed/[id]`, และ `public/embed.js` (`<vm-model>`) เชื่อมต่อกับ Core API (`CORE_API_URL` / `INTERNAL_CORE_API_URL` ใน Docker) และ CDN Service เรียบร้อย
    - หน้า `/login` (`AuthForm.tsx` & `lib/auth.ts`) เชื่อมต่อ API `check-email`, `login`, `register` เข้าสู่ Core API และเก็บ `token` ลงใน `localStorage` เรียบร้อย (Merged PR #13)
 
 ---
@@ -229,9 +229,12 @@ Agent ทุกตัว **ห้ามละเมิด** กฎต่อไ�
 
 ## 7. แนวทางปฏิบัติและคำสั่งตรวจสอบสำหรับ Agent (Agent Workflow & Verification)
 
-### 7.1 ข้อควรระวังในการรันคำสั่งบน Windows PowerShell
+### 7.1 ข้อควรระวังในการรันคำสั่งบน Windows PowerShell และ Docker
 - หากรันคำสั่งบน Windows PowerShell ที่ติดนโยบาย `ExecutionPolicy` ของสคริปต์ `.ps1` ให้เรียกใช้ **`npx.cmd`** และ **`npm.cmd`** แทน `npx` และ `npm`
 - อ่านไฟล์ที่เกี่ยวข้องให้ครบถ้วนก่อนแก้ไขทุกครั้ง และรักษาสไตล์การเขียนโค้ด (TypeScript strictness, `AppError`, Dual-mode DB query + Supabase fallback) ให้สอดคล้องกับโค้ดเดิม
+- `docker-compose.yml` โหลดไฟล์ `.env` / `.env.local` ทับ `.env.example` อัตโนมัติ และส่ง `INTERNAL_CORE_API_URL=http://core-api:4000` ให้ Next.js Server Component ใน Container `frontend`
+- สำหรับการรันใน Docker บน Windows ค่า `DATABASE_URL` ต้องใช้ **Supabase IPv4 Session Pooler** (`aws-0-<region>.pooler.supabase.com:5432`) เนื่องจาก Direct Host (`db.<project>.supabase.co`) เป็น IPv6-only ซึ่งเครือข่าย Docker Bridge เริ่มต้นไม่รองรับ
+- ค่า `JWT_SECRET` ใน `services/core-api/.env` และ `services/cdn-service/.env` ต้องตรงกันเสมอ
 
 ### 7.2 คำสั่งตรวจสอบบังคับก่อนจบงานทุกครั้ง (Mandatory Verification Checklist)
 

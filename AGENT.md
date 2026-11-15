@@ -96,11 +96,13 @@ Agent ทุกตัว **ห้ามละเมิด** กฎต่อไ�
 
 ### 4.2 Core API (`services/core-api/` — พอร์ต `4000`)
 - **Auth (`/api/auth`):**
+  - `POST /api/auth/check-email` — ตรวจสอบว่าอีเมลมีบัญชีในระบบแล้วหรือไม่ (`{ exists: boolean }`)
   - `POST /api/auth/register` — สมัครสมาชิก (`bcrypt` + ออก JWT)
   - `POST /api/auth/login` — ล็อกอิน (บล็อกผู้ใช้ที่ `suspended_at IS NOT NULL` ด้วย `403 ACCOUNT_SUSPENDED`)
 - **Models (`/api/models`):**
   - `GET /api/models?q=&tag=&license=&price=free|paid&page=` — ค้นหา กรอง แบ่งหน้า (กรอง `hidden_at IS NULL AND deleted_at IS NULL AND u.suspended_at IS NULL`)
   - `GET /api/models/:id` — รายละเอียดโมเดล (ไม่ส่ง `fileUrl` ของโมเดลเสียเงิน)
+  - `PATCH /api/models/:id` — แก้ไขรายละเอียด/ราคา/สัญญาอนุญาต *(ยังเป็น TODO stub — รอดำเนินการ)*
   - `DELETE /api/models/:id` — Soft Delete (`deleted_at = NOW()`, เฉพาะเจ้าของหรือแอดมิน)
 - **Payments (`/api`):**
   - `POST /api/models/:id/checkout` — สร้างรายการสั่งซื้อรายชิ้น (`status = 'pending'`), ล็อก `amount_cents`, `currency`, `license_type` จากตาราง `models`, และสุ่ม `embed_key` 48 ตัวอักษร hex (`crypto.randomBytes(24)`)
@@ -153,6 +155,24 @@ Agent ทุกตัว **ห้ามละเมิด** กฎต่อไ�
 
 ส่วนนี้กำหนดแผนที่นำทาง (Roadmap) สำหรับ AI Agent ทุกตัว เพื่อให้สามารถรับงานต่อและพัฒนาฟีเจอร์ถัดไปได้อย่างเป็นระบบโดยไม่ชนกัน:
 
+### 6.0 สรุปความคืบหน้าโครงการปัจจุบัน (Current Project Progress Summary — ภาพรวม ~85%)
+
+| ระบบ / โมดูล | ความคืบหน้า | สถานะและผลการทดสอบ | สิ่งที่ทำเสร็จแล้วและงานที่คงเหลือ |
+| :--- | :---: | :--- | :--- |
+| **Database & Cloud Storage** (`supabase/schema.sql` + Supabase Bucket `models`) | **100%** | ✅ พร้อมใช้งาน | ครบทุกตาราง (`users`, `models`, `purchases`, `likes`, `comments`), คอลัมน์ Single-item purchase & watermark, Seed accounts/model และอัปโหลดไฟล์ `.glb` ใน `storage_data/` ขึ้น Supabase bucket `models` เรียบร้อยแล้ว |
+| **CDN Service, Upload & Watermarking** (`services/cdn-service`) | **100%** | ✅ **23/23 tests** | `POST /api/models`, `GET /cdn/models/:id/:hash.glb`, `/preview.glb`, `/file.glb?key=`, `/download`, `/poster.webp`, `POST /cdn/verify-watermark`, HTTP Range (`206`/`416`), ETag (`304`), Rate Limit, Constant-time `embed_key` check, Dual-layer GLB Watermarking (Metadata HMAC + 64-vertex steganography) |
+| **Core API — Auth** (`services/core-api/src/modules/auth`) | **100%** | ✅ **2/2 tests** | `POST /api/auth/check-email`, `POST /api/auth/register`, `POST /api/auth/login` (พร้อมตรวจ `suspended_at`) |
+| **Core API — Models** (`services/core-api/src/modules/models`) | **90%** | ✅ ใช้งานได้ (ขาด `PATCH`) | `GET /api/models` (search, tag, license, price, pagination), `GET /api/models/:id` (ซ่อน `fileUrl` สำหรับโมเดลเสียเงิน), `DELETE /api/models/:id` (Soft delete) \| **คงเหลือ:** `PATCH /api/models/:id` (แก้ไขชื่อ/รายละเอียด/ราคา/สัญญาอนุญาต — ยังเป็น TODO stub) |
+| **Core API — Payments** (`services/core-api/src/modules/payments`) | **100%** | ✅ **12/12 tests** | `POST /api/models/:id/checkout`, `POST /api/purchases/:id/confirm-mock`, `POST /api/models/:id/pay-mock`, `GET /api/me/purchases`, `GET /api/purchases/:id`, `POST /api/purchases/:id/regenerate-key` |
+| **Core API — Seller** (`services/core-api/src/modules/seller`) | **100%** | ✅ **5/5 tests** | `POST /api/seller/enable`, `GET /api/seller/status`, `GET /api/seller/models`, `GET /api/seller/sales` |
+| **Core API — Admin** (`services/core-api/src/modules/admin`) | **0%** | 🚧 รอพัฒนา | ยังไม่มีโมดูล `/api/admin/*` (`overview`, `users`, `users/:id/suspend`, `models`, `models/:id/hide`, `purchases`) |
+| **Frontend — Public Pages, 3D Viewer, Upload, Auth & Embed** (`frontend`) | **100%** | ✅ **4/4 tests** | หน้าแรก (`/`), คลังโมเดล (`/gallery`), รายละเอียดโมเดล + 3D Playground (`/models/[id]`), หน้าครีเอเตอร์ (`/creator`, `/creators/[handle]`), หน้าอัปโหลดพร้อมถ่ายภาพปกอัตโนมัติ (`/upload`), หน้าเข้าสู่ระบบ/สมัครสมาชิก (`/login` เชื่อม API จริง), และระบบ Cross-Origin Embed (`/embed/[id]` + `public/embed.js` `<vm-model>`) |
+| **Frontend — Buyer / Seller / Admin Dashboards** (`frontend`) | **20%** | 🚧 รอพัฒนา UI เชื่อม API | หน้า `/me` ปัจจุบันยังเป็น Placeholder (`<h1>My Dashboard</h1>`) ต้องเชื่อมกับ `GET /api/me/purchases`, `POST /api/purchases/:id/regenerate-key`, หน้า `/pay/mock/[id]`, หน้า `/seller` (`/api/seller/*`), และหน้า `/admin/*` (`/api/admin/*`) |
+
+> **หมายเหตุเพิ่มเติม:** โมดูล `interactions.routes.ts` (Like/Comment) และหน้า `/forgot-password` ปัจจุบันยังเป็น Stub/UI-only ตามลำดับ (อยู่นอก Scope หลักของระบบซื้อขายรายชิ้นและ CDN v1)
+
+---
+
 ### Phase 1: โครงสร้างพื้นฐาน, ระบบ CDN, ลายน้ำ 3 มิติ และการซื้อรายชิ้น (Completed ✅)
 1. **Database Schema & Core Middlewares (แฮม):**
    - `supabase/schema.sql` (รองรับ Single-Item Purchase: `amount_cents`, `currency`, `license_type`, `watermark_hash`, `paid_at`)
@@ -176,13 +196,14 @@ Agent ทุกตัว **ห้ามละเมิด** กฎต่อไ�
 
 ---
 
-### Phase 2: ระบบแอดมิน และการเชื่อมหน้า Dashboard (Current Priority 🚧)
+### Phase 2: ระบบแอดมิน, แก้ไขโมเดล และการเชื่อมหน้า Dashboard (Current Priority 🚧)
 
 เมื่อผู้ใช้งานสั่งให้พัฒนาต่อในส่วนที่เหลือ Agent ต้องยึดแนวทางและลำดับความสำคัญดังนี้:
 
-1. **งานที่ 1 — พัฒนา Admin Backend Module (`services/core-api/src/modules/admin/` — ต้า & เป้ก):**
-   - **เป้าหมาย:** สร้าง `admin.routes.ts` และผูกเข้ากับ `app.use('/api/admin', adminRouter)` ใน `services/core-api/src/app.ts` โดยทุก Route ต้องผ่าน `requireAuth` และ `requireAdmin` (ตรวจ `role === 'admin'` และ `suspended_at IS NULL` จากฐานข้อมูลจริง)
-   - **Endpoints ที่ต้องมี:**
+1. **งานที่ 1 — พัฒนา Admin Backend Module และ `PATCH /api/models/:id` (`services/core-api/` — ต้า & เป้ก):**
+   - **Models Edit (`services/core-api/src/modules/models/models.routes.ts`):** พัฒนา `PATCH /api/models/:id` (จากเดิมที่เป็น TODO stub) ให้เจ้าของโมเดลหรือแอดมินแก้ไข `title`, `description`, `tags`, `license`, `price_cents` พร้อมอัปเดต `updated_at`
+   - **Admin Router (`services/core-api/src/modules/admin/`):** สร้าง `admin.routes.ts` และผูกเข้ากับ `app.use('/api/admin', adminRouter)` ใน `services/core-api/src/app.ts` โดยทุก Route ต้องผ่าน `requireAuth` และ `requireAdmin` (ตรวจ `role === 'admin'` และ `suspended_at IS NULL` จากฐานข้อมูลจริง)
+   - **Endpoints ที่ต้องมีใน `/api/admin`:**
      - `GET /api/admin/overview` — สรุปจำนวนผู้ใช้ทั้งหมด, จำนวนโมเดล, จำนวนรายการสั่งซื้อสำเร็จ และยอดขายรวม
      - `GET /api/admin/users` — ดึงรายชื่อผู้ใช้ทั้งหมดพร้อมสถานะ `role`, `is_seller`, `suspended_at`
      - `PATCH /api/admin/users/:id/suspend` — ระงับ (`suspended_at = NOW()`) หรือคืนสิทธิ์ (`suspended_at = NULL`) บัญชีผู้ใช้ (ห้ามแอดมินระงับตัวเอง)
@@ -190,10 +211,10 @@ Agent ทุกตัว **ห้ามละเมิด** กฎต่อไ�
      - `PATCH /api/admin/models/:id/hide` — ซ่อน (`hidden_at = NOW()`) หรือแสดงผลคืน (`hidden_at = NULL`) โมเดล (เมื่อซ่อนแล้ว CDN จะบล็อกการสตรีมด้วย `403 MODEL_UNAVAILABLE` ทันที)
      - `GET /api/admin/purchases` — ดูรายการสั่งซื้อทั้งหมดในระบบพร้อมข้อมูลผู้ซื้อ โมเดล ราคา และ `watermark_hash`
 
-2. **งานที่ 2 — เชื่อมต่อ Frontend Auth, Mock Checkout, Buyer/Seller/Admin Dashboards (`frontend/` — เจี๊ยบ & ภีม):**
-   - **Auth (`/login`):** เชื่อมต่อฟอร์มเข้าสู่ระบบและสมัครสมาชิกเข้ากับ `POST /api/auth/login` และ `POST /api/auth/register` พร้อมเก็บ JWT Token
+2. **งานที่ 2 — เชื่อมต่อ Mock Checkout และ Buyer/Seller/Admin Dashboards (`frontend/` — เจี๊ยบ & ภีม):**
+   - **Auth (`/login`):** *(เสร็จแล้ว ✅ — Merged PR #13: เชื่อมต่อ `check-email`, `login`, `register` และเก็บ JWT ลง `localStorage` เรียบร้อย)*
    - **Mock Checkout (`/pay/mock/[id]`):** หน้าจำลองการชำระเงินที่เรียก `POST /api/models/:id/checkout` และ `POST /api/purchases/:id/confirm-mock` เมื่อกดปุ่มยืนยันการชำระเงิน
-   - **Buyer Dashboard (`/me`):** ดึงรายการโมเดลที่ซื้อแล้วจาก `GET /api/me/purchases` แสดง `embed_key`, ประเภท License, ปุ่มดาวน์โหลด `.glb` และปุ่มกด Regenerate Key (`POST /api/purchases/:id/regenerate-key`)
+   - **Buyer Dashboard (`/me`):** แทนที่หน้า Placeholder เดิมโดยดึงรายการโมเดลที่ซื้อแล้วจาก `GET /api/me/purchases` แสดง `embed_key`, ประเภท License, ปุ่มดาวน์โหลด `.glb` และปุ่มกด Regenerate Key (`POST /api/purchases/:id/regenerate-key`)
    - **Seller Dashboard (`/seller`):** เชื่อมต่อ `GET /api/seller/status`, ปุ่มเปิดโหมดคนขาย (`POST /api/seller/enable`), รายการโมเดลของฉัน (`GET /api/seller/models`), และตารางสรุปยอดขาย (`GET /api/seller/sales`)
    - **Admin Dashboard (`/admin/*`):** สร้างหน้าแดชบอร์ดแอดมินทั้ง 4 ส่วน (`/admin`, `/admin/models`, `/admin/users`, `/admin/purchases`) เชื่อมกับ `/api/admin/*`
 
@@ -220,12 +241,13 @@ cd services/cdn-service
 npx.cmd tsc --noEmit -p .
 npm.cmd test
 
-# 2. ตรวจ Type-check และรัน Unit Tests ของ Core API (ต้องผ่านครบ 17/17 tests)
+# 2. ตรวจ Type-check และรัน Unit Tests ของ Core API (ต้องผ่านครบ 19/19 tests)
 cd services/core-api
 npx.cmd tsc --noEmit -p .
 npm.cmd test
 
-# 3. ตรวจ Type-check ของ Frontend
+# 3. ตรวจ Type-check และรัน Unit Tests ของ Frontend (ต้องผ่านครบ 4/4 tests)
 cd frontend
 npx.cmd tsc --noEmit -p .
+npm.cmd test
 ```

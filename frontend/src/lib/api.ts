@@ -1,133 +1,99 @@
 import { buildProfile, creatorHandle, type CreatorProfile } from './creators';
 import { PAGE_SIZE, queryModels } from './pagination';
 import { MOCK_MODELS } from './mock-models';
-import type { License, Model, ModelsPage, ModelsParams } from './types';
+import type { Model, ModelsPage, ModelsParams } from './types';
 
 export const CORE_API_URL = process.env.NEXT_PUBLIC_CORE_API_URL || 'http://localhost:4000';
 export const CDN_SERVICE_URL = process.env.NEXT_PUBLIC_CDN_SERVICE_URL || 'http://localhost:4001';
-export const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-export const SUPABASE_PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || '';
 
-// Mock data is merged with real Supabase/API models unless NEXT_PUBLIC_USE_MOCK=false.
+// Inside Docker, Next.js Server Components reach core-api via the internal service hostname,
+// while browser clients continue using NEXT_PUBLIC_CORE_API_URL (localhost:4000).
+function getServerCoreApiUrl(): string {
+  if (typeof window === 'undefined' && process.env.INTERNAL_CORE_API_URL) {
+    return process.env.INTERNAL_CORE_API_URL;
+  }
+  return CORE_API_URL;
+}
+
+// Mock data is merged with real database models (via Core API) unless NEXT_PUBLIC_USE_MOCK=false.
 const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK !== 'false';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-function mapSupabaseRow(row: any): Model | null {
-  const owner = Array.isArray(row.users) ? row.users[0] : row.users;
-  if (row.hidden_at || row.deleted_at || owner?.suspended_at) return null;
-
-  return {
-    id: String(row.id),
-    title: String(row.title || 'Untitled Model'),
-    creator: String(owner?.display_name || row.creator || 'Creator'),
-    description: row.description ? String(row.description) : undefined,
-    tags: Array.isArray(row.tags) ? row.tags.map(String) : [],
-    license: (row.license as License) || 'CC0',
-    priceCents: Number(row.price_cents) || 0,
-    likeCount: Number(row.like_count) || 0,
-    downloadCount: Number(row.download_count) || 0,
-    posterUrl: row.poster_hash
-      ? `${CDN_SERVICE_URL}/cdn/models/${encodeURIComponent(String(row.id))}/poster.webp`
-      : undefined,
-  };
+function buildModelSearchParams(params: ModelsParams, pageSize?: number): URLSearchParams {
+  const sp = new URLSearchParams();
+  if (params.q) sp.set('q', params.q);
+  if (params.tag) sp.set('tag', params.tag);
+  if (params.license) sp.set('license', params.license);
+  if (params.price) sp.set('price', params.price);
+  if (params.page) sp.set('page', String(params.page));
+  if (pageSize) sp.set('pageSize', String(pageSize));
+  return sp;
 }
 
-async function fetchSupabaseModels(): Promise<Model[]> {
-  if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) return [];
+async function fetchCoreApiModels(params: ModelsParams = {}, pageSize = 100): Promise<Model[]> {
   try {
-    const select =
-      'id,title,description,tags,license,price_cents,download_count,poster_hash,hidden_at,deleted_at,users!models_owner_id_fkey(display_name,suspended_at)';
-    const url = `${SUPABASE_URL.replace(/\/+$/, '')}/rest/v1/models?select=${encodeURIComponent(select)}&hidden_at=is.null&deleted_at=is.null&order=created_at.desc`;
-    const res = await fetch(url, {
-      headers: {
-        apikey: SUPABASE_PUBLISHABLE_KEY,
-        Authorization: `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
-      },
-      cache: 'no-store',
-    });
+    const query = buildModelSearchParams(params, pageSize).toString();
+    const url = `${getServerCoreApiUrl()}/api/models${query ? `?${query}` : ''}`;
+    const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) return [];
-    const rows = (await res.json()) as any[];
-    return rows.map(mapSupabaseRow).filter((m): m is Model => m !== null);
+    const data = (await res.json()) as Partial<ModelsPage>;
+    return Array.isArray(data.items) ? data.items : [];
   } catch {
     return [];
   }
 }
 
-async function fetchSupabaseModelById(id: string): Promise<Model | null> {
-  if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY || !UUID_RE.test(id)) return null;
+async function fetchCoreApiModelById(id: string): Promise<Model | null> {
+  if (!UUID_RE.test(id)) return null;
   try {
-    const select =
-      'id,title,description,tags,license,price_cents,download_count,poster_hash,hidden_at,deleted_at,users!models_owner_id_fkey(display_name,suspended_at)';
-    const url = `${SUPABASE_URL.replace(/\/+$/, '')}/rest/v1/models?select=${encodeURIComponent(select)}&id=eq.${encodeURIComponent(id)}&limit=1`;
-    const res = await fetch(url, {
-      headers: {
-        apikey: SUPABASE_PUBLISHABLE_KEY,
-        Authorization: `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
-      },
+    const res = await fetch(`${getServerCoreApiUrl()}/api/models/${encodeURIComponent(id)}`, {
       cache: 'no-store',
     });
     if (!res.ok) return null;
-    const rows = (await res.json()) as any[];
-    if (!rows.length) return null;
-    return mapSupabaseRow(rows[0]);
+    const data = (await res.json()) as Partial<Model>;
+    if (data && data.id && data.title !== 'Sample 3D Asset') {
+      return data as Model;
+    }
+    return null;
   } catch {
     return null;
   }
 }
 
-/** List models for the gallery (paged, real uploaded models from Supabase + mock catalogue). */
+/** List models for the gallery (paged, real database models from Core API + optional mock catalogue). */
 export async function fetchModels(params: ModelsParams): Promise<ModelsPage> {
-  const supabaseModels = await fetchSupabaseModels();
-
   if (USE_MOCK) {
-    const combined = [...supabaseModels, ...MOCK_MODELS];
+    const apiModels = await fetchCoreApiModels();
+    const combined = [...apiModels, ...MOCK_MODELS];
     return queryModels(combined, params);
   }
 
   try {
-    const sp = new URLSearchParams();
-    if (params.q) sp.set('q', params.q);
-    if (params.tag) sp.set('tag', params.tag);
-    if (params.license) sp.set('license', params.license);
-    if (params.price) sp.set('price', params.price);
-    if (params.page) sp.set('page', String(params.page));
-
-    const res = await fetch(`${CORE_API_URL}/api/models?${sp}`, { cache: 'no-store' });
+    const sp = buildModelSearchParams(params);
+    const res = await fetch(`${getServerCoreApiUrl()}/api/models?${sp}`, { cache: 'no-store' });
     if (res.ok) {
       const data = (await res.json()) as Partial<ModelsPage>;
-      if (data.items && data.items.length > 0) {
+      if (Array.isArray(data.items)) {
         return {
           items: data.items,
-          page: data.page ?? 1,
+          page: data.page ?? params.page ?? 1,
           pageSize: data.pageSize ?? PAGE_SIZE,
           total: data.total ?? data.items.length,
         };
       }
     }
   } catch {
-    // Fall through to Supabase models
+    // Core API offline
   }
 
-  return queryModels(supabaseModels, params);
+  return queryModels([], params);
 }
 
 /** One model for its detail page, or `null` when it does not exist. */
 export async function fetchModel(id: string): Promise<Model | null> {
   if (UUID_RE.test(id)) {
-    const fromSupabase = await fetchSupabaseModelById(id);
-    if (fromSupabase) return fromSupabase;
-
-    try {
-      const res = await fetch(`${CORE_API_URL}/api/models/${encodeURIComponent(id)}`, { cache: 'no-store' });
-      if (res.ok) {
-        const data = (await res.json()) as any;
-        if (data && data.id && data.title !== 'Sample 3D Asset') {
-          return data as Model;
-        }
-      }
-    } catch {
-      // Ignore if core-api is offline
-    }
+    const fromApi = await fetchCoreApiModelById(id);
+    if (fromApi) return fromApi;
   }
 
   if (USE_MOCK) return MOCK_MODELS.find((m) => m.id === id) ?? null;
@@ -136,8 +102,8 @@ export async function fetchModel(id: string): Promise<Model | null> {
 
 /** Other models by the same creator (most popular first), for the "More from" row. */
 export async function fetchMoreFromCreator(model: Model, limit = 4): Promise<Model[]> {
-  const supabaseModels = await fetchSupabaseModels();
-  const pool = USE_MOCK ? [...supabaseModels, ...MOCK_MODELS] : supabaseModels;
+  const apiModels = await fetchCoreApiModels();
+  const pool = USE_MOCK ? [...apiModels, ...MOCK_MODELS] : apiModels;
   return queryModels(
     pool.filter((m) => m.creator === model.creator && m.id !== model.id),
     {},
@@ -147,14 +113,14 @@ export async function fetchMoreFromCreator(model: Model, limit = 4): Promise<Mod
 
 /** A creator profile by handle (see `creatorHandle`), or `null` when nobody has that handle. */
 export async function fetchCreator(handle: string): Promise<CreatorProfile | null> {
-  const supabaseModels = await fetchSupabaseModels();
-  const pool = USE_MOCK ? [...supabaseModels, ...MOCK_MODELS] : supabaseModels;
+  const apiModels = await fetchCoreApiModels();
+  const pool = USE_MOCK ? [...apiModels, ...MOCK_MODELS] : apiModels;
   const mine = pool.filter((m) => creatorHandle(m.creator) === handle);
   if (mine.length > 0) return buildProfile(mine[0].creator, mine);
 
   if (!USE_MOCK) {
     try {
-      const res = await fetch(`${CORE_API_URL}/api/creators/${encodeURIComponent(handle)}`, { cache: 'no-store' });
+      const res = await fetch(`${getServerCoreApiUrl()}/api/creators/${encodeURIComponent(handle)}`, { cache: 'no-store' });
       if (res.ok) return (await res.json()) as CreatorProfile;
     } catch {
       return null;

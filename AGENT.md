@@ -167,11 +167,12 @@ Agent ทุกตัว **ห้ามละเมิด** กฎต่อไ�
    - ฝังลายน้ำ 2 ชั้น (Metadata HMAC + 64-point Vertex Steganography) ทั้งตอนอัปโหลด (`purchaseId: 'original'`) และตอนผู้ซื้อดาวน์โหลด (`purchaseId` + `license_type` พร้อมบันทึก `watermark_hash`)
    - Endpoint `POST /cdn/verify-watermark` สำหรับพิสูจน์ความเป็นเจ้าของไฟล์ `.glb`
 4. **Auth, Catalog Models, Payments & Seller Backend (ต้า, เป้ก & ภีม):**
-   - `auth.routes.ts` (`register`, `login` พร้อมบล็อกบัญชีที่ถูกระงับ)
+   - `auth.routes.ts` (`register`, `login`, `check-email` พร้อมบล็อกบัญชีที่ถูกระงับ + `auth.test.ts`)
    - `models.routes.ts` (`GET /api/models` ค้นหา/กรอง/แบ่งหน้า, `GET /api/models/:id` ซ่อนลิงก์ไฟล์เต็มของโมเดลเสียเงิน, และ `DELETE /api/models/:id` Soft Delete)
-   - `payments.routes.ts` + `payments.test.ts` และ `seller.routes.ts` + `seller.test.ts` (ผ่าน **17/17 tests**)
-5. **Frontend Viewer, Gallery & Cross-Origin Embed (เจี๊ยบ & นนท์):**
+   - `payments.routes.ts` + `payments.test.ts` และ `seller.routes.ts` + `seller.test.ts` (ผ่าน **19/19 tests**)
+5. **Frontend Viewer, Gallery, Auth & Cross-Origin Embed (เจี๊ยบ, ต้า & นนท์):**
    - หน้า `/`, `/gallery`, `/models/[id]`, `/creators/[handle]`, `/embed/[id]`, และ `public/embed.js` (`<vm-model>`) เชื่อมต่อกับ Supabase และ CDN Service เรียบร้อย
+   - หน้า `/login` (`AuthForm.tsx` & `lib/auth.ts`) เชื่อมต่อ API `check-email`, `login`, `register` เข้าสู่ Core API และเก็บ `token` ลงใน `localStorage` เรียบร้อย (Merged PR #13)
 
 ---
 

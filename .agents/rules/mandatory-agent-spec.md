@@ -4,11 +4,11 @@ Before writing code, modifying files, or executing commands in this workspace, e
 
 ## Key Directives for All Agents
 1. **Follow the Development Roadmap in `AGENT.md` Section 6:**
-   - **Phase 1 (Completed):** Database Schema & Middlewares, Upload + Dual Storage (`LocalDiskStorage` & `SupabaseStorage`), CDN Streaming (`206`/`416`, ETag/`304`, Rate Limit, Constant-Time `embed_key`), Multi-Layer GLB Watermarking (`glbWatermark.ts` + `POST /cdn/verify-watermark`), Auth API, Single-Item Purchase & Seller API, Frontend Viewer & Cross-Origin Embed.
+   - **Phase 1 (Completed):** Database Schema & Middlewares, Upload + Dual Storage (`LocalDiskStorage` & `SupabaseStorage`), CDN Streaming (`206`/`416`, ETag/`304`, Rate Limit, Constant-Time `embed_key`), Multi-Layer GLB Watermarking (`glbWatermark.ts` + `POST /cdn/verify-watermark`), Auth API (`check-email`, `register`, `login`), Models Catalog (`GET /api/models`, `GET /api/models/:id`, `DELETE /api/models/:id`), Single-Item Purchase & Seller API, Frontend Viewer, Auth UI (`/login`), Docker Internal Routing (`INTERNAL_CORE_API_URL`), and Cross-Origin Embed.
    - **Phase 2 (Current Priority):**
-     1. Integrate Models Catalog & Search API (`services/core-api/src/modules/models/models.routes.ts`).
+     1. Complete `PATCH /api/models/:id` (`services/core-api/src/modules/models/models.routes.ts`).
      2. Implement Admin Backend Module (`services/core-api/src/modules/admin/`).
-     3. Connect Frontend Auth (`/login`), Mock Checkout (`/pay/mock/[id]`), Buyer (`/me`), Seller (`/seller`), and Admin (`/admin/*`) Dashboards.
+     3. Connect Mock Checkout (`/pay/mock/[id]`), Buyer (`/me`), Seller (`/seller`), and Admin (`/admin/*`) Dashboards in `frontend/`.
    - **Phase 3 (Future Roadmap):** Watermark Inspector UI, Stripe Webhook Integration, and Automated 3D Compression.
 2. **Never Violate Core Security Invariants (`AGENT.md` Section 3):**
    - Always check `is_seller`, `role`, and `suspended_at` against the database on the backend.

@@ -21,4 +21,4 @@ Every AI agent working in this repository **MUST** read and follow [AGENT.md](./
 4. **Run Verification Before Completing Any Task:**
    - `services/cdn-service`: `npx.cmd tsc --noEmit -p .` and `npm.cmd test`
    - `services/core-api`: `npx.cmd tsc --noEmit -p .` and `npm.cmd test`
-   - `frontend`: `npx.cmd tsc --noEmit -p .`
+   - `frontend`: `npx.cmd tsc --noEmit -p .` and `npm.cmd test`

@@ -126,11 +126,11 @@ broken-design/
 │   │   │   ├── config/                   # ตั้งค่าการเชื่อมต่อ PostgreSQL DB และ Environment Variables
 │   │   │   ├── middlewares/              # JWT Auth, ตรวจบทบาท (requireSeller / requireAdmin), Error Handler  [แฮม]
 │   │   │   ├── modules/
-│   │   │   │   ├── auth/                 # สมัครสมาชิก, ล็อกอิน (bcrypt + JWT), บล็อกบัญชีที่ถูกระงับ  [ต้า]
+│   │   │   │   ├── auth/                 # สมัครสมาชิก, check-email, ล็อกอิน (bcrypt + JWT), บล็อกบัญชีที่ถูกระงับ + Tests  [ต้า]
 │   │   │   │   ├── models/               # ดึงรายการ, ค้นหา, กรอง, แบ่งหน้า, รายละเอียด, Soft Delete  [เป้ก / แฮม]
 │   │   │   │   ├── payments/             # ซื้อรายชิ้นจำลอง, ล็อกราคา/License, สร้าง/Regenerate embed_key + Tests  [ภีม]
 │   │   │   │   ├── seller/               # ยอดขาย, โมเดลของคนขาย, เปิดโหมดคนขาย + Tests  [ภีม]
-│   │   │   │   ├── admin/                # ภาพรวม, ซ่อน/คืนโมเดล, ระงับ/คืนบัญชี, รายการซื้อขาย  [ต้า / เป้ก]
+│   │   │   │   ├── admin/                # (รอพัฒนาใน Phase 2) ภาพรวม, ซ่อน/คืนโมเดล, ระงับ/คืนบัญชี, รายการซื้อขาย  [ต้า / เป้ก]
 │   │   │   │   └── interactions/         # ถูกใจและความคิดเห็น (Likes/Comments)
 │   │   │   ├── scripts/
 │   │   │   │   └── seedAdmin.ts          # สคริปต์สร้างบัญชี Admin และ Creator เริ่มต้น  [แฮม]
@@ -173,11 +173,13 @@ broken-design/
 │   │   │   ├── creators/[handle]/page.tsx# หน้าโปรไฟล์ครีเอเตอร์
 │   │   │   └── embed/[id]/page.tsx       # หน้า Viewer สำหรับ Iframe (CSP frame-ancestors *)  [นนท์]
 │   │   ├── components/
+│   │   │   ├── auth/                     # AuthForm.tsx เชื่อมต่อ /api/auth/check-email, login, register  [ต้า]
 │   │   │   ├── gallery/                  # การ์ดโมเดลและตัวกรอง
 │   │   │   ├── model/                    # ModelPreview (3D CDN), ModelActions (Download/Buy), EmbedSnippets
 │   │   │   └── viewer/                   # 3D Canvas Viewer & EmbedIframeViewer
 │   │   └── lib/
-│   │       └── api.ts                    # เชื่อมต่อ Supabase REST, CORE_API_URL และ CDN_SERVICE_URL
+│   │       ├── api.ts                    # เชื่อมต่อ CORE_API_URL (รองรับ INTERNAL_CORE_API_URL สำหรับ Docker) และ CDN_SERVICE_URL
+│   │       └── auth.ts                   # Auth API client (checkEmail, login, register)  [ต้า]
 │   ├── next.config.ts
 │   ├── .env.example
 │   ├── Dockerfile
@@ -213,6 +215,7 @@ broken-design/
 
 | หมวดหมู่ | Method & Path | รายละเอียดการทำงาน |
 | :--- | :--- | :--- |
+| **Auth** | `POST /api/auth/check-email` | ตรวจสอบว่าอีเมลมีบัญชีอยู่ในระบบแล้วหรือไม่ (`{ exists }`) |
 | **Auth** | `POST /api/auth/register` | สมัครสมาชิกใหม่ (เข้ารหัสรหัสผ่านด้วย `bcrypt` และคืนค่า JWT) |
 | **Auth** | `POST /api/auth/login` | เข้าสู่ระบบ (ตรวจสอบรหัสผ่าน และบล็อกบัญชีที่มี `suspended_at` ด้วย `403 ACCOUNT_SUSPENDED`) |
 | **Models** | `GET /api/models` | ดึงรายการโมเดล ค้นหา (`q`), กรองตาม `tag`, `license`, `price=free\|paid` และแบ่งหน้า (`page`) |
@@ -284,9 +287,10 @@ broken-design/
 2. **ตั้งค่าฐานข้อมูลและ Storage บน Supabase:**
    - นำสคริปต์ใน [`supabase/schema.sql`](./supabase/schema.sql) ไปรันใน **SQL Editor** ของ Supabase เพื่อสร้างตารางและบัญชีตัวอย่าง
    - สร้าง Storage Bucket ชื่อ `models` บน Supabase Storage สำหรับจัดเก็บไฟล์ `.glb` และ `.webp`
-3. **ตั้งค่าไฟล์ Environment (`.env`):**
-   - คัดลอก `.env.example` เป็น `.env` ใน `services/core-api/` และ `services/cdn-service/` (และ `.env.local` ใน `frontend/`)
-   - กำหนดค่า `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_KEY`, `JWT_SECRET`, และ `WATERMARK_SECRET` (ห้ามนำไฟล์ `.env` ขึ้น Git)
+3. **ตั้งค่าไฟล์ Environment (`.env` / `.env.local`):**
+   - คัดลอก `.env.example` เป็น `.env` ใน `services/core-api/` และ `services/cdn-service/` และเป็น `.env.local` ใน `frontend/` (`docker-compose.yml` จะโหลด `.env` / `.env.local` ทับ `.env.example` ให้อัตโนมัติ พร้อมส่ง `INTERNAL_CORE_API_URL=http://core-api:4000` ให้ Container `frontend`)
+   - กำหนดค่า `DATABASE_URL`, `JWT_SECRET` (ให้ตรงกันทั้ง `core-api` และ `cdn-service`), `WATERMARK_SECRET`, และ `SUPABASE_URL` / `SUPABASE_KEY` (สำหรับ Storage bucket `models` ใน `cdn-service`) — *ห้ามนำไฟล์ `.env` ขึ้น Git*
+   - หากใช้ `docker compose` แนะนำให้ตั้งค่า `DATABASE_URL` เป็น **Supabase IPv4 Session Pooler** (`aws-0-<region>.pooler.supabase.com:5432`) เนื่องจาก Direct Host (`db.<project>.supabase.co`) เป็น IPv6-only ซึ่งเครือข่าย Docker Bridge เริ่มต้นไม่รองรับ
 
 ### 8.2 บัญชีทดสอบเริ่มต้น (Default Seed Accounts)
 - **Admin:** `admin@brokendesign.com` / รหัสผ่าน: `Admin@BrokenDesign2026!`
@@ -296,7 +300,7 @@ broken-design/
 ### 8.3 การรันระบบและการทดสอบ (Running & Testing)
 - **รันทุกเซอร์วิสพร้อมกันด้วย Docker Compose:**
   ```bash
-  docker compose up --build
+  docker compose up -d --build
   ```
 - **หรือรันแยกแต่ละเซอร์วิสในโหมดพัฒนา (`npm run dev`):**
   - `frontend`: `http://localhost:3000`
@@ -309,12 +313,13 @@ broken-design/
   npx tsc --noEmit -p .
   npm test
 
-  # 2. ทดสอบ Core API — Payments & Seller (17 test cases)
+  # 2. ทดสอบ Core API — Auth, Payments & Seller (19 test cases)
   cd services/core-api
   npx tsc --noEmit -p .
   npm test
 
-  # 3. ตรวจสอบ Type-Check ของฝั่ง Frontend
+  # 3. ตรวจสอบ Type-Check และ Unit Tests ของฝั่ง Frontend (4 test cases)
   cd frontend
   npx tsc --noEmit -p .
+  npm test
   ```

@@ -1,0 +1,127 @@
+# TASKS — Lixyte task board
+
+อัปเดตล่าสุด: 2026-11-15 · สถานะตรวจจากโค้ดใน branch `kzwnjuy` หลัง merge `main` แล้ว (commit `fd653bd`) ยังไม่ได้รันเว็บหรือเทสต์ในรอบนี้
+คอลัมน์ **ผู้รับ** แบ่งตามหลักว่าแต่ละคนทำ Frontend ของ backend ที่ตัวเองดูแล แก้ได้เมื่อทีมปรับการแบ่งงาน (ตาราง §7 ใน `README.md`)
+
+สถานะ: `[x]` ใช้ได้ · `[~]` ทำบางส่วน (UI อย่างเดียว / placeholder / ทำแค่ฝั่งเดียว) · `[ ]` ยังไม่มี
+
+## 1. หน้าเว็บ (Frontend)
+
+### สาธารณะและ login
+| สถานะ | เส้นทาง | ผู้รับ | Backend ที่ใช้ | หมายเหตุ |
+|---|---|---|---|---|
+| [x] | `/` หน้าแรก | เจี๊ยบ | - | |
+| [x] | `/gallery` | เป้ก | `GET /api/models` | ค้นหาและตัวกรอง tag / license / price ทำงานผ่าน URL รวมข้อมูลจริงกับข้อมูลตัวอย่าง (ปิดข้อมูลตัวอย่างด้วย `NEXT_PUBLIC_USE_MOCK=false`) คอมเมนต์หัวไฟล์ `page.tsx` ยังเขียนว่า "UI only" ซึ่งล้าสมัย |
+| [x] | `/models/[id]` | นนท์ | `GET /api/models/:id`, CDN | viewer 3D จาก CDN, ดาวน์โหลด, เริ่มซื้อ ยังไม่มีถูกใจ/คอมเมนต์ และ Playground |
+| [~] | `/creators/[handle]` | เจี๊ยบ | `/api/creators/:handle` (ไม่มี) | UI อ่านอย่างเดียว ข้อมูลตัวอย่าง |
+| [x] | `/creator` | เจี๊ยบ | - | |
+| [ ] | `/docs` | เจี๊ยบ | - | ลิงก์ในเมนูยังชี้ไปหน้าที่ไม่มี ต้องมีคนเขียนเนื้อหา |
+| [ ] | `/licenses` | เจี๊ยบ | - | อธิบายไลเซนส์แบบตาราง ทำได้/ทำไม่ได้ |
+| [ ] | หน้ากฎหมาย (Terms, Privacy, Seller terms, คืนเงิน, DMCA) | เจี๊ยบ | - | ต้องให้ผู้เชี่ยวชาญตรวจเนื้อหา |
+| [ ] | แจ้งโมเดลละเมิด | ยังไม่มีผู้รับ | ไม่มี | ต้องมีทั้งหน้าและ endpoint |
+| [x] | `/embed/[id]` | นนท์ | CDN | ถ้า key ผิดหรือถูกหมุน จะสลับไป `preview.glb` พร้อมแจ้งเตือน |
+| [ ] | Playground `/models/[id]/embed` | นนท์ | - | `components/playground/` ว่างอยู่ |
+| [x] | `/login` | ต้า | `POST /api/auth/check-email`, `/login`, `/register` | ต่อ core-api แล้ว เก็บ token ใน `localStorage` ปุ่ม Google ยังเป็น UI อย่างเดียว |
+| [~] | `/forgot-password` | ต้า | ไม่มี endpoint | UI อย่างเดียว ตรวจอีเมลแล้วไม่ส่งอะไร |
+
+### ผู้ซื้อ
+| สถานะ | เส้นทาง | ผู้รับ | Backend ที่ใช้ | หมายเหตุ |
+|---|---|---|---|---|
+| [ ] | `/checkout/[id]` | ภีม | `POST /api/models/:id/checkout` | backend ใช้ได้ ตอนนี้ปุ่มซื้อบนหน้าโมเดลเรียก checkout ตรง ๆ |
+| [ ] | `/pay/mock/[id]` | ภีม | `POST /api/purchases/:id/confirm-mock` | **checkout ส่งผู้ใช้มาหน้านี้ แต่หน้ายังไม่มี จึงเจอ 404** |
+| [ ] | `/checkout/success` | ภีม | `GET /api/purchases/:id` | แสดง embed key และโค้ดทันที |
+| [~] | `/me` | ภีม | `GET /api/me/purchases`, `POST /api/purchases/:id/regenerate-key` | หน้าเป็นหัวข้อบรรทัดเดียว backend ใช้ได้แล้ว |
+
+### ผู้ขาย
+| สถานะ | เส้นทาง | ผู้รับ | Backend ที่ใช้ | หมายเหตุ |
+|---|---|---|---|---|
+| [ ] | `/seller` | ภีม | `/api/seller/status`, `/models`, `/sales`, `/enable` | backend ใช้ได้พร้อมเทสต์ ยังไม่มีหน้า |
+| [x] | `/upload` | แฮม | `POST /api/models` (CDN) | มีพรีวิว 3D และจับภาพปก ดูปัญหา token ฝังโค้ดในส่วนที่ 3 |
+| [ ] | `/seller/models/[id]` แก้และลบโมเดล | แฮม | `PATCH`, `DELETE /api/models/:id` | `DELETE` ใช้ได้ `PATCH` ยังเป็น TODO |
+
+### แอดมิน
+| สถานะ | เส้นทาง | ผู้รับ | Backend ที่ใช้ | หมายเหตุ |
+|---|---|---|---|---|
+| [ ] | `/admin` ภาพรวม | เจี๊ยบ | `GET /api/admin/overview` | backend ยังไม่มี |
+| [ ] | `/admin/models` | เจี๊ยบ | `GET /api/admin/models`, `PATCH .../hide` | backend ยังไม่มี |
+| [ ] | `/admin/users` | เจี๊ยบ | `GET /api/admin/users`, `PATCH .../suspend` | backend ยังไม่มี |
+| [ ] | `/admin/purchases` | เจี๊ยบ | `GET /api/admin/purchases` | ต้องเลือกชื่อเดียว: purchases หรือ orders |
+| [ ] | คิวรายงานโมเดล | ยังไม่มีผู้รับ | ไม่มี | |
+
+### หน้าระบบ
+| สถานะ | เส้นทาง | ผู้รับ | หมายเหตุ |
+|---|---|---|---|
+| [ ] | `app/not-found.tsx` (404 ทั้งเว็บ) | เป้ก | ลอกแบบจาก `models/[id]/not-found.tsx` |
+| [ ] | `app/403/page.tsx` | เป้ก | |
+| [ ] | `app/error.tsx` (500 ทั้งเว็บ) | เป้ก | อย่าแทนที่ `gallery/error.tsx` |
+| [ ] | สถานะ WebGL ใช้ไม่ได้ | นนท์ | ทำใน viewer (`ModelPreview`, `EmbedIframeViewer`, `embed.js`) |
+
+### ทำทีหลังได้
+| สถานะ | เส้นทาง | ผู้รับ |
+|---|---|---|
+| [ ] | `/settings` (เปลี่ยนรหัสผ่าน ลบบัญชี) | ยังไม่มีผู้รับ |
+| [ ] | `/contact` | ยังไม่มีผู้รับ |
+| [ ] | `/verify` ตรวจลายน้ำ (endpoint `POST /cdn/verify-watermark` พร้อมแล้ว) | นนท์ |
+| [ ] | ที่ฉันบันทึก + ถูกใจ/คอมเมนต์ | ยังไม่มีผู้รับ (`modules/interactions/` ยังเป็น stub) |
+
+## 2. Backend
+
+### ใช้ได้แล้ว
+| สถานะ | งาน | ผู้รับ | หมายเหตุ |
+|---|---|---|---|
+| [x] | `POST /api/auth/check-email`, `/register`, `/login` | ต้า | บัญชีที่ถูกระงับได้ `403 ACCOUNT_SUSPENDED` |
+| [x] | `GET /api/models` (`q`, `tag`, `license`, `price`, `page`, `pageSize`), `GET /api/models/:id` | เป้ก | ซ่อนโมเดลที่ถูกซ่อน/ลบ/เจ้าของถูกระงับ |
+| [x] | `DELETE /api/models/:id` (soft delete) | แฮม | เจ้าของหรือแอดมิน |
+| [x] | payments: `checkout`, `confirm-mock`, `pay-mock`, `me/purchases`, `regenerate-key`, `purchases/:id` | ภีม | มีเทสต์ 12 ข้อ (นับจากไฟล์) |
+| [x] | `/api/seller/enable`, `status`, `models`, `sales` | ภีม | มีเทสต์ 5 ข้อ (นับจากไฟล์) |
+| [x] | cdn-service: อัปโหลด, สตรีม, ดาวน์โหลด, poster, ลายน้ำ 2 ชั้น, `verify-watermark`, rate limit | นนท์, แฮม | มีเทสต์ 23 ข้อ (นับจากไฟล์) |
+
+### ยังค้าง
+| สถานะ | งาน | ผู้รับ | หมายเหตุ |
+|---|---|---|---|
+| [ ] | endpoint ลืมรหัสผ่าน | ต้า | หน้า `/forgot-password` รออยู่ |
+| [ ] | rate limit ให้ `/api/auth/*` โดยเฉพาะ `check-email` | ต้า | ตอนนี้ใครก็ถามได้ว่าอีเมลไหนสมัครไว้แล้ว |
+| [ ] | `PATCH /api/models/:id` | แฮม | ยังเป็น TODO |
+| [ ] | สร้าง `modules/admin/admin.routes.ts` และผูก `/api/admin` ใน `app.ts` | เจี๊ยบ | ยังไม่มีโมดูลนี้เลย |
+| [ ] | `GET /api/admin/overview` | เจี๊ยบ | นับผู้ใช้ โมเดล คำสั่งซื้อ `paid` และยอดรวม |
+| [ ] | `GET /api/admin/models` | เจี๊ยบ | รวมโมเดลที่ซ่อนและถูกลบ |
+| [ ] | `PATCH /api/admin/models/:id/hide` | เจี๊ยบ | สลับ `hidden_at` |
+| [ ] | `GET /api/admin/purchases` | เจี๊ยบ | ผู้ซื้อ โมเดล ราคา `watermark_hash` |
+| [ ] | `GET /api/admin/users`, `PATCH /api/admin/users/:id/suspend` | เจี๊ยบ | ห้ามแอดมินระงับตัวเอง |
+| [ ] | `/api/creators/:handle` | ยังไม่มีผู้รับ | ฝั่งหน้าเว็บเรียกไว้ตอนปิดข้อมูลตัวอย่าง |
+| [ ] | endpoint แจ้งโมเดลละเมิด | ยังไม่มีผู้รับ | |
+| [~] | `modules/interactions/` (ถูกใจ, คอมเมนต์) | ยังไม่มีผู้รับ | ยังเป็น stub |
+| [~] | Stripe webhook `POST /api/webhooks/stripe` | ภีม | stub ตอบ `received: true` ยังไม่ตรวจลายเซ็น (และต้องใช้ raw body) |
+
+## 3. ความปลอดภัย (ทำก่อนใช้งานจริง)
+รายละเอียดอยู่ใน `docs/ARCHITECTURE.md` ส่วน "Known issues"
+
+| สถานะ | งาน | ผู้รับ | หมายเหตุ |
+|---|---|---|---|
+| [ ] | เอา `DEV_CREATOR_TOKEN` ออกจากโค้ด `frontend/src/app/upload/page.tsx` ไปไว้ใน `.env.local` | แฮม | เคยย้ายแล้ว แต่ merge ทำให้กลับมาเป็นค่าฝังในโค้ด token เดิมยังอยู่ในประวัติ git |
+| [ ] | เลิกใช้ค่าตกหล่น `'dev-secret'` ของ `JWT_SECRET` และค่าตกหล่นของ `WATERMARK_SECRET` (ให้ระบบไม่ยอมเริ่มเมื่อไม่ตั้งค่าใน production) | แฮม | ทั้ง core-api และ cdn-service |
+| [ ] | แก้ `requireAdmin` / `requireSeller` ให้ตรวจ role และ `suspended_at` จากฐานข้อมูล | แฮม | ตอนนี้เชื่อ role ใน JWT เท่านั้น (ฝั่ง seller router ตรวจฐานข้อมูลเองแล้ว) |
+| [ ] | ตรึง `algorithms: ['HS256']` และตรวจ payload ของ JWT ตอน `jwt.verify` | แฮม | ทั้งสองบริการ |
+| [ ] | ให้ CORS `*` ของ cdn-service ใช้เฉพาะ route สตรีม | นนท์ | อัปโหลดต้องใช้ token แล้ว แต่ CORS ยังเปิดหมด |
+| [ ] | เปลี่ยนรหัสผ่านบัญชีตัวอย่าง (admin / creator) ก่อน deploy | แฮม | ค่าเริ่มต้นเขียนอยู่ใน `schema.sql`, `seedAdmin.ts` และ README |
+| [ ] | ส่ง embed key ผ่าน header หรือ token อายุสั้นแทน query string | นนท์ | ตอนนี้ key รั่วลง log และ referrer ได้ |
+
+## 4. งานโครงสร้างและเอกสาร
+
+| สถานะ | งาน | ผู้รับ | หมายเหตุ |
+|---|---|---|---|
+| [ ] | แก้ README ที่ชนกัน (`UU`) และ `CLAUDE.md` (`AA`) ที่เกิดจากการคืนไฟล์ใน stash หลัง merge | เจี๊ยบ | ต้องเลือกฉบับของ `main` หรือของ branch ก่อน commit |
+| [ ] | commit `docs/` (PRD, ARCHITECTURE, DESIGN_SYSTEM, TASKS) | เจี๊ยบ | ตอนนี้ยังไม่ได้ commit |
+| [ ] | ทำ Navbar ให้อ่าน token แล้วเปลี่ยนเป็นเมนูบัญชี (Library, Seller, Admin เฉพาะแอดมิน, Log out) | เจี๊ยบ | ตอนนี้แสดงแค่ "Log in" เสมอ |
+| [ ] | ทำตัวส่ง request กลาง (`apiFetch`) ที่แนบ token และจัดการ error รูปแบบเดียวกัน | ต้า | ตอนนี้ `lib/auth.ts` กับหน้าอื่นเรียก `fetch` แยกกัน |
+| [ ] | แยก `frontend/src/lib/api.ts` เป็น `lib/api/{models,auth,purchases,admin}.ts` | ต้า | กันคนแก้ไฟล์เดียวชนกัน |
+| [ ] | เลือกชื่อเส้นทางเดียว: `/me` หรือ `/library`, `/admin/purchases` หรือ `/admin/orders` | ทั้งทีม | |
+| [ ] | ตัดสินใจเรื่องระบบถูกใจ/คอมเมนต์ว่าอยู่ใน v1 หรือไม่ | ทั้งทีม | ถ้าเปิดต้องมีระบบกลั่นกรอง |
+| [ ] | ระบบเสริม: อีเมลระบบ, ใบเสร็จ/ใบอนุญาต, onboarding หลังซื้อ, FAQ, แบนเนอร์คุกกี้, ปุ่มแชร์ + Open Graph, สลับภาษา, ล็อก key ผูกโดเมน, สถิติการใช้ key | ยังไม่มีผู้รับ | ยังไม่ได้เริ่ม |
+
+## 5. กติกาตอนส่งงาน
+- ตรวจชนิดข้อมูลและเทสต์ก่อนส่ง: `cd frontend && npx tsc --noEmit -p . && npm test` และ `cd services/core-api && npx tsc --noEmit -p . && npm test` และ `cd services/cdn-service && npx tsc --noEmit -p . && npm test` (บน Windows PowerShell ที่ติดนโยบาย ใช้ `npx.cmd` / `npm.cmd`) ต้องรัน `npm install` ในแต่ละโฟลเดอร์ก่อน
+- ห้ามรัน `npm run build` ขณะ `npm run dev` เปิดอยู่
+- ตรวจหน้าเว็บที่ 375px ก่อนส่ง และอ่าน `docs/DESIGN_SYSTEM.md` ก่อนทำ UI
+- ตรวจสิทธิ์ที่ backend เสมอ ฝั่งหน้าเว็บซ่อนเมนูได้อย่างเดียว (`AGENT.md` ข้อ 3.2)
+- ห้ามนำไฟล์ `.env` ขึ้น git แก้ `.env.example` เฉพาะชื่อตัวแปรและค่าตัวอย่าง

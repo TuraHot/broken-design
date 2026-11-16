@@ -42,11 +42,12 @@
 ### แอดมิน
 | สถานะ | เส้นทาง | ผู้รับ | Backend ที่ใช้ | หมายเหตุ |
 |---|---|---|---|---|
-| [ ] | `/admin` ภาพรวม | เจี๊ยบ | `GET /api/admin/overview` | backend ยังไม่มี |
-| [ ] | `/admin/models` | เจี๊ยบ | `GET /api/admin/models`, `PATCH .../hide` | backend ยังไม่มี |
-| [ ] | `/admin/users` | เจี๊ยบ | `GET /api/admin/users`, `PATCH .../suspend` | backend ยังไม่มี |
-| [ ] | `/admin/purchases` | เจี๊ยบ | `GET /api/admin/purchases` | ต้องเลือกชื่อเดียว: purchases หรือ orders |
-| [ ] | คิวรายงานโมเดล | ยังไม่มีผู้รับ | ไม่มี | |
+| [x] | `/admin` ภาพรวม | เจี๊ยบ | `GET /api/admin/overview` | ทำแล้ว ทดสอบในเบราว์เซอร์กับ API จำลอง (ยังไม่ได้ลองกับ core-api + Postgres จริง) |
+| [x] | `/admin/models` | เจี๊ยบ | `GET /api/admin/models`, `PATCH .../hide` | ทำแล้ว ทดสอบในเบราว์เซอร์กับ API จำลอง (ยังไม่ได้ลองกับ core-api + Postgres จริง) |
+| [x] | `/admin/users` | เจี๊ยบ | `GET /api/admin/users`, `PATCH .../suspend` | ทำแล้ว ทดสอบในเบราว์เซอร์กับ API จำลอง (ยังไม่ได้ลองกับ core-api + Postgres จริง) |
+| [x] | `/admin/purchases` | เจี๊ยบ | `GET /api/admin/purchases` | ทำแล้ว ใช้ชื่อ purchases (ยังไม่ได้ลองกับ core-api + Postgres จริง) |
+| [x] | popup ส่งคำร้องเรียน (เมนู user + footer) + `/admin/complaints` | เจี๊ยบ | `POST /api/complaints`, `GET` / `PATCH /api/admin/complaints` ทดสอบแล้วในเบราว์เซอร์กับ API จำลอง (ยังไม่ได้ลองกับ Postgres จริง ต้องรัน SQL ของตาราง `complaints` ใน `schema.sql` ก่อน) |
+| [ ] | ปุ่ม "Report" บนหน้า `/models/[id]` เรียก `useReport().openReport()` (เปิด popup และกรอกลิงก์โมเดลให้เอง) | นนท์ | ไฟล์ของนนท์ ยังไม่ได้แก้ |
 
 ### หน้าระบบ
 | สถานะ | เส้นทาง | ผู้รับ | หมายเหตุ |
@@ -82,12 +83,12 @@
 | [ ] | endpoint ลืมรหัสผ่าน | ต้า | หน้า `/forgot-password` รออยู่ |
 | [ ] | rate limit ให้ `/api/auth/*` โดยเฉพาะ `check-email` | ต้า | ตอนนี้ใครก็ถามได้ว่าอีเมลไหนสมัครไว้แล้ว |
 | [ ] | `PATCH /api/models/:id` | แฮม | ยังเป็น TODO |
-| [ ] | สร้าง `modules/admin/admin.routes.ts` และผูก `/api/admin` ใน `app.ts` | เจี๊ยบ | ยังไม่มีโมดูลนี้เลย |
-| [ ] | `GET /api/admin/overview` | เจี๊ยบ | นับผู้ใช้ โมเดล คำสั่งซื้อ `paid` และยอดรวม |
-| [ ] | `GET /api/admin/models` | เจี๊ยบ | รวมโมเดลที่ซ่อนและถูกลบ |
-| [ ] | `PATCH /api/admin/models/:id/hide` | เจี๊ยบ | สลับ `hidden_at` |
-| [ ] | `GET /api/admin/purchases` | เจี๊ยบ | ผู้ซื้อ โมเดล ราคา `watermark_hash` |
-| [ ] | `GET /api/admin/users`, `PATCH /api/admin/users/:id/suspend` | เจี๊ยบ | ห้ามแอดมินระงับตัวเอง |
+| [x] | สร้าง `modules/admin/admin.routes.ts` และผูก `/api/admin` ใน `app.ts` | เจี๊ยบ | ตรวจ admin + `suspended_at` จากฐานข้อมูลในโมดูลเอง (`requireActiveAdmin`) แฮมจะย้ายไปรวมใน `auth.middleware.ts` ภายหลังก็ได้ |
+| [x] | `GET /api/admin/overview` | เจี๊ยบ | ผู้ใช้ โมเดล คำสั่งซื้อ `paid` ยอดรวม (`amount_cents`) |
+| [x] | `GET /api/admin/models` | เจี๊ยบ | รวมโมเดลที่ซ่อนและถูกลบ + เจ้าของ |
+| [x] | `PATCH /api/admin/models/:id/hide` | เจี๊ยบ | body `{ hidden: boolean }` |
+| [x] | `GET /api/admin/purchases` | เจี๊ยบ | ผู้ซื้อ โมเดล ราคา `watermark_hash` (ไม่ส่ง `embed_key`) |
+| [x] | `GET /api/admin/users`, `PATCH /api/admin/users/:id/suspend` | เจี๊ยบ | body `{ suspended: boolean }` ห้ามระงับตัวเอง |
 | [ ] | `/api/creators/:handle` | ยังไม่มีผู้รับ | ฝั่งหน้าเว็บเรียกไว้ตอนปิดข้อมูลตัวอย่าง |
 | [ ] | endpoint แจ้งโมเดลละเมิด | ยังไม่มีผู้รับ | |
 | [~] | `modules/interactions/` (ถูกใจ, คอมเมนต์) | ยังไม่มีผู้รับ | ยังเป็น stub |
@@ -112,7 +113,7 @@
 |---|---|---|---|
 | [ ] | แก้ README ที่ชนกัน (`UU`) และ `CLAUDE.md` (`AA`) ที่เกิดจากการคืนไฟล์ใน stash หลัง merge | เจี๊ยบ | ต้องเลือกฉบับของ `main` หรือของ branch ก่อน commit |
 | [ ] | commit `docs/` (PRD, ARCHITECTURE, DESIGN_SYSTEM, TASKS) | เจี๊ยบ | ตอนนี้ยังไม่ได้ commit |
-| [ ] | ทำ Navbar ให้อ่าน token แล้วเปลี่ยนเป็นเมนูบัญชี (Library, Seller, Admin เฉพาะแอดมิน, Log out) | เจี๊ยบ | ตอนนี้แสดงแค่ "Log in" เสมอ |
+| [x] | ทำ Navbar ให้อ่าน token แล้วเปลี่ยนเป็นเมนูบัญชี (Library, Seller, Admin เฉพาะแอดมิน, Log out) | เจี๊ยบ | `components/AccountMenu.tsx` + `lib/session.ts` ทดสอบในเบราว์เซอร์แล้วด้วยข้อมูล login จำลอง (ยังไม่ได้ลอง login จริงกับ core-api) ลิงก์ `/seller` ยังเป็น 404 จนกว่าจะมีหน้า (`/admin` มีแล้ว) ถ้าต้าทำตัวเก็บ token กลาง ให้ย้ายส่วนอ่านใน `session.ts` ไปใช้ของต้า |
 | [ ] | ทำตัวส่ง request กลาง (`apiFetch`) ที่แนบ token และจัดการ error รูปแบบเดียวกัน | ต้า | ตอนนี้ `lib/auth.ts` กับหน้าอื่นเรียก `fetch` แยกกัน |
 | [ ] | แยก `frontend/src/lib/api.ts` เป็น `lib/api/{models,auth,purchases,admin}.ts` | ต้า | กันคนแก้ไฟล์เดียวชนกัน |
 | [ ] | เลือกชื่อเส้นทางเดียว: `/me` หรือ `/library`, `/admin/purchases` หรือ `/admin/orders` | ทั้งทีม | |

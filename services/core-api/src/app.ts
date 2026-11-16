@@ -1,18 +1,21 @@
 import express from "express";
 import cors from "cors";
 import { env } from "./config/env";
+import { allowedOrigins } from "./config/cors";
 import { testDbConnection } from "./config/db";
 import { authRouter } from "./modules/auth/auth.routes";
 import { modelsRouter } from "./modules/models/models.routes";
 import { paymentsRouter } from "./modules/payments/payments.routes";
 import { interactionsRouter } from "./modules/interactions/interactions.routes";
 import { sellerRouter } from "./modules/seller/seller.routes";
+import { adminRouter } from "./modules/admin/admin.routes";
+import { complaintsRouter } from "./modules/complaints/complaints.routes";
 import { errorHandler } from "./middlewares/error.middleware";
 
 
 export const app = express();
 
-app.use(cors({ origin: env.frontendUrl, credentials: true }));
+app.use(cors({ origin: allowedOrigins(), credentials: true }));
 app.use(express.json());
 
 app.get("/health", async (_req, res) => {
@@ -28,6 +31,8 @@ app.use("/api/auth", authRouter);
 app.use("/api/models", modelsRouter);
 app.use("/api", paymentsRouter);
 app.use("/api/seller", sellerRouter);
+app.use("/api/admin", adminRouter);
+app.use("/api/complaints", complaintsRouter);
 app.use("/api", interactionsRouter);
 
 app.use(errorHandler);

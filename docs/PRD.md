@@ -35,7 +35,7 @@ Model editing in the browser, formats other than `.glb`, real-time collaboration
 |---|---|---|
 | Landing page | Dark HUD hero with the 3D lily (it bursts apart on scroll), the headline "3D models, one line of code" and a short explanation, then Popular models, Categories, New arrivals and a join banner | [built] |
 | Creator landing | Page at `/creator` for creators: what they can do, how it works in three steps, a glowing 3D butterfly, "Get started" → `/login`. Content only | [built] |
-| Navbar / Footer | Logo, Gallery, Docs, Creator, search, Log in on every page (hidden on `/login` and `/forgot-password`). Search sends you to `/gallery?q=…`. The Navbar does not yet change after login (no logged-in menu, no log out) | [partial] |
+| Navbar / Footer | Logo, Gallery, Docs, Creator, search, Log in on every page (hidden on `/login` and `/forgot-password`). Search sends you to `/gallery?q=…`. After login the right side becomes an account menu (Library, Seller dashboard for sellers, Log out; admins do not use the public pages: after login they are sent to `/admin` and stay there, unless they press "View Website" in the admin layout); the Seller page it links to does not exist yet | [built] |
 | Auth | core-api: `check-email`, `register`, `login` (bcrypt + JWT; roles `user`, `creator`, `admin`; suspended accounts get `403 ACCOUNT_SUSPENDED`). `/login` is connected: email first → password (known email) or display name + password (new email); the token is kept in `localStorage`. "Continue with Google" is **UI only**. There is no one-time-code step. `/forgot-password` is UI only (no endpoint) | [partial] |
 | Seller mode | `POST /api/seller/enable`, `GET /api/seller/status`, `/models`, `/sales` in core-api (with tests). No seller page in the frontend yet | [partial] backend [built], page [todo] |
 | Upload | `/upload` (live 3D preview, poster captured from the viewer) → cdn-service `POST /api/models`: seller only, account status checked in the database, `.glb` validated (magic bytes `glTF`, version 2, length = size; main ≤ 50 MB, preview ≤ 5 MB, poster ≤ 1 MB), original watermark embedded, stored by sha256. Paid models must include a preview file | [built] |
@@ -49,17 +49,18 @@ Model editing in the browser, formats other than `.glb`, real-time collaboration
 | Purchases | core-api: checkout (price, currency and license locked at purchase), mock confirmation, `GET /api/me/purchases`, regenerate key, `GET /api/purchases/:id` (with tests). Stripe webhook is a stub. The mock payment page `/pay/mock/[id]` does not exist yet | [partial] |
 | Buyer dashboard | Purchase history, embed keys, regenerate (`/me`) | [scaffold] (page is one heading) |
 | Creator dashboard | My models, sales, edit metadata, delete (`/seller`). `PATCH /api/models/:id` is a TODO; `DELETE` (soft delete) works | [scaffold] |
-| Admin | Overview, hide / restore models, suspend / restore users, see orders (`/admin/*`). The database fields exist (`hidden_at`, `suspended_at`), the CDN already honours them, but there are no `/api/admin/*` routes and no admin pages | [todo] |
+| Admin | Overview, hide / restore models, suspend / restore users, see orders (`/admin/*`). `/api/admin/*` and the four pages (`/admin`, `/admin/models`, `/admin/users`, `/admin/purchases`) are built; the CDN honours `hidden_at` and `suspended_at`. Hide / restore and suspend / restore ask "Sure?" first | [built] |
+| Complaints | Any signed-in user can report a model, a person, a purchase or something else from a popup (account menu → "Report a problem", or the footer link; on a model page the model link is filled in) (a pasted model link fills in the model; max 5 reports an hour, 10 to 2000 characters). Admins read them at `/admin/complaints` (open first): "Read & respond" opens the whole complaint in a dialog where they change the status (open, in review, resolved, dismissed), add a note and hide the reported model | [built] |
 | Likes & comments | Like a model, comment on a model | [scaffold] |
 
 ### Later
-Docs site (`/docs`), licenses page, legal pages, report-a-model, system pages (global 404 / 403 / 500), forgot-password endpoint, usage statistics for creators, notifications, key lock to allowed domains, real Stripe checkout, automatic model optimisation (Draco / Meshopt).
+Docs site (`/docs`), licenses page, legal pages, a "Report" button on the model page that calls `openReport()` (the popup), system pages (global 404 / 403 / 500), forgot-password endpoint, usage statistics for creators, notifications, key lock to allowed domains, real Stripe checkout, automatic model optimisation (Draco / Meshopt).
 
 ## 7. Key user flows
 1. **Discover → embed:** Landing → Gallery (search / filter) → Model detail → copy embed code → paste on own site.
 2. **Publish:** Log in or sign up → turn on seller mode → Upload `.glb` + metadata → model appears in Gallery.
 3. **Buy:** Model detail → Checkout → mock payment → embed key in `/me` → embed with `key=...`. (The payment page and `/me` are the missing pieces.)
-4. **Moderate:** Admin hides a model or suspends an owner → the CDN stops serving it immediately, even to people who bought it. (Admin screens are missing.)
+4. **Moderate:** Admin hides a model or suspends an owner → the CDN stops serving it immediately, even to people who bought it. (Done from `/admin/models` and `/admin/users`.)
 
 ## 8. Content rules
 - Licenses: `CC0`, `CC-BY`, `CC-BY-NC`, `COMMERCIAL`.
@@ -77,6 +78,6 @@ Docs site (`/docs`), licenses page, legal pages, report-a-model, system pages (g
 ## 10. Open questions
 - Payment provider for launch: mock only, or Stripe at launch?
 - Platform fee / creator payout model.
-- Moderation for uploaded files and comments (admin tools are not built yet).
+- Moderation for uploaded files and comments (admin tools cover models, accounts and user complaints; comments have no moderation yet).
 - Legal text (terms, privacy, refunds, DMCA) needs review by someone qualified before real payments.
 - Landing copy: the headline is "3D models, one line of code"; confirm it with the team and the site name (Lixyte) before launch.

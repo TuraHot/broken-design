@@ -3,9 +3,13 @@
 // Site footer — brand line and links to pages that exist. Hidden on the auth pages.
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { isAuthPath } from '@/lib/auth-paths';
+import { useReport } from '@/components/report/ReportProvider';
+import { hidesPublicChrome } from '@/lib/auth-paths';
 
-const GROUPS = [
+// A link goes to a page; `report` opens the "Report a problem" popup instead.
+type FooterLink = { label: string; href: string } | { label: string; report: true };
+
+const GROUPS: { title: string; links: FooterLink[] }[] = [
   {
     title: 'Product',
     links: [
@@ -17,13 +21,15 @@ const GROUPS = [
     title: 'Account',
     links: [
       { href: '/login', label: 'Log in or sign up' },
+      { label: 'Report a problem', report: true },
     ],
   },
 ];
 
 export default function Footer() {
   const pathname = usePathname();
-  if (isAuthPath(pathname)) return null;
+  const { openReport } = useReport();
+  if (hidesPublicChrome(pathname)) return null;
 
   return (
     <footer className="relative z-10 border-t border-white/10 bg-black">
@@ -40,10 +46,16 @@ export default function Footer() {
               <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70">{g.title}</p>
               <ul className="mt-3 grid gap-2 text-sm">
                 {g.links.map((l) => (
-                  <li key={l.href}>
-                    <Link href={l.href} className="text-white/65 transition-colors hover:text-white">
-                      {l.label}
-                    </Link>
+                  <li key={l.label}>
+                    {'report' in l ? (
+                      <button type="button" onClick={openReport} className="text-left text-white/65 transition-colors hover:text-white">
+                        {l.label}
+                      </button>
+                    ) : (
+                      <Link href={l.href} className="text-white/65 transition-colors hover:text-white">
+                        {l.label}
+                      </Link>
+                    )}
                   </li>
                 ))}
               </ul>

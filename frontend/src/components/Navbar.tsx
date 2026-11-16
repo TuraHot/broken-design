@@ -1,11 +1,12 @@
 'use client';
 
-// Top navigation — logo, Gallery / Docs, search box (UI only, searches nothing yet), Log in
+// Top navigation — logo, Gallery / Docs / Creator, search box (goes to /gallery?q=), Log in or account menu
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { FormEvent, useState } from 'react';
 import { Search, X } from 'lucide-react';
-import { isAuthPath } from '@/lib/auth-paths';
+import { hidesPublicChrome } from '@/lib/auth-paths';
+import AccountMenu from './AccountMenu';
 
 // `desktopOnly` links are hidden below `sm` so the bar fits at 375px.
 const LINKS = [
@@ -26,7 +27,7 @@ export default function Navbar() {
     router.push(q ? `/gallery?q=${encodeURIComponent(q)}` : '/gallery');
   };
 
-  if (isAuthPath(pathname)) return null;
+  if (hidesPublicChrome(pathname)) return null;
 
   const searchField = (
     <form onSubmit={submit} role="search" className="relative w-full">
@@ -78,12 +79,7 @@ export default function Navbar() {
           >
             {mobileSearch ? <X className="h-5 w-5" /> : <Search className="h-5 w-5" />}
           </button>
-          <Link
-            href="/login"
-            className="whitespace-nowrap rounded-lg bg-white px-3 py-1.5 font-medium sm:px-3.5 text-black transition-colors hover:bg-white/85"
-          >
-            Log in
-          </Link>
+          <AccountMenu />
         </div>
       </nav>
 

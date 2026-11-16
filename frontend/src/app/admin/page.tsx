@@ -1,0 +1,237 @@
+'use client';
+
+// /admin — the platform at a glance: what needs attention, key numbers, catalogue mix, people, recent activity
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { AlertCircle, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { Badge } from '@/components/admin/ui';
+import { AdminApiError, adminFetch, type AdminOverview } from '@/lib/admin-api';
+import { formatCount, formatDate, formatMoney } from '@/lib/format';
+
+const LABEL = 'font-mono text-[11px] uppercase tracking-[0.16em] text-white/65';
+
+function Panel({ title, action, children }: { title: string; action?: { href: string; label: string }; children: React.ReactNode }) {
+  const id = `panel-${title.toLowerCase().replace(/\s+/g, '-')}`;
+  return (
+    <section aria-labelledby={id} className="rounded-lg border border-white/10 bg-white/5 p-5">
+      <div className="flex items-center justify-between gap-3">
+        <h2 id={id} className={LABEL}>{title}</h2>
+        {action && (
+          <Link href={action.href} className="inline-flex items-center gap-1 text-sm text-white/65 transition-colors hover:text-white">
+            {action.label}
+            <ArrowRight aria-hidden className="h-4 w-4" />
+          </Link>
+        )}
+      </div>
+      <div className="mt-4">{children}</div>
+    </section>
+  );
+}
+
+function Stat({ label, value, note, href }: { label: string; value: string; note?: string; href?: string }) {
+  const body = (
+    <>
+      <p className={LABEL}>{label}</p>
+      <p className="mt-3 font-display text-2xl">{value}</p>
+      <p className="mt-2 min-h-5 text-sm text-white/65">{note}</p>
+    </>
+  );
+  const cls = 'block rounded-lg border border-white/10 bg-white/5 p-5';
+  return href ? <Link href={href} className={`${cls} transition-colors hover:border-white/30`}>{body}</Link> : <div className={cls}>{body}</div>;
+}
+
+/** A labelled bar. The numbers are printed, so the bar is decoration. */
+function Bar({ label, value, total }: { label: string; value: number; total: number }) {
+  const pct = total > 0 ? Math.round((value / total) * 100) : 0;
+  return (
+    <li>
+      <div className="flex items-baseline justify-between gap-3 text-sm">
+        <span className="text-white/80">{label}</span>
+        <span className="font-mono text-[13px] text-white/65">{formatCount(value)} · {pct}%</span>
+      </div>
+      <div aria-hidden className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/10">
+        <div className="h-full rounded-full bg-hud/70" style={{ width: `${pct}%` }} />
+      </div>
+    </li>
+  );
+}
+
+function Empty({ children }: { children: React.ReactNode }) {
+  return <p className="text-sm text-white/65">{children}</p>;
+}
+
+export default function AdminOverviewPage() {
+  const [data, setData] = useState<AdminOverview | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const ctrl = new AbortController();
+    adminFetch<AdminOverview>('/overview', { signal: ctrl.signal })
+      .then(setData)
+      .catch((err) => {
+        if (ctrl.signal.aborted) return;
+        setError(err instanceof AdminApiError ? err.message : 'Something went wrong. Please try again.');
+      });
+    return () => ctrl.abort();
+  }, []);
+
+  const attention = data
+    ? [
+        { n: data.openComplaints, text: data.openComplaints === 1 ? 'new complaint' : 'new complaints', href: '/admin/complaints' },
+        { n: data.suspendedUsers, text: data.suspendedUsers === 1 ? 'suspended account' : 'suspended accounts', href: '/admin/users' },
+        { n: data.hiddenModels, text: data.hiddenModels === 1 ? 'hidden model' : 'hidden models', href: '/admin/models' },
+        { n: data.pendingPurchases, text: data.pendingPurchases === 1 ? 'unpaid order' : 'unpaid orders', href: '/admin/purchases' },
+      ].filter((a) => a.n > 0)
+    : [];
+
+  return (
+    <div>
+      <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud">[ Admin ]</p>
+      <h1 className="mt-3 font-display text-[clamp(28px,4vw,48px)] uppercase leading-[1.02]">Overview</h1>
+
+      {error && (
+        <p role="status" className="mt-8 flex items-center gap-2 text-red-300">
+          <AlertCircle aria-hidden className="h-4 w-4 shrink-0" />
+          {error}
+        </p>
+      )}
+      {!data && !error && <p role="status" className="mt-8 text-sm text-white/65">Loading…</p>}
+
+      {data && (
+        <div className="mt-8 grid grid-cols-[minmax(0,1fr)] gap-6">
+          <Panel title="Needs attention">
+            {attention.length === 0 ? (
+              <p className="flex items-center gap-2 text-sm text-white/65">
+                <CheckCircle2 aria-hidden className="h-4 w-4 shrink-0" />
+                Nothing needs attention right now.
+              </p>
+            ) : (
+              <ul className="flex flex-wrap gap-3">
+                {attention.map((a) => (
+                  <li key={a.text}>
+                    <Link href={a.href} className="inline-flex items-center gap-2 rounded-lg border border-amber/50 px-3 py-2 text-sm text-amber transition-colors hover:bg-white/5">
+                      <AlertCircle aria-hidden className="h-4 w-4 shrink-0" />
+                      <span><strong className="font-medium">{formatCount(a.n)}</strong> {a.text}</span>
+                      <ArrowRight aria-hidden className="h-4 w-4" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Panel>
+
+          <div>
+            <h2 className={`${LABEL} mb-3`}>Totals</h2>
+            <div className="grid grid-cols-[minmax(0,1fr)] gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <Stat label="Users" value={formatCount(data.totalUsers)} note={`${formatCount(data.suspendedUsers)} suspended`} href="/admin/users" />
+              <Stat label="Models" value={formatCount(data.totalModels)} note={`${formatCount(data.hiddenModels)} hidden`} href="/admin/models" />
+              <Stat label="Paid purchases" value={formatCount(data.paidPurchases)} note={`${formatCount(data.pendingPurchases)} unpaid`} href="/admin/purchases" />
+              <Stat
+                label="Revenue"
+                value={formatMoney(data.totalRevenueCents)}
+                note={data.paidPurchases > 0 ? `${formatMoney(Math.round(data.totalRevenueCents / data.paidPurchases))} per order` : 'No sales yet'}
+              />
+            </div>
+          </div>
+
+          <div>
+            <h2 className={`${LABEL} mb-3`}>Last 7 days</h2>
+            <div className="grid grid-cols-[minmax(0,1fr)] gap-4 sm:grid-cols-3">
+              <Stat label="New users" value={formatCount(data.newUsers7d)} />
+              <Stat label="New models" value={formatCount(data.newModels7d)} />
+              <Stat label="Revenue" value={formatMoney(data.revenue7dCents)} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-2">
+            <Panel title="Catalogue" action={{ href: '/admin/models', label: 'Manage models' }}>
+              <ul className="grid gap-4">
+                <Bar label="Free models" value={data.freeModels} total={data.totalModels} />
+                <Bar label="Paid models" value={data.totalModels - data.freeModels} total={data.totalModels} />
+              </ul>
+              <p className={`${LABEL} mb-3 mt-6`}>By license</p>
+              {data.licenseBreakdown.length === 0 ? (
+                <Empty>No models yet.</Empty>
+              ) : (
+                <ul className="grid gap-4">
+                  {data.licenseBreakdown.map((l) => (
+                    <Bar key={l.license} label={l.license} value={l.count} total={data.totalModels} />
+                  ))}
+                </ul>
+              )}
+              <p className="mt-6 text-sm text-white/65">
+                {formatCount(data.totalDownloads)} downloads · {formatCount(data.totalViews)} views in total
+              </p>
+            </Panel>
+
+            <Panel title="People" action={{ href: '/admin/users', label: 'Manage users' }}>
+              <ul className="grid gap-4">
+                <Bar label="Sellers" value={data.sellerUsers} total={data.totalUsers} />
+                <Bar label="Admins" value={data.adminUsers} total={data.totalUsers} />
+                <Bar label="Other members" value={Math.max(0, data.totalUsers - data.sellerUsers - data.adminUsers)} total={data.totalUsers} />
+              </ul>
+              <p className={`${LABEL} mb-3 mt-6`}>Newest members</p>
+              {data.recentUsers.length === 0 ? (
+                <Empty>No members yet.</Empty>
+              ) : (
+                <ul className="divide-y divide-white/10">
+                  {data.recentUsers.map((u) => (
+                    <li key={u.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
+                      <span className="min-w-0">
+                        <span className="block truncate text-white">{u.displayName}</span>
+                        <span className="block truncate text-white/65">{u.email}</span>
+                      </span>
+                      <span className="flex shrink-0 items-center gap-3">
+                        <Badge>{u.role}</Badge>
+                        <span className="hidden font-mono text-[13px] text-white/65 sm:inline">{formatDate(u.createdAt)}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Panel>
+
+            <Panel title="Top models" action={{ href: '/admin/models', label: 'All models' }}>
+              {data.topModels.length === 0 ? (
+                <Empty>No models yet.</Empty>
+              ) : (
+                <ol className="divide-y divide-white/10">
+                  {data.topModels.map((m, i) => (
+                    <li key={m.id} className="flex items-center gap-3 py-2.5 text-sm">
+                      <span className="w-5 shrink-0 font-mono text-[13px] text-white/65">{i + 1}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-white">{m.title}</span>
+                        <span className="block truncate text-white/65">by {m.ownerName}</span>
+                      </span>
+                      <span className="shrink-0 text-right font-mono text-[13px] text-white/65">
+                        {formatCount(m.downloadCount)} downloads
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </Panel>
+
+            <Panel title="Recent purchases" action={{ href: '/admin/purchases', label: 'All purchases' }}>
+              {data.recentPurchases.length === 0 ? (
+                <Empty>No paid purchases yet.</Empty>
+              ) : (
+                <ul className="divide-y divide-white/10">
+                  {data.recentPurchases.map((p) => (
+                    <li key={p.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
+                      <span className="min-w-0">
+                        <span className="block truncate text-white">{p.model.title}</span>
+                        <span className="block truncate text-white/65">{p.buyerName} · {formatDate(p.paidAt)}</span>
+                      </span>
+                      <span className="shrink-0 text-white/80">{formatMoney(p.amountCents, p.currency)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Panel>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

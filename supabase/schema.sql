@@ -88,6 +88,23 @@ CREATE TABLE IF NOT EXISTS comments (
 
 CREATE INDEX IF NOT EXISTS idx_comments_model_id ON comments (model_id);
 
+-- 6.1 Complaints Table (คำร้องเรียนจากผู้ใช้ — แอดมินดูและปิดเรื่องที่ /admin/complaints)
+CREATE TABLE IF NOT EXISTS complaints (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    reporter_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    category VARCHAR(20) NOT NULL CHECK (category IN ('model', 'account', 'purchase', 'other')),
+    model_id UUID REFERENCES models(id) ON DELETE SET NULL,
+    message TEXT NOT NULL CHECK (char_length(message) BETWEEN 10 AND 2000),
+    status VARCHAR(20) NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'in_review', 'resolved', 'dismissed')),
+    admin_note TEXT,
+    handled_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    handled_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_complaints_status ON complaints (status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_complaints_reporter ON complaints (reporter_id, created_at DESC);
+
 -- 7. Seed Initial Accounts (Admin must be set in DB, cannot register via UI)
 -- Password for both initial accounts: Admin@BrokenDesign2026!
 INSERT INTO users (email, password_hash, display_name, role, is_seller)

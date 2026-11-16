@@ -1,8 +1,10 @@
 // Root Layout — Lixyte
 import type { Metadata } from 'next';
 import { Chakra_Petch, Michroma, Share_Tech_Mono } from 'next/font/google';
+import AdminOnlyRedirect from '@/components/AdminOnlyRedirect';
 import Footer from '@/components/Footer';
 import Navbar from '@/components/Navbar';
+import ReportProvider from '@/components/report/ReportProvider';
 import './globals.css';
 
 const chakra = Chakra_Petch({ subsets: ['latin'], weight: ['400', '500', '600'], display: 'swap' });
@@ -17,9 +19,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body className={`${chakra.className} ${michroma.variable} ${shareTechMono.variable}`}>
-        <Navbar />
-        {children}
-        <Footer />
+        <ReportProvider>
+          <AdminOnlyRedirect />
+          <Navbar />
+          {/* The page grows to fill the screen, so a short page still has the footer at the very bottom. */}
+          <div className="flex min-h-dvh flex-col">
+            <div className="flex-1">{children}</div>
+            <Footer />
+          </div>
+        </ReportProvider>
       </body>
     </html>
   );

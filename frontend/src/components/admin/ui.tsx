@@ -1,0 +1,87 @@
+'use client';
+
+// Small building blocks shared by the admin pages
+import { useState } from 'react';
+
+type Tone = 'neutral' | 'warn' | 'danger';
+
+const TONES: Record<Tone, string> = {
+  neutral: 'border-white/15 text-white/65',
+  warn: 'border-amber/50 text-amber',
+  danger: 'border-red-400/50 text-red-300',
+};
+
+/** Status label. The text carries the meaning; the colour only backs it up. */
+export function Badge({ tone = 'neutral', children }: { tone?: Tone; children: React.ReactNode }) {
+  return (
+    <span className={`inline-block whitespace-nowrap rounded-md border px-2 py-0.5 font-mono text-[11px] uppercase tracking-[0.12em] ${TONES[tone]}`}>
+      {children}
+    </span>
+  );
+}
+
+const BTN = 'h-8 whitespace-nowrap rounded-lg border px-3 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-40';
+
+/**
+ * Two-step button: the first click asks "Sure?", the second runs the action.
+ * Focus lands on Cancel so a stray Enter does not confirm.
+ */
+export function ConfirmAction({
+  label,
+  ariaLabel,
+  onConfirm,
+  disabled,
+}: {
+  label: string;
+  ariaLabel: string;
+  onConfirm: () => Promise<void>;
+  disabled?: boolean;
+}) {
+  const [asking, setAsking] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  if (!asking) {
+    return (
+      <button
+        type="button"
+        aria-label={ariaLabel}
+        disabled={disabled}
+        onClick={() => setAsking(true)}
+        className={`${BTN} border-white/15 text-white/80 hover:border-white/40 hover:text-white`}
+      >
+        {label}
+      </button>
+    );
+  }
+
+  return (
+    <span role="group" aria-label={`Confirm: ${ariaLabel}`} className="inline-flex items-center gap-2">
+      <span className="text-sm text-white/65">Sure?</span>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          try {
+            await onConfirm();
+          } finally {
+            setBusy(false);
+            setAsking(false);
+          }
+        }}
+        className={`${BTN} border-red-400/60 text-red-300 hover:bg-red-400/10`}
+      >
+        {busy ? 'Working…' : 'Yes'}
+      </button>
+      <button
+        type="button"
+        autoFocus
+        disabled={busy}
+        onClick={() => setAsking(false)}
+        className={`${BTN} border-white/15 text-white/80 hover:border-white/40 hover:text-white`}
+      >
+        Cancel
+      </button>
+    </span>
+  );
+}

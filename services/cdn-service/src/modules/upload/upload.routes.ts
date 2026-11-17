@@ -122,7 +122,7 @@ uploadRouter.post(
         throw new AppError(
           400,
           'PREVIEW_REQUIRED',
-          'Paid models require a lightweight preview GLB file (under 5 MB) for public rotation'
+          'Paid models require a preview GLB file (under 50 MB) for public rotation'
         );
       }
 

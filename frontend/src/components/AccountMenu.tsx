@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { useReport } from '@/components/report/ReportProvider';
+import { creatorHandle } from '@/lib/creators';
 import { clearSession, readSession, type Session } from '@/lib/session';
 
 const itemClass =
@@ -121,11 +122,18 @@ export default function AccountMenu() {
                   </Link>
                 </li>
                 {user.is_seller && (
-                  <li>
-                    <Link href="/seller" className={itemClass}>
-                      Seller dashboard
-                    </Link>
-                  </li>
+                  <>
+                    <li>
+                      <Link href="/seller" className={itemClass}>
+                        Seller dashboard
+                      </Link>
+                    </li>
+                    <li>
+                      <Link href={`/creators/${creatorHandle(name)}`} className={itemClass}>
+                        Creator profile
+                      </Link>
+                    </li>
+                  </>
                 )}
                 <li>
                   <button

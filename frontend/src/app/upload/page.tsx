@@ -29,7 +29,7 @@ const LICENSES = [
 ] as const;
 
 const MAX_MODEL_SIZE = 50 * 1024 * 1024; // 50 MB
-const MAX_PREVIEW_SIZE = 5 * 1024 * 1024; // 5 MB
+const MAX_PREVIEW_SIZE = 50 * 1024 * 1024; // 50 MB
 const MAX_POSTER_SIZE = 1 * 1024 * 1024; // 1 MB
 
 // Default Creator token for local dev & testing (until Member 1 finishes login API)
@@ -433,7 +433,7 @@ export default function UploadPage() {
                     <span className="flex items-center gap-1.5">
                       <Layers className="h-4 w-4 text-emerald-400" /> Preview GLB
                     </span>
-                    <span className="text-[11px] text-white/40">&lt; 5 MB</span>
+                    <span className="text-[11px] text-white/40">&lt; 50 MB</span>
                   </div>
 
                   {previewFile ? (
@@ -458,7 +458,7 @@ export default function UploadPage() {
                           if (e.target.files && e.target.files[0]) {
                             const pf = e.target.files[0];
                             if (pf.size > MAX_PREVIEW_SIZE) {
-                              setValidationError('Preview file exceeds 5 MB limit.');
+                              setValidationError('Preview file exceeds 50 MB limit.');
                               return;
                             }
                             setPreviewFile(pf);

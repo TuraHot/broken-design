@@ -1,5 +1,6 @@
 // Creator profile header: cover, photo, name, bio and stats. Read-only; the cover and photo are placeholders until
 // creators can upload their own.
+import Link from 'next/link';
 import { initials } from '@/lib/creators';
 import { formatCount } from '@/lib/format';
 
@@ -42,7 +43,12 @@ export default function ProfileHeader({ name, handle, bio, modelCount, downloads
         </div>
 
         <div className="min-w-0 flex-1 pt-3">
-          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70">[ Creator ]</p>
+          <Link
+            href="/creator"
+            className="inline-block font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70 transition-colors hover:text-hud"
+          >
+            [ Creator ]
+          </Link>
           <h1 className="mt-1 font-display text-[clamp(22px,3vw,32px)] uppercase leading-[1.05] text-white">{name}</h1>
           <p className="mt-1 text-sm text-white/65">@{handle}</p>
         </div>

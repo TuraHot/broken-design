@@ -355,6 +355,7 @@ broken-design/
 - **Admin:** `admin@brokendesign.com` / รหัสผ่าน: `Admin@BrokenDesign2026!`
 - **Creator (คนขาย):** `creator@brokendesign.com` / รหัสผ่าน: `Creator@BrokenDesign2026!`
 - **โมเดล 3D ตัวอย่างบน Supabase:** ID `7524b129-938b-41c9-b66c-977a809e1c89` (`Lixyte Crystal Cube`)
+- **Buyer:** `buyer@lixyte.com` / รหัสผ่าน: `Buyer@BrokenDesign2026!`
 
 ### 8.3 การรันระบบและการทดสอบ (Running & Testing)
 - **รันทุกเซอร์วิสพร้อมกันด้วย Docker Compose:**

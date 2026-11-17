@@ -194,8 +194,7 @@ broken-design/
 │   │   │   ├── login/page.tsx            # หน้าเข้าสู่ระบบและสมัครสมาชิก  [ต้า]
 │   │   │   ├── forgot-password/page.tsx  # หน้ารีเซ็ตรหัสผ่าน (UI อย่างเดียว ยังไม่มี endpoint)  [ต้า]
 │   │   │   ├── upload/page.tsx           # หน้าอัปโหลด .glb + สร้างภาพ Poster ด้วย .toBlob()  [แฮม]
-│   │   │   ├── me/page.tsx               # หน้า Dashboard ผู้ซื้อ: รายการที่ซื้อ, embed_key, Regenerate Key, ดาวน์โหลด, เปิดโหมดคนขาย  [แฮม / ภีม]
-│   │   │   ├── seller/page.tsx           # หน้า Dashboard คนขาย: สรุปรายได้, ยอดขาย, โมเดลของฉัน และ Soft Delete  [แฮม / ภีม]
+│   │   │   ├── me/page.tsx               # หน้า Dashboard ผู้ซื้อ (Placeholder — รอพัฒนาต่อใน Phase 2)  [ภีม]
 │   │   │   └── admin/                    # layout.tsx & 5 หน้าแดชบอร์ดแอดมิน (Overview, Models, Users, Purchases, Complaints)  [เจี๊ยบ]
 │   │   ├── components/
 │   │   │   ├── Navbar.tsx, Footer.tsx, AccountMenu.tsx, AdminOnlyRedirect.tsx, PixieCursor.tsx

@@ -1,6 +1,6 @@
 # Lixyte — System Architecture
 
-Component inventory, end-to-end flows, deployment configuration, and pre-launch known issues. Last reviewed on `main` after merging PR #15 (`kzwnjuy`), `Pek`, and `ham` (2026-11-17).
+Component inventory, end-to-end flows, deployment configuration, and pre-launch known issues. Last reviewed on `main` after merging PR #15 (`kzwnjuy`) and `Pek` (2026-11-17).
 > **Authoritative Specs (Do Not Duplicate):**
 > - **Access Control Matrix, Security Rules, Full API & DB Contracts & Test Commands:** [`AGENT.md`](../AGENT.md) (§3–§5, §7.2)
 > - **Per-Page / Per-Route Task Status & Owners:** [`docs/TASKS.md`](TASKS.md) and [`README.md` §7](../README.md#7-การแบ่งงานภายในทีมผู้พัฒนา-6-คน-team-responsibilities)
@@ -47,8 +47,7 @@ Both backends read the same PostgreSQL database and verify the same JWT (`JWT_SE
 | `src/components/report/*`, `components/ui/Modal.tsx`, `lib/complaints.ts` | Accessible modal dialog for reporting issues (`POST /api/complaints`) from account menu or footer |
 | `src/app/admin/*`, `components/admin/*`, `lib/admin-api.ts`, `lib/admin-view.ts` | Dedicated admin layout (`AdminShell`, `AdminList`) covering Overview, Models, Users, Purchases, and Complaints |
 | `src/lib/api.ts`, `pagination.ts`, `mock-models.ts`, `types.ts` | Shared API client (`INTERNAL_CORE_API_URL` on SSR, `CORE_API_URL` in browser; merges mock catalogue unless `NEXT_PUBLIC_USE_MOCK=false`) |
-| `src/app/me/page.tsx`, `src/app/seller/page.tsx` | Buyer dashboard (`/me`: purchases, `embed_key` copy/regenerate, watermarked `.glb` download, seller toggle) and Seller dashboard (`/seller`: revenue/sales summary, uploaded models table, soft delete) |
-| `src/app/pay/mock/[id]`, `docs`, `components/playground/` | Pending pages tracked in [`docs/TASKS.md`](TASKS.md) |
+| `src/app/me/page.tsx`, `pay/mock/[id]`, `seller`, `docs`, `components/playground/` | Placeholder/pending pages tracked in [`docs/TASKS.md`](TASKS.md) |
 
 `next.config.ts` sets CSP: `frame-ancestors *` for `/embed/*` and `frame-ancestors 'self'` for all other routes.
 
@@ -71,7 +70,7 @@ High-I/O upload, multi-layer `.glb` watermarking, and streaming (`upload/upload.
 2. **Upload:** `/upload` → `cdn-service` `POST /api/models` → seller & DB suspension checks → validate GLB header → embed original watermark → `sha256` → `StorageAdapter.put` → insert `models` row → visible in `GET /api/models`.
 3. **Browse:** Gallery SSR reads `page, q, tag, license, price` from URL → `core-api` `GET /api/models` (via `INTERNAL_CORE_API_URL` in Docker) → renders cards + `/cdn/models/:id/poster.webp`.
 4. **Embed (free & paid):** `<vm-model>` or `/embed/[id]` loads `/cdn/models/:id/preview.glb` (or `/file.glb?key=...` for paid models verified via `crypto.timingSafeEqual`); `401`/`403` falls back to `preview.glb` with a notice.
-5. **Purchase (mock) & Download:** `ModelActions` → `POST /api/models/:id/checkout` → `/pay/mock/<id>` *(pending page)* → `confirm-mock` sets `status = 'paid'` → buyer reads/regenerates `embed_key` in `/me` or downloads watermarked `.glb` via `GET /cdn/models/:id/download`.
+5. **Purchase (mock) & Download:** `ModelActions` → `POST /api/models/:id/checkout` → `/pay/mock/<id>` *(pending page)* → `confirm-mock` sets `status = 'paid'` → buyer reads `embed_key` in `/me` *(pending)* or downloads watermarked `.glb` via `GET /cdn/models/:id/download`.
 6. **Moderation:** User submits complaint (`POST /api/complaints`) or admin sets `hidden_at` / `suspended_at` (`PATCH /api/admin/...`) → CDN immediately returns `403 MODEL_UNAVAILABLE` across all routes, including for buyers.
 
 ## 4. Environment & deployment
@@ -89,4 +88,4 @@ High-I/O upload, multi-layer `.glb` watermarking, and streaming (`upload/upload.
 7. Passing `embed_key` in query string (`?key=`) exposes it to access logs and referrers; consider headers or short-lived tokens.
 8. Seed credentials in `schema.sql`, `seedAdmin.ts`, and `README.md` must be rotated/disabled before production.
 9. `frontend/src/app/upload/page.tsx` still embeds a fallback `DEV_CREATOR_TOKEN`; remove it before shipping.
-10. `/pay/mock/[id]` and `PATCH /api/models/:id` are not completed yet (see [`docs/TASKS.md`](TASKS.md)).
+10. `/pay/mock/[id]`, `/me`, `/seller`, and `PATCH /api/models/:id` are not completed yet (see [`docs/TASKS.md`](TASKS.md)).

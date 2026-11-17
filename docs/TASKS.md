@@ -1,6 +1,6 @@
 # TASKS — Lixyte task board
 
-อัปเดตล่าสุด: 2026-11-17 · สถานะตรวจจากโค้ดบน `main` หลัง merge PR #15 (`origin/kzwnjuy`) และ branch `origin/Pek` และสร้างตาราง `complaints` บน PostgreSQL จริงแล้ว (ผลเทสต์ล่าสุดผ่านครบทั้งระบบ: `cdn-service` 23/23, `core-api` 48/48, `frontend` 4/4 = **75/75**)
+อัปเดตล่าสุด: 2026-11-17 · สถานะตรวจจากโค้ดบน `main` หลัง merge PR #15 (`origin/kzwnjuy`), branch `origin/Pek`, และ branch `origin/ham` รวมถึงสร้างตาราง `complaints` บน PostgreSQL จริงแล้ว (ผลเทสต์ล่าสุดผ่านครบทั้งระบบ: `cdn-service` 23/23, `core-api` 48/48, `frontend` 4/4 = **75/75**)
 คอลัมน์ **ผู้รับ** แบ่งตามหลักว่าแต่ละคนทำ Frontend ของ backend ที่ตัวเองดูแล แก้ได้เมื่อทีมปรับการแบ่งงาน (ตาราง §7 ใน `README.md`)
 
 สถานะ: `[x]` ใช้ได้ · `[~]` ทำบางส่วน (UI อย่างเดียว / placeholder / ทำแค่ฝั่งเดียว) · `[ ]` ยังไม่มี
@@ -30,12 +30,12 @@
 | [ ] | `/checkout/[id]` | ภีม | `POST /api/models/:id/checkout` | backend ใช้ได้ ตอนนี้ปุ่มซื้อบนหน้าโมเดลเรียก checkout ตรง ๆ |
 | [ ] | `/pay/mock/[id]` | ภีม | `POST /api/purchases/:id/confirm-mock` | **checkout ส่งผู้ใช้มาหน้านี้ แต่หน้ายังไม่มี จึงเจอ 404** |
 | [ ] | `/checkout/success` | ภีม | `GET /api/purchases/:id` | แสดง embed key และโค้ดทันที |
-| [~] | `/me` | ภีม | `GET /api/me/purchases`, `POST /api/purchases/:id/regenerate-key` | หน้าเป็นหัวข้อบรรทัดเดียว backend ใช้ได้แล้ว |
+| [x] | `/me` | ภีม / แฮม | `GET /api/me/purchases`, `POST /api/purchases/:id/regenerate-key` | เชื่อมต่อแล้ว (Merged `origin/ham`): แสดงโปรไฟล์, ปุ่มเปิดคนขาย, embed_key, copy snippet, regenerate key และดาวน์โหลด `.glb` |
 
 ### ผู้ขาย
 | สถานะ | เส้นทาง | ผู้รับ | Backend ที่ใช้ | หมายเหตุ |
 |---|---|---|---|---|
-| [ ] | `/seller` | ภีม | `/api/seller/status`, `/models`, `/sales`, `/enable` | backend ใช้ได้พร้อมเทสต์ ยังไม่มีหน้า |
+| [x] | `/seller` | ภีม / แฮม | `/api/seller/status`, `/models`, `/sales`, `/enable`, `DELETE /api/models/:id` | เชื่อมต่อแล้ว (Merged `origin/ham`): แสดงรายได้, ยอดขาย, รายการโมเดล และปุ่ม Soft Delete |
 | [x] | `/upload` | แฮม | `POST /api/models` (CDN) | มีพรีวิว 3D และจับภาพปก ดูปัญหา token ฝังโค้ดในส่วนที่ 3 |
 | [ ] | `/seller/models/[id]` แก้และลบโมเดล | แฮม | `PATCH`, `DELETE /api/models/:id` | `DELETE` ใช้ได้ `PATCH` ยังเป็น TODO |
 
@@ -113,7 +113,7 @@
 |---|---|---|---|
 | [x] | แก้ README ที่ชนกัน และอัปเดตเอกสาร `.md` ทั้งหมดหลัง merge PR #15 + `Pek` | เจี๊ยบ / ทีม | อัปเดตและจัดให้ตรงกับโค้ดบน `main` แล้ว |
 | [x] | commit `docs/` (PRD, ARCHITECTURE, DESIGN_SYSTEM, TASKS) | เจี๊ยบ | Merged ลง `main` ใน PR #15 แล้ว |
-| [x] | ทำ Navbar ให้อ่าน token แล้วเปลี่ยนเป็นเมนูบัญชี (Library, Seller, Admin เฉพาะแอดมิน, Log out) | เจี๊ยบ | `components/AccountMenu.tsx` + `lib/session.ts` ทดสอบในเบราว์เซอร์แล้วด้วยข้อมูล login จำลอง (ยังไม่ได้ลอง login จริงกับ core-api) ลิงก์ `/seller` ยังเป็น 404 จนกว่าจะมีหน้า (`/admin` มีแล้ว) ถ้าต้าทำตัวเก็บ token กลาง ให้ย้ายส่วนอ่านใน `session.ts` ไปใช้ของต้า |
+| [x] | ทำ Navbar ให้อ่าน token แล้วเปลี่ยนเป็นเมนูบัญชี (Library, Seller, Admin เฉพาะแอดมิน, Log out) | เจี๊ยบ | `components/AccountMenu.tsx` + `lib/session.ts` เชื่อมต่อลิงก์ `/me`, `/seller`, และ `/admin` ที่สร้างเสร็จทั้งหมดแล้ว |
 | [ ] | ทำตัวส่ง request กลาง (`apiFetch`) ที่แนบ token และจัดการ error รูปแบบเดียวกัน | ต้า | ตอนนี้ `lib/auth.ts` กับหน้าอื่นเรียก `fetch` แยกกัน |
 | [ ] | แยก `frontend/src/lib/api.ts` เป็น `lib/api/{models,auth,purchases,admin}.ts` | ต้า | กันคนแก้ไฟล์เดียวชนกัน |
 | [ ] | เลือกชื่อเส้นทางเดียว: `/me` หรือ `/library`, `/admin/purchases` หรือ `/admin/orders` | ทั้งทีม | |

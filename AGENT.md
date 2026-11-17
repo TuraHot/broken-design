@@ -170,7 +170,7 @@ Agent ทุกตัว **ห้ามละเมิด** กฎต่อไ�
 - **กฎการออกแบบ UI สำหรับงานฝั่ง Frontend:** อ่าน [`docs/DESIGN_SYSTEM.md`](./docs/DESIGN_SYSTEM.md) ก่อนแก้ไขหน้าเว็บทุกครั้ง
 - **รายการแก้ไขด้านความปลอดภัยก่อนเปิดใช้งานจริง (Pre-launch Security Hardening):** ดู [`docs/ARCHITECTURE.md` §5](./docs/ARCHITECTURE.md#5-known-issues-to-fix-before-launch)
 
-### 6.0 สรุปความคืบหน้าโครงการปัจจุบัน (Current Project Progress Summary — ภาพรวม ~92%)
+### 6.0 สรุปความคืบหน้าโครงการปัจจุบัน (Current Project Progress Summary — ภาพรวม ~96%)
 
 | ระบบ / โมดูล | ความคืบหน้า | สถานะและผลการทดสอบ | สิ่งที่ทำเสร็จแล้วและงานที่คงเหลือ |
 | :--- | :---: | :--- | :--- |
@@ -183,7 +183,8 @@ Agent ทุกตัว **ห้ามละเมิด** กฎต่อไ�
 | **Core API — Admin & Complaints** (`services/core-api/src/modules/admin`, `complaints`) | **100%** | ✅ **25/25 tests** | `/api/admin/*` ครบทั้ง 8 endpoints (`overview`, `users`, `users/:id/suspend`, `models`, `models/:id/hide`, `purchases`, `complaints`, `complaints/:id`) ผ่าน **20/20** + `POST /api/complaints` (rate limit 5/hr) ผ่าน **5/5** *(รวม Core API ทั้งหมด **48/48 tests**)* |
 | **Frontend — Public Pages, Error Pages (`403`/`404`/`500`), Auth, Upload & Embed** (`frontend`) | **100%** | ✅ **4/4 tests** | หน้าแรก (`/`), `/gallery` (ค้นหา/กรอง/แบ่งหน้า), `/models/[id]`, `/creator`, `/creators/[handle]`, `/upload`, `/login`, `/embed/[id]`, `public/embed.js` (`<vm-model>`), เมนูบัญชี (`AccountMenu.tsx`), หน้า `403`, `not-found.tsx` (404), และ `error.tsx` (500) |
 | **Frontend — Admin Dashboard & Report Modal** (`frontend/src/app/admin/*`) | **100%** | ✅ พร้อมใช้งาน | `/admin`, `/admin/models`, `/admin/users`, `/admin/purchases`, `/admin/complaints` พร้อม Modal แจ้งปัญหา (`ReportForm.tsx`) ในเมนูผู้ใช้และ Footer *(เหลือเชื่อมปุ่ม Report ใน `/models/[id]` ให้เรียก `useReport().openReport()`)* |
-| **Frontend — Buyer & Seller Dashboards** (`frontend`) | **20%** | 🚧 รอพัฒนา UI เชื่อม API | หน้า `/me` ปัจจุบันยังเป็น Placeholder (`<h1>My Dashboard</h1>`) และยังขาด `/pay/mock/[id]`, `/seller` (รวมถึงหน้าเสริม `/docs`, `/licenses`, `/verify` ตรวจลายน้ำ) |
+| **Frontend — Buyer & Seller Dashboards** (`frontend/src/app/me`, `seller`) | **100%** | ✅ พร้อมใช้งาน | `/me` (รายการที่ซื้อ, `embed_key`, Regenerate Key, ดาวน์โหลด `.glb` ฝังลายน้ำ, เปิดโหมดคนขาย) และ `/seller` (สรุปรายได้, ยอดขาย, โมเดลของฉัน, Soft Delete) เชื่อม API จริงครบ |
+| **Frontend — Mock Checkout & Optional Pages** (`frontend`) | **🚧** | 🚧 รอพัฒนา | ยังขาด `/pay/mock/[id]` (หน้าจำลองชำระเงิน) และหน้าเสริม `/docs`, `/licenses`, `/verify` ตรวจลายน้ำ |
 
 > **หมายเหตุเพิ่มเติม:** โมดูล `interactions.routes.ts` (Like/Comment) และหน้า `/forgot-password` ปัจจุบันยังเป็น Stub/UI-only ตามลำดับ (อยู่นอก Scope หลักของระบบซื้อขายรายชิ้นและ CDN v1)
 
@@ -212,10 +213,11 @@ Agent ทุกตัว **ห้ามละเมิด** กฎต่อไ�
    - หน้า `/login` (`AuthForm.tsx` & `lib/auth.ts`) เชื่อมต่อ API `check-email`, `login`, `register` เข้าสู่ Core API และเก็บ `token` ลงใน `localStorage` พร้อม `AccountMenu.tsx`
    - หน้าแดชบอร์ดแอดมินทั้ง 5 หน้า (`/admin`, `/admin/models`, `/admin/users`, `/admin/purchases`, `/admin/complaints`) และ Popup แจ้งปัญหา (`ReportForm.tsx`) เชื่อมต่อ API จริงเรียบร้อย (Merged PR #15)
    - หน้า Error ระบบทั่วทั้งเว็บ (`app/403/page.tsx`, `app/not-found.tsx`, `app/error.tsx`) เรียบร้อย (Merged `origin/Pek`)
+   - หน้า Buyer Dashboard (`/me`) และ Seller Dashboard (`/seller`) พร้อมฟังก์ชันใน `lib/api.ts` และ `lib/types.ts` เชื่อมต่อ Core API & CDN เรียบร้อย (Merged `origin/ham`)
 
 ---
 
-### Phase 2: แก้ไขโมเดล และการเชื่อมหน้า Buyer / Seller Dashboards (Current Priority 🚧)
+### Phase 2: แก้ไขโมเดล, หน้าจ่ายเงินจำลอง และการปรับปรุงความปลอดภัย (Current Priority 🚧)
 
 เมื่อผู้ใช้งานสั่งให้พัฒนาต่อในส่วนที่เหลือ Agent ต้องยึดแนวทางและลำดับความสำคัญดังนี้:
 
@@ -223,10 +225,9 @@ Agent ทุกตัว **ห้ามละเมิด** กฎต่อไ�
    - **Models Edit (`services/core-api/src/modules/models/models.routes.ts`):** พัฒนา `PATCH /api/models/:id` (จากเดิมที่เป็น TODO stub) ให้เจ้าของโมเดลหรือแอดมินแก้ไข `title`, `description`, `tags`, `license`, `price_cents`
    - **Security Hardening (`docs/ARCHITECTURE.md` §5):** แก้ `requireAdmin` / `requireSeller` ใน `auth.middleware.ts` ให้ตรวจ DB เสมอ, เอา `DEV_CREATOR_TOKEN` ออกจาก `frontend/src/app/upload/page.tsx`, และเพิ่ม rate limit บน `/api/auth/*`
 
-2. **งานที่ 2 — เชื่อมต่อ Mock Checkout และ Buyer / Seller Dashboards (`frontend/` — ภีม, แฮม & นนท์):**
+2. **งานที่ 2 — เชื่อมต่อ Mock Checkout และปรับแต่งส่วนที่เหลือ (`frontend/` — ภีม, แฮม & นนท์):**
    - **Mock Checkout (`/pay/mock/[id]`):** หน้าจำลองการชำระเงินที่เรียก `POST /api/purchases/:id/confirm-mock` (ตอนนี้ checkout redirect มาหน้านี้แล้วยัง 404 อยู่)
-   - **Buyer Dashboard (`/me`):** แทนที่หน้า Placeholder เดิมโดยดึงรายการโมเดลที่ซื้อแล้วจาก `GET /api/me/purchases` แสดง `embed_key`, ประเภท License, ปุ่มดาวน์โหลด `.glb` และปุ่มกด Regenerate Key (`POST /api/purchases/:id/regenerate-key`)
-   - **Seller Dashboard (`/seller` & `/seller/models/[id]`):** เชื่อมต่อ `GET /api/seller/status`, ปุ่มเปิดโหมดคนขาย (`POST /api/seller/enable`), รายการโมเดลของฉัน (`GET /api/seller/models`), ตารางสรุปยอดขาย (`GET /api/seller/sales`), และหน้าแก้ไข/ลบโมเดล
+   - **Seller Edit Page (`/seller/models/[id]`):** หน้าแก้ไขข้อมูล/ราคาโมเดล (คู่กับ `PATCH /api/models/:id`)
    - **Report Button (`/models/[id]`):** เพิ่มปุ่ม Report ที่เรียก `useReport().openReport()` (เปิด Popup แจ้งปัญหาพร้อมกรอกลิงก์โมเดลอัตโนมัติ)
 
 ---

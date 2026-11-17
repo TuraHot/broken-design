@@ -1,6 +1,7 @@
 # Lixyte — Product Requirements (PRD)
 
-Status tags: **[built]** works in code, **[partial]** part of it works (see the note), **[scaffold]** route/page exists but is a placeholder or stub, **[todo]** not started. Source of truth for scope; update when scope changes. Last checked against the code on branch `kzwnjuy` after merging `main` (2026-11-15). Who owns which page and what is still open: [`TASKS.md`](TASKS.md).
+Source of truth for product scope, goals, and content rules. Last reviewed on `main` after merging PR #15 (`kzwnjuy`) and `Pek` (2026-11-17).
+> **Live implementation status, test counts & task owners:** See [`docs/TASKS.md`](TASKS.md) and [`AGENT.md` §6](../AGENT.md#6-เส้นทางการพัฒนาของโปรเจกต์-development-roadmap--agent-action-plan).
 
 ## 1. What it is
 Lixyte is a **3D asset repository and WebGL CDN** — a library of 3D models you can embed on any site with one line of code. It stores, searches and streams standard `.glb` (binary glTF 2.0) models, and lets anyone embed a model on an external website with an `<iframe>` or a `<vm-model>` web component, without downloading or hosting the file.
@@ -9,7 +10,7 @@ Lixyte is a **3D asset repository and WebGL CDN** — a library of 3D models you
 - **Web developers / designers** who want 3D on a site with one line of code and no hosting.
 - **3D creators** who want to publish models (free or paid), reach developers, and see usage.
 - **Buyers** (a developer who buys a paid model) who need a stable embed key for their site.
-- **Admins** who moderate the catalogue (hide models, suspend accounts, see all orders). Admin is set in the database only, cannot be self-registered, and cannot buy or sell.
+- **Admins** who moderate the catalogue (hide models, suspend accounts, resolve complaints, view all orders). Admin is set in the database only, cannot be self-registered, and cannot buy or sell.
 
 One account covers buyer and seller: any user can switch on **seller mode** (`is_seller`).
 
@@ -28,39 +29,25 @@ Lixyte makes a model usable by copying a snippet; the platform hosts, validates 
 ## 5. Non-goals (for now)
 Model editing in the browser, formats other than `.glb`, real-time collaboration, in-app 3D authoring, manual light/dark switching, enterprise plans.
 
-## 6. Features
+## 6. Product Scope
 
 ### Must have (MVP)
-| Feature | Description | Status |
-|---|---|---|
-| Landing page | Dark HUD hero with the 3D lily (it bursts apart on scroll), the headline "3D models, one line of code" and a short explanation, then Popular models, Categories, New arrivals and a join banner | [built] |
-| Creator landing | Page at `/creator` for creators: what they can do, how it works in three steps, a glowing 3D butterfly, "Get started" → `/login`. Content only | [built] |
-| Navbar / Footer | Logo, Gallery, Docs, Creator, search, Log in on every page (hidden on `/login` and `/forgot-password`). Search sends you to `/gallery?q=…`. After login the right side becomes an account menu (Library, Seller dashboard for sellers, Log out; admins do not use the public pages: after login they are sent to `/admin` and stay there, unless they press "View Website" in the admin layout); the Seller page it links to does not exist yet | [built] |
-| Auth | core-api: `check-email`, `register`, `login` (bcrypt + JWT; roles `user`, `creator`, `admin`; suspended accounts get `403 ACCOUNT_SUSPENDED`). `/login` is connected: email first → password (known email) or display name + password (new email); the token is kept in `localStorage`. "Continue with Google" is **UI only**. There is no one-time-code step. `/forgot-password` is UI only (no endpoint) | [partial] |
-| Seller mode | `POST /api/seller/enable`, `GET /api/seller/status`, `/models`, `/sales` in core-api (with tests). No seller page in the frontend yet | [partial] backend [built], page [todo] |
-| Upload | `/upload` (live 3D preview, poster captured from the viewer) → cdn-service `POST /api/models`: seller only, account status checked in the database, `.glb` validated (magic bytes `glTF`, version 2, length = size; main ≤ 50 MB, preview ≤ 5 MB, poster ≤ 1 MB), original watermark embedded, stored by sha256. Paid models must include a preview file | [built] |
-| Gallery | Paged grid of model cards. Real models come from core-api `GET /api/models` and are merged with the mock catalogue unless `NEXT_PUBLIC_USE_MOCK=false`. Search (`q`) and the Tag / License / Price dropdowns work and live in the URL | [built] |
-| Model detail | `/models/[id]`: 3D preview streamed from the CDN (placeholder for sample catalogue models), description and tags, owner, stats, license rules, copy-ready embed code, "More from creator". Download streams through the CDN (login needed for paid models); "Buy" starts checkout. Not yet: like / comment, embed playground | [partial] |
-| Creator profile | `/creators/[handle]` [UI only, mock data]: cover and photo (placeholders), stats, the creator's models, Donate box (no payment). Not yet: accounts, changing cover and photo, real donations, Commissions tab. Core-api has no `/api/creators/:handle` yet | [partial] |
-| Embed | `<iframe>` page `/embed/[id]` and `public/embed.js` custom element `<vm-model>` (`model-id`, `key`, `cdn-base`, camera options). A wrong or rotated key falls back to `preview.glb` with a notice instead of breaking | [built] |
-| Embed playground | Adjust viewer options, generate HTML / React / Vue / WordPress snippets | [todo] |
-| CDN streaming | Free/preview GLB stream, paid GLB with embed key, poster, download, CORS, Cache-Control, HTTP Range, ETag, rate limits, hidden / suspended models blocked | [built] |
-| Watermark | Two layers (signed metadata + vertex steganography) on upload and again on each paid download (with the buyer's purchase id); `POST /cdn/verify-watermark` checks a file | [built] backend, inspector page [todo] |
-| Purchases | core-api: checkout (price, currency and license locked at purchase), mock confirmation, `GET /api/me/purchases`, regenerate key, `GET /api/purchases/:id` (with tests). Stripe webhook is a stub. The mock payment page `/pay/mock/[id]` does not exist yet | [partial] |
-| Buyer dashboard | Purchase history, embed keys, regenerate (`/me`) | [scaffold] (page is one heading) |
-| Creator dashboard | My models, sales, edit metadata, delete (`/seller`). `PATCH /api/models/:id` is a TODO; `DELETE` (soft delete) works | [scaffold] |
-| Admin | Overview, hide / restore models, suspend / restore users, see orders (`/admin/*`). `/api/admin/*` and the four pages (`/admin`, `/admin/models`, `/admin/users`, `/admin/purchases`) are built; the CDN honours `hidden_at` and `suspended_at`. Hide / restore and suspend / restore ask "Sure?" first | [built] |
-| Complaints | Any signed-in user can report a model, a person, a purchase or something else from a popup (account menu → "Report a problem", or the footer link; on a model page the model link is filled in) (a pasted model link fills in the model; max 5 reports an hour, 10 to 2000 characters). Admins read them at `/admin/complaints` (open first): "Read & respond" opens the whole complaint in a dialog where they change the status (open, in review, resolved, dismissed), add a note and hide the reported model | [built] |
-| Likes & comments | Like a model, comment on a model | [scaffold] |
+- **Landing & Discovery:** Dark HUD landing page (`/`) with interactive 3D lily hero, creator onboarding landing (`/creator`), global Navbar/Footer with role-aware account menu, and `/gallery` with URL-backed search (`q`) and Tag / License / Price filters.
+- **Authentication & Account Mode:** Email-first login/sign-up (`/login`), suspended account blocking (`403 ACCOUNT_SUSPENDED`), and one-click seller mode activation (`is_seller`).
+- **Creator Upload & Catalogue Management:** Validated `.glb` + preview/poster upload (`/upload`) with automatic `<model-viewer>.toBlob()` poster capture, content-addressable storage, plus creator model editing/soft-deletion (`/seller`).
+- **Model Detail & Cross-Origin Embed:** Model showcase (`/models/[id]`) with 3D preview, license breakdown, copyable `<vm-model>` and `<iframe>` snippets (`/embed/[id]`), and automatic graceful fallback to `preview.glb` when an embed key is missing/invalid/rotated.
+- **Single-Item Purchase & Downloads:** Checkout locking price, currency, and license type at purchase time, mock payment confirmation (`/pay/mock/[id]`), buyer library (`/me`) with `embed_key` viewing/regeneration, and authenticated downloads.
+- **CDN & Multi-Layer GLB Watermarking:** Range/ETag/CORS-enabled CDN streaming plus two-layer GLB watermarking (metadata HMAC signature + 64-vertex X-coordinate steganography) on upload and paid downloads, backed by `/cdn/verify-watermark`.
+- **Moderation, Complaints & System Error Pages:** User report modal (`openReport`) for flagging models/accounts/purchases, Admin dashboards (`/admin/*`) for overview, model hide/restore, user suspend/restore, purchases, and complaint resolution, plus global `403` / `404` / `500` error pages.
 
-### Later
-Docs site (`/docs`), licenses page, legal pages, a "Report" button on the model page that calls `openReport()` (the popup), system pages (global 404 / 403 / 500), forgot-password endpoint, usage statistics for creators, notifications, key lock to allowed domains, real Stripe checkout, automatic model optimisation (Draco / Meshopt).
+### Later (Post-v1)
+Docs site (`/docs`), licenses comparison page (`/licenses`), legal pages (Terms, Privacy, Refunds, DMCA), "Report" trigger button directly on `/models/[id]`, forgot-password email flow, creator profile accounts/avatars/donations, embed playground (`/models/[id]/embed`), watermark inspector UI (`/verify`), creator usage stats, key domain locking, real Stripe checkout, likes/comments moderation, and automatic 3D compression (Draco / Meshopt).
 
 ## 7. Key user flows
 1. **Discover → embed:** Landing → Gallery (search / filter) → Model detail → copy embed code → paste on own site.
 2. **Publish:** Log in or sign up → turn on seller mode → Upload `.glb` + metadata → model appears in Gallery.
-3. **Buy:** Model detail → Checkout → mock payment → embed key in `/me` → embed with `key=...`. (The payment page and `/me` are the missing pieces.)
-4. **Moderate:** Admin hides a model or suspends an owner → the CDN stops serving it immediately, even to people who bought it. (Done from `/admin/models` and `/admin/users`.)
+3. **Buy:** Model detail → Checkout → payment confirmation → copy `embed_key` or download watermarked `.glb` in `/me`.
+4. **Moderate:** User submits a complaint or Admin reviews models/users in `/admin/*` → hiding a model or suspending an owner blocks CDN streaming immediately, including for earlier buyers.
 
 ## 8. Content rules
 - Licenses: `CC0`, `CC-BY`, `CC-BY-NC`, `COMMERCIAL`.

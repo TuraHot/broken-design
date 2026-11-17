@@ -114,6 +114,17 @@ Agent ทุกตัว **ห้ามละเมิด** กฎต่อไ�
   - `GET /api/seller/status` — ตรวจสถานะคนขาย
   - `GET /api/seller/models` — รายการโมเดลของคนขาย
   - `GET /api/seller/sales` — สรุปรายได้และประวัติการขาย
+- **Admin (`/api/admin`):** *(ทุก Route ตรวจ `role === 'admin'` และ `suspended_at IS NULL` จากฐานข้อมูลจริงผ่าน `requireActiveAdmin`)*
+  - `GET /api/admin/overview` — สรุปยอดรวมระบบ, สถิติ 7 วันล่าสุด, สัดส่วน Free/Paid & License, Top 5 โมเดล, รายการซื้อและผู้ใช้ล่าสุด, คำร้องเรียนที่เปิดอยู่
+  - `GET /api/admin/users` — รายชื่อผู้ใช้ (ค้นหาด้วย `q` + แบ่งหน้า `page`, `pageSize`)
+  - `PATCH /api/admin/users/:id/suspend` — ระงับหรือคืนสิทธิ์บัญชีผู้ใช้ (`{ suspended: boolean }`, ห้ามระงับตัวเอง)
+  - `GET /api/admin/models` — รายการโมเดลทั้งหมดรวมโมเดลที่ซ่อนและถูกลบ
+  - `PATCH /api/admin/models/:id/hide` — ซ่อนหรือแสดงผลโมเดลคืน (`{ hidden: boolean }`)
+  - `GET /api/admin/purchases` — รายการสั่งซื้อทั้งหมดพร้อมข้อมูลผู้ซื้อ, โมเดล และ `watermark_hash` (ไม่ส่ง `embed_key`)
+  - `GET /api/admin/complaints` — รายการคำร้องเรียน (กรอง `?status=` ได้, เรียง `open` และ `in_review` ขึ้นก่อน)
+  - `PATCH /api/admin/complaints/:id` — เปลี่ยนสถานะคำร้องเรียน (`open`, `in_review`, `resolved`, `dismissed`) พร้อมบันทึก `admin_note`
+- **Complaints (`/api/complaints`):**
+  - `POST /api/complaints` — ผู้ใช้ที่ล็อกอินส่งคำร้องเรียน (`category`: `model|account|purchase|other`, `modelId?`, `message` 10–2000 ตัวอักษร; จำกัดไม่เกิน 5 ครั้ง/ชั่วโมง ต่อผู้ใช้)
 
 ### 4.3 Frontend & Embed Contract (`frontend/` — พอร์ต `3000`)
 - **Web Component (`public/embed.js`):**
@@ -139,6 +150,7 @@ Agent ทุกตัว **ห้ามละเมิด** กฎต่อไ�
 - **`models`**: `id (UUID)`, `owner_id (FK users)`, `title`, `description`, `tags (TEXT[] GIN)`, `license ('CC0'|'CC-BY'|'CC-BY-NC'|'COMMERCIAL')`, `file_hash (CHAR(64))`, `file_size (BIGINT)`, `preview_hash (CHAR(64))`, `poster_hash (CHAR(64))`, `price_cents (INT)`, `currency (CHAR(3))`, `view_count`, `download_count`, `hidden_at`, `deleted_at`, `created_at`
 - **`purchases`**: `id (UUID)`, `user_id (FK users)`, `model_id (FK models)`, `status ('pending'|'paid')`, `amount_cents (INT)`, `currency (VARCHAR(10))`, `license_type (VARCHAR(50))`, `watermark_hash (VARCHAR(128))`, `paid_at (TIMESTAMPTZ)`, `provider_session_id`, `embed_key (VARCHAR(64) UNIQUE)`, `created_at`, `UNIQUE(user_id, model_id)`
 - **`likes`** & **`comments`**: ตารางสำหรับระบบถูกใจและคอมเมนต์
+- **`complaints`**: `id (UUID)`, `reporter_id (FK users)`, `category ('model'|'account'|'purchase'|'other')`, `model_id (FK models, ON DELETE SET NULL)`, `message (TEXT 10..2000)`, `status ('open'|'in_review'|'resolved'|'dismissed')`, `admin_note`, `handled_by (FK users)`, `handled_at (TIMESTAMPTZ)`, `created_at`
 - **Multi-Layer GLB Watermarking (`services/cdn-service/src/utils/glbWatermark.ts`):**
   - **Layer 1 (Metadata Signature):** ฝัง `{ platform: 'Lixyte', modelId, ownerId, license, purchaseId, signature, issuedAt }` (HMAC-SHA256 ด้วย `WATERMARK_SECRET`) ลงใน `asset.extras` และ `asset.copyright`
   - **Layer 2 (Vertex Steganography):** ฝังบิต 64 บิตแรกของ `signature` ลงในทศนิยมหลักที่ 4 ของพิกัดแกน X (`Math.round(x * 10000)`) ของจุดยอด 64 จุดแรกใน `POSITION` accessor ของ Mesh แรก
@@ -154,29 +166,33 @@ Agent ทุกตัว **ห้ามละเมิด** กฎต่อไ�
 ## 6. เส้นทางการพัฒนาของโปรเจกต์ (Development Roadmap & Agent Action Plan)
 
 ส่วนนี้กำหนดแผนที่นำทาง (Roadmap) สำหรับ AI Agent ทุกตัว เพื่อให้สามารถรับงานต่อและพัฒนาฟีเจอร์ถัดไปได้อย่างเป็นระบบโดยไม่ชนกัน:
+- **ติดตามสถานะรายหน้า/รายไฟล์แบบละเอียดและผู้รับผิดชอบ:** ดู [`docs/TASKS.md`](./docs/TASKS.md)
+- **กฎการออกแบบ UI สำหรับงานฝั่ง Frontend:** อ่าน [`docs/DESIGN_SYSTEM.md`](./docs/DESIGN_SYSTEM.md) ก่อนแก้ไขหน้าเว็บทุกครั้ง
+- **รายการแก้ไขด้านความปลอดภัยก่อนเปิดใช้งานจริง (Pre-launch Security Hardening):** ดู [`docs/ARCHITECTURE.md` §5](./docs/ARCHITECTURE.md#5-known-issues-to-fix-before-launch)
 
-### 6.0 สรุปความคืบหน้าโครงการปัจจุบัน (Current Project Progress Summary — ภาพรวม ~85%)
+### 6.0 สรุปความคืบหน้าโครงการปัจจุบัน (Current Project Progress Summary — ภาพรวม ~92%)
 
 | ระบบ / โมดูล | ความคืบหน้า | สถานะและผลการทดสอบ | สิ่งที่ทำเสร็จแล้วและงานที่คงเหลือ |
 | :--- | :---: | :--- | :--- |
-| **Database & Cloud Storage** (`supabase/schema.sql` + Supabase Bucket `models`) | **100%** | ✅ พร้อมใช้งาน | ครบทุกตาราง (`users`, `models`, `purchases`, `likes`, `comments`), คอลัมน์ Single-item purchase & watermark, Seed accounts/model และอัปโหลดไฟล์ `.glb` ใน `storage_data/` ขึ้น Supabase bucket `models` เรียบร้อยแล้ว |
+| **Database & Cloud Storage** (`supabase/schema.sql` + Supabase Bucket `models`) | **100%** | ✅ พร้อมใช้งาน | ครบทุกตาราง (`users`, `models`, `purchases`, `likes`, `comments`, `complaints`), คอลัมน์ Single-item purchase & watermark, Seed accounts/model และอัปโหลดไฟล์ `.glb` ใน `storage_data/` ขึ้น Supabase bucket `models` เรียบร้อยแล้ว |
 | **CDN Service, Upload & Watermarking** (`services/cdn-service`) | **100%** | ✅ **23/23 tests** | `POST /api/models`, `GET /cdn/models/:id/:hash.glb`, `/preview.glb`, `/file.glb?key=`, `/download`, `/poster.webp`, `POST /cdn/verify-watermark`, HTTP Range (`206`/`416`), ETag (`304`), Rate Limit, Constant-time `embed_key` check, Dual-layer GLB Watermarking (Metadata HMAC + 64-vertex steganography) |
-| **Core API — Auth** (`services/core-api/src/modules/auth`) | **100%** | ✅ **2/2 tests** | `POST /api/auth/check-email`, `POST /api/auth/register`, `POST /api/auth/login` (พร้อมตรวจ `suspended_at`) |
+| **Core API — Auth & CORS** (`services/core-api/src/modules/auth`, `config/cors.ts`) | **100%** | ✅ **6/6 tests** | `POST /api/auth/check-email`, `POST /api/auth/register`, `POST /api/auth/login` (**2/2**), และ CORS `localhost`/`127.0.0.1` handling (**4/4**) |
 | **Core API — Models** (`services/core-api/src/modules/models`) | **90%** | ✅ ใช้งานได้ (ขาด `PATCH`) | `GET /api/models` (search, tag, license, price, pagination), `GET /api/models/:id` (ซ่อน `fileUrl` สำหรับโมเดลเสียเงิน), `DELETE /api/models/:id` (Soft delete) \| **คงเหลือ:** `PATCH /api/models/:id` (แก้ไขชื่อ/รายละเอียด/ราคา/สัญญาอนุญาต — ยังเป็น TODO stub) |
 | **Core API — Payments** (`services/core-api/src/modules/payments`) | **100%** | ✅ **12/12 tests** | `POST /api/models/:id/checkout`, `POST /api/purchases/:id/confirm-mock`, `POST /api/models/:id/pay-mock`, `GET /api/me/purchases`, `GET /api/purchases/:id`, `POST /api/purchases/:id/regenerate-key` |
 | **Core API — Seller** (`services/core-api/src/modules/seller`) | **100%** | ✅ **5/5 tests** | `POST /api/seller/enable`, `GET /api/seller/status`, `GET /api/seller/models`, `GET /api/seller/sales` |
-| **Core API — Admin** (`services/core-api/src/modules/admin`) | **0%** | 🚧 รอพัฒนา | ยังไม่มีโมดูล `/api/admin/*` (`overview`, `users`, `users/:id/suspend`, `models`, `models/:id/hide`, `purchases`) |
-| **Frontend — Public Pages, 3D Viewer, Upload, Auth & Embed** (`frontend`) | **100%** | ✅ **4/4 tests** | หน้าแรก (`/`), คลังโมเดล (`/gallery`), รายละเอียดโมเดล + 3D Playground (`/models/[id]`), หน้าครีเอเตอร์ (`/creator`, `/creators/[handle]`), หน้าอัปโหลดพร้อมถ่ายภาพปกอัตโนมัติ (`/upload`), หน้าเข้าสู่ระบบ/สมัครสมาชิก (`/login` เชื่อม API จริง), และระบบ Cross-Origin Embed (`/embed/[id]` + `public/embed.js` `<vm-model>`) |
-| **Frontend — Buyer / Seller / Admin Dashboards** (`frontend`) | **20%** | 🚧 รอพัฒนา UI เชื่อม API | หน้า `/me` ปัจจุบันยังเป็น Placeholder (`<h1>My Dashboard</h1>`) ต้องเชื่อมกับ `GET /api/me/purchases`, `POST /api/purchases/:id/regenerate-key`, หน้า `/pay/mock/[id]`, หน้า `/seller` (`/api/seller/*`), และหน้า `/admin/*` (`/api/admin/*`) |
+| **Core API — Admin & Complaints** (`services/core-api/src/modules/admin`, `complaints`) | **100%** | ✅ **25/25 tests** | `/api/admin/*` ครบทั้ง 8 endpoints (`overview`, `users`, `users/:id/suspend`, `models`, `models/:id/hide`, `purchases`, `complaints`, `complaints/:id`) ผ่าน **20/20** + `POST /api/complaints` (rate limit 5/hr) ผ่าน **5/5** *(รวม Core API ทั้งหมด **48/48 tests**)* |
+| **Frontend — Public Pages, Error Pages (`403`/`404`/`500`), Auth, Upload & Embed** (`frontend`) | **100%** | ✅ **4/4 tests** | หน้าแรก (`/`), `/gallery` (ค้นหา/กรอง/แบ่งหน้า), `/models/[id]`, `/creator`, `/creators/[handle]`, `/upload`, `/login`, `/embed/[id]`, `public/embed.js` (`<vm-model>`), เมนูบัญชี (`AccountMenu.tsx`), หน้า `403`, `not-found.tsx` (404), และ `error.tsx` (500) |
+| **Frontend — Admin Dashboard & Report Modal** (`frontend/src/app/admin/*`) | **100%** | ✅ พร้อมใช้งาน | `/admin`, `/admin/models`, `/admin/users`, `/admin/purchases`, `/admin/complaints` พร้อม Modal แจ้งปัญหา (`ReportForm.tsx`) ในเมนูผู้ใช้และ Footer *(เหลือเชื่อมปุ่ม Report ใน `/models/[id]` ให้เรียก `useReport().openReport()`)* |
+| **Frontend — Buyer & Seller Dashboards** (`frontend`) | **20%** | 🚧 รอพัฒนา UI เชื่อม API | หน้า `/me` ปัจจุบันยังเป็น Placeholder (`<h1>My Dashboard</h1>`) และยังขาด `/pay/mock/[id]`, `/seller` (รวมถึงหน้าเสริม `/docs`, `/licenses`, `/verify` ตรวจลายน้ำ) |
 
 > **หมายเหตุเพิ่มเติม:** โมดูล `interactions.routes.ts` (Like/Comment) และหน้า `/forgot-password` ปัจจุบันยังเป็น Stub/UI-only ตามลำดับ (อยู่นอก Scope หลักของระบบซื้อขายรายชิ้นและ CDN v1)
 
 ---
 
-### Phase 1: โครงสร้างพื้นฐาน, ระบบ CDN, ลายน้ำ 3 มิติ และการซื้อรายชิ้น (Completed ✅)
-1. **Database Schema & Core Middlewares (แฮม):**
-   - `supabase/schema.sql` (รองรับ Single-Item Purchase: `amount_cents`, `currency`, `license_type`, `watermark_hash`, `paid_at`)
-   - `auth.middleware.ts` (`requireAuth`, `requireSeller`, `requireAdmin`) และ `error.middleware.ts` (`AppError`)
+### Phase 1: โครงสร้างพื้นฐาน, ระบบ CDN, ลายน้ำ 3 มิติ, การซื้อรายชิ้น และระบบแอดมิน (Completed ✅)
+1. **Database Schema & Core Middlewares (แฮม & เจี๊ยบ):**
+   - `supabase/schema.sql` (ตาราง `users`, `models`, `purchases`, `likes`, `comments`, `complaints` และ Seed)
+   - `auth.middleware.ts` (`requireAuth`, `requireSeller`, `requireAdmin`), `error.middleware.ts` (`AppError`), และ `config/cors.ts` (`4/4 tests`)
 2. **Upload, Dual Storage & GLB Validation (แฮม & นนท์):**
    - `LocalDiskStorage` และ `SupabaseStorage` (`models` bucket) พร้อมระบบ Fallback อัตโนมัติ
    - `glbValidator.ts` ตรวจ Magic Bytes (`glTF` v2) และคำนวณ `sha256`
@@ -186,37 +202,32 @@ Agent ทุกตัว **ห้ามละเมิด** กฎต่อไ�
    - รองรับ HTTP Range (`206`/`416`), ETag (`304`), Rate Limit, Constant-Time `embed_key` check
    - ฝังลายน้ำ 2 ชั้น (Metadata HMAC + 64-point Vertex Steganography) ทั้งตอนอัปโหลด (`purchaseId: 'original'`) และตอนผู้ซื้อดาวน์โหลด (`purchaseId` + `license_type` พร้อมบันทึก `watermark_hash`)
    - Endpoint `POST /cdn/verify-watermark` สำหรับพิสูจน์ความเป็นเจ้าของไฟล์ `.glb`
-4. **Auth, Catalog Models, Payments & Seller Backend (ต้า, เป้ก & ภีม):**
-   - `auth.routes.ts` (`register`, `login`, `check-email` พร้อมบล็อกบัญชีที่ถูกระงับ + `auth.test.ts`)
+4. **Auth, Catalog Models, Payments, Seller, Admin & Complaints Backend (ต้า, เป้ก, ภีม & เจี๊ยบ):**
+   - `auth.routes.ts` (`register`, `login`, `check-email` พร้อมบล็อกบัญชีที่ถูกระงับ + `auth.test.ts` **2/2**)
    - `models.routes.ts` (`GET /api/models` ค้นหา/กรอง/แบ่งหน้า, `GET /api/models/:id` ซ่อนลิงก์ไฟล์เต็มของโมเดลเสียเงิน, และ `DELETE /api/models/:id` Soft Delete)
-   - `payments.routes.ts` + `payments.test.ts` และ `seller.routes.ts` + `seller.test.ts` (ผ่าน **19/19 tests**)
-5. **Frontend Viewer, Gallery, Auth & Cross-Origin Embed (เจี๊ยบ, ต้า & นนท์):**
+   - `payments.routes.ts` (**12/12**) และ `seller.routes.ts` (**5/5**)
+   - `admin.routes.ts` (ทั้ง 8 endpoints พร้อม `requireActiveAdmin` ตรวจจาก DB + `admin.test.ts` **20/20**) และ `complaints.routes.ts` (`POST /api/complaints` + `complaints.test.ts` **5/5**) — *รวม Core API ผ่านครบ **48/48 tests***
+5. **Frontend Public Pages, Error Pages, Auth, Admin Dashboard & Cross-Origin Embed (เจี๊ยบ, เป้ก, ต้า & นนท์):**
    - หน้า `/`, `/gallery`, `/models/[id]`, `/creators/[handle]`, `/embed/[id]`, และ `public/embed.js` (`<vm-model>`) เชื่อมต่อกับ Core API (`CORE_API_URL` / `INTERNAL_CORE_API_URL` ใน Docker) และ CDN Service เรียบร้อย
-   - หน้า `/login` (`AuthForm.tsx` & `lib/auth.ts`) เชื่อมต่อ API `check-email`, `login`, `register` เข้าสู่ Core API และเก็บ `token` ลงใน `localStorage` เรียบร้อย (Merged PR #13)
+   - หน้า `/login` (`AuthForm.tsx` & `lib/auth.ts`) เชื่อมต่อ API `check-email`, `login`, `register` เข้าสู่ Core API และเก็บ `token` ลงใน `localStorage` พร้อม `AccountMenu.tsx`
+   - หน้าแดชบอร์ดแอดมินทั้ง 5 หน้า (`/admin`, `/admin/models`, `/admin/users`, `/admin/purchases`, `/admin/complaints`) และ Popup แจ้งปัญหา (`ReportForm.tsx`) เชื่อมต่อ API จริงเรียบร้อย (Merged PR #15)
+   - หน้า Error ระบบทั่วทั้งเว็บ (`app/403/page.tsx`, `app/not-found.tsx`, `app/error.tsx`) เรียบร้อย (Merged `origin/Pek`)
 
 ---
 
-### Phase 2: ระบบแอดมิน, แก้ไขโมเดล และการเชื่อมหน้า Dashboard (Current Priority 🚧)
+### Phase 2: แก้ไขโมเดล และการเชื่อมหน้า Buyer / Seller Dashboards (Current Priority 🚧)
 
 เมื่อผู้ใช้งานสั่งให้พัฒนาต่อในส่วนที่เหลือ Agent ต้องยึดแนวทางและลำดับความสำคัญดังนี้:
 
-1. **งานที่ 1 — พัฒนา Admin Backend Module และ `PATCH /api/models/:id` (`services/core-api/` — ต้า & เป้ก):**
-   - **Models Edit (`services/core-api/src/modules/models/models.routes.ts`):** พัฒนา `PATCH /api/models/:id` (จากเดิมที่เป็น TODO stub) ให้เจ้าของโมเดลหรือแอดมินแก้ไข `title`, `description`, `tags`, `license`, `price_cents` พร้อมอัปเดต `updated_at`
-   - **Admin Router (`services/core-api/src/modules/admin/`):** สร้าง `admin.routes.ts` และผูกเข้ากับ `app.use('/api/admin', adminRouter)` ใน `services/core-api/src/app.ts` โดยทุก Route ต้องผ่าน `requireAuth` และ `requireAdmin` (ตรวจ `role === 'admin'` และ `suspended_at IS NULL` จากฐานข้อมูลจริง)
-   - **Endpoints ที่ต้องมีใน `/api/admin`:**
-     - `GET /api/admin/overview` — สรุปจำนวนผู้ใช้ทั้งหมด, จำนวนโมเดล, จำนวนรายการสั่งซื้อสำเร็จ และยอดขายรวม
-     - `GET /api/admin/users` — ดึงรายชื่อผู้ใช้ทั้งหมดพร้อมสถานะ `role`, `is_seller`, `suspended_at`
-     - `PATCH /api/admin/users/:id/suspend` — ระงับ (`suspended_at = NOW()`) หรือคืนสิทธิ์ (`suspended_at = NULL`) บัญชีผู้ใช้ (ห้ามแอดมินระงับตัวเอง)
-     - `GET /api/admin/models` — ดึงรายการโมเดลทั้งหมดในระบบ (รวมโมเดลที่ถูกซ่อนหรือถูกลบ)
-     - `PATCH /api/admin/models/:id/hide` — ซ่อน (`hidden_at = NOW()`) หรือแสดงผลคืน (`hidden_at = NULL`) โมเดล (เมื่อซ่อนแล้ว CDN จะบล็อกการสตรีมด้วย `403 MODEL_UNAVAILABLE` ทันที)
-     - `GET /api/admin/purchases` — ดูรายการสั่งซื้อทั้งหมดในระบบพร้อมข้อมูลผู้ซื้อ โมเดล ราคา และ `watermark_hash`
+1. **งานที่ 1 — พัฒนา `PATCH /api/models/:id` และการปรับปรุงความปลอดภัย Backend (`services/core-api/` — แฮม & ต้า):**
+   - **Models Edit (`services/core-api/src/modules/models/models.routes.ts`):** พัฒนา `PATCH /api/models/:id` (จากเดิมที่เป็น TODO stub) ให้เจ้าของโมเดลหรือแอดมินแก้ไข `title`, `description`, `tags`, `license`, `price_cents`
+   - **Security Hardening (`docs/ARCHITECTURE.md` §5):** แก้ `requireAdmin` / `requireSeller` ใน `auth.middleware.ts` ให้ตรวจ DB เสมอ, เอา `DEV_CREATOR_TOKEN` ออกจาก `frontend/src/app/upload/page.tsx`, และเพิ่ม rate limit บน `/api/auth/*`
 
-2. **งานที่ 2 — เชื่อมต่อ Mock Checkout และ Buyer/Seller/Admin Dashboards (`frontend/` — เจี๊ยบ & ภีม):**
-   - **Auth (`/login`):** *(เสร็จแล้ว ✅ — Merged PR #13: เชื่อมต่อ `check-email`, `login`, `register` และเก็บ JWT ลง `localStorage` เรียบร้อย)*
-   - **Mock Checkout (`/pay/mock/[id]`):** หน้าจำลองการชำระเงินที่เรียก `POST /api/models/:id/checkout` และ `POST /api/purchases/:id/confirm-mock` เมื่อกดปุ่มยืนยันการชำระเงิน
+2. **งานที่ 2 — เชื่อมต่อ Mock Checkout และ Buyer / Seller Dashboards (`frontend/` — ภีม, แฮม & นนท์):**
+   - **Mock Checkout (`/pay/mock/[id]`):** หน้าจำลองการชำระเงินที่เรียก `POST /api/purchases/:id/confirm-mock` (ตอนนี้ checkout redirect มาหน้านี้แล้วยัง 404 อยู่)
    - **Buyer Dashboard (`/me`):** แทนที่หน้า Placeholder เดิมโดยดึงรายการโมเดลที่ซื้อแล้วจาก `GET /api/me/purchases` แสดง `embed_key`, ประเภท License, ปุ่มดาวน์โหลด `.glb` และปุ่มกด Regenerate Key (`POST /api/purchases/:id/regenerate-key`)
-   - **Seller Dashboard (`/seller`):** เชื่อมต่อ `GET /api/seller/status`, ปุ่มเปิดโหมดคนขาย (`POST /api/seller/enable`), รายการโมเดลของฉัน (`GET /api/seller/models`), และตารางสรุปยอดขาย (`GET /api/seller/sales`)
-   - **Admin Dashboard (`/admin/*`):** สร้างหน้าแดชบอร์ดแอดมินทั้ง 4 ส่วน (`/admin`, `/admin/models`, `/admin/users`, `/admin/purchases`) เชื่อมกับ `/api/admin/*`
+   - **Seller Dashboard (`/seller` & `/seller/models/[id]`):** เชื่อมต่อ `GET /api/seller/status`, ปุ่มเปิดโหมดคนขาย (`POST /api/seller/enable`), รายการโมเดลของฉัน (`GET /api/seller/models`), ตารางสรุปยอดขาย (`GET /api/seller/sales`), และหน้าแก้ไข/ลบโมเดล
+   - **Report Button (`/models/[id]`):** เพิ่มปุ่ม Report ที่เรียก `useReport().openReport()` (เปิด Popup แจ้งปัญหาพร้อมกรอกลิงก์โมเดลอัตโนมัติ)
 
 ---
 
@@ -244,7 +255,7 @@ cd services/cdn-service
 npx.cmd tsc --noEmit -p .
 npm.cmd test
 
-# 2. ตรวจ Type-check และรัน Unit Tests ของ Core API (ต้องผ่านครบ 19/19 tests)
+# 2. ตรวจ Type-check และรัน Unit Tests ของ Core API (ต้องผ่านครบ 48/48 tests)
 cd services/core-api
 npx.cmd tsc --noEmit -p .
 npm.cmd test

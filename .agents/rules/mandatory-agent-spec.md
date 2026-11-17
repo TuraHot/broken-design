@@ -1,18 +1,10 @@
 # Mandatory Pre-Work Rule: Read `AGENT.md`
 
-Before writing code, modifying files, or executing commands in this workspace, every AI agent **MUST** read and strictly follow the engineering specification and development roadmap in [AGENT.md](../../AGENT.md).
+Before writing code, modifying files, or executing commands in this workspace, every AI agent **MUST** read and strictly follow **[AGENT.md](../../AGENT.md)**.
 
-## Key Directives for All Agents
-1. **Follow the Development Roadmap in `AGENT.md` Section 6:**
-   - **Phase 1 (Completed):** Database Schema & Middlewares, Upload + Dual Storage (`LocalDiskStorage` & `SupabaseStorage`), CDN Streaming (`206`/`416`, ETag/`304`, Rate Limit, Constant-Time `embed_key`), Multi-Layer GLB Watermarking (`glbWatermark.ts` + `POST /cdn/verify-watermark`), Auth API (`check-email`, `register`, `login`), Models Catalog (`GET /api/models`, `GET /api/models/:id`, `DELETE /api/models/:id`), Single-Item Purchase & Seller API, Frontend Viewer, Auth UI (`/login`), Docker Internal Routing (`INTERNAL_CORE_API_URL`), and Cross-Origin Embed.
-   - **Phase 2 (Current Priority):**
-     1. Complete `PATCH /api/models/:id` (`services/core-api/src/modules/models/models.routes.ts`).
-     2. Implement Admin Backend Module (`services/core-api/src/modules/admin/`).
-     3. Connect Mock Checkout (`/pay/mock/[id]`), Buyer (`/me`), Seller (`/seller`), and Admin (`/admin/*`) Dashboards in `frontend/`.
-   - **Phase 3 (Future Roadmap):** Watermark Inspector UI, Stripe Webhook Integration, and Automated 3D Compression.
-2. **Never Violate Core Security Invariants (`AGENT.md` Section 3):**
-   - Always check `is_seller`, `role`, and `suspended_at` against the database on the backend.
-   - Never expose `file_hash` of a paid model without a valid paid `embed_key` verified via `crypto.timingSafeEqual`.
-   - Maintain the standard error format `{ error: { code, message } }` via `AppError`.
-3. **Always Run Verification Commands (`AGENT.md` Section 7.2):**
-   - Use `npx.cmd` and `npm.cmd` on Windows PowerShell to run `tsc --noEmit` and `npm test` in `services/cdn-service`, `services/core-api`, and `frontend`.
+## Authoritative References (Do Not Duplicate)
+- **Security Invariants, Access Control Matrix & Error Format:** [AGENT.md §3](../../AGENT.md#3-กฎเหล็กทางธุรกิจและความปลอดภัย-core-invariants--access-rules)
+- **API Contracts, Database Schema & Multi-Layer GLB Watermarking:** [AGENT.md §4–§5](../../AGENT.md#4-สเปกของแต่ละเซอร์วิสและ-api-contract)
+- **Development Roadmap & Verification Checklist (`tsc` + `npm test`):** [AGENT.md §6–§7](../../AGENT.md#6-เส้นทางการพัฒนาของโปรเจกต์-development-roadmap--agent-action-plan)
+- **Frontend UI & Accessibility Rules:** [docs/DESIGN_SYSTEM.md](../../docs/DESIGN_SYSTEM.md)
+- **Granular Task Status & Known Security Items:** [docs/TASKS.md](../../docs/TASKS.md) and [docs/ARCHITECTURE.md §5](../../docs/ARCHITECTURE.md#5-known-issues-to-fix-before-launch)

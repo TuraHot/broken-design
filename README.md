@@ -5,7 +5,7 @@
 นักพัฒนาเว็บสามารถค้นหาโมเดล ปรับแต่งมุมมองใน Playground แล้วคัดลอกโค้ดเพียง 1–2 บรรทัด (`<vm-model>` Web Component หรือ `<iframe>`) ไปวางบนเว็บไซต์ของตนเองเพื่อให้โมเดลสตรีมจาก CDN ของ Lixyte โดยตรง ไม่ต้องดาวน์โหลด ไม่ต้องตั้งค่า CORS/Cache เอง และไม่ต้องแบกภาระแบนด์วิดท์ของไฟล์ 3 มิติขนาดใหญ่ หรือเลือกดาวน์โหลดไฟล์ `.glb` ที่ฝังใบอนุญาตและลายน้ำดิจิทัล (Multi-Layer Watermark) ไปใช้งานต่อได้ทันที
 
 > 🤖 **สำหรับ AI Coding Agents (Antigravity, Gemini, Claude, Cursor, Copilot, Codex):**
-> โปรเจกต์นี้ใช้ **[AGENT.md](./AGENT.md)** เป็นเอกสารกำหนดสถาปัตยกรรม กฎเหล็กด้านความปลอดภัย และเส้นทางการพัฒนา (Development Roadmap) โดยมีการผูกกฎบังคับอ่านอัตโนมัติไว้ใน [GEMINI.md](./GEMINI.md), [AGENTS.md](./AGENTS.md), และ [.agents/rules/mandatory-agent-spec.md](./.agents/rules/mandatory-agent-spec.md)
+> โปรเจกต์นี้แบ่งหน้าที่เอกสารแบบ **Single Source of Truth** โดยใช้ **[AGENT.md](./AGENT.md)** เป็นแหล่งอ้างอิงหลักด้านความปลอดภัย API/DB Contract และคำสั่งทดสอบ (ร่วมกับ [docs/DESIGN_SYSTEM.md](./docs/DESIGN_SYSTEM.md) สำหรับงาน UI และ [docs/TASKS.md](./docs/TASKS.md) สำหรับสถานะงานรายหน้า) ส่วนไฟล์ [GEMINI.md](./GEMINI.md), [CLAUDE.md](./CLAUDE.md), [AGENTS.md](./AGENTS.md), และ [.agents/rules/mandatory-agent-spec.md](./.agents/rules/mandatory-agent-spec.md) ทำหน้าที่เป็นตัวชี้กฎอัตโนมัติสำหรับเครื่องมือแต่ละตัว (ดูสรุปในหัวข้อ [5.1](#51-สรุปหน้าที่ของไฟล์เอกสาร-md-ในโปรเจกต์-single-source-of-truth))
 
 ---
 
@@ -120,44 +120,60 @@ broken-design/
 ├── .agents/
 │   └── rules/
 │       └── mandatory-agent-spec.md       # กฎบังคับให้ AI Agent อ่าน AGENT.md ก่อนทำงานทุกครั้ง
+├── .claude/
+│   └── launch.json                       # การตั้งค่า Preview Server สำหรับ Claude Code
+├── docs/                                 # เอกสาร Product, Architecture, Design System และ Task Board
+│   ├── PRD.md                            # ขอบเขตผลิตภัณฑ์ (Product Requirements) และสถานะฟีเจอร์
+│   ├── ARCHITECTURE.md                   # สถาปัตยกรรมระบบ, Data Flows และ Known Issues
+│   ├── DESIGN_SYSTEM.md                  # กฎ UI, สี, ฟอนต์, ปุ่ม และ Components มาตรฐาน
+│   └── TASKS.md                          # ตารางติดตามงาน (Task Board) แยกตามหน้าเว็บ/Backend/ผู้รับผิดชอบ
+│
 ├── services/
 │   ├── core-api/                         # [Microservice 1] Core Business Logic API (Port 4000)
 │   │   ├── src/
-│   │   │   ├── config/                   # ตั้งค่าการเชื่อมต่อ PostgreSQL DB และ Environment Variables
-│   │   │   ├── middlewares/              # JWT Auth, ตรวจบทบาท (requireSeller / requireAdmin), Error Handler  [แฮม]
+│   │   │   ├── config/                   # db.ts, env.ts, cors.ts & cors.test.ts (4 test cases)
+│   │   │   ├── middlewares/              # auth.middleware.ts (requireAuth/requireSeller/requireAdmin), error.middleware.ts  [แฮม]
 │   │   │   ├── modules/
-│   │   │   │   ├── auth/                 # สมัครสมาชิก, check-email, ล็อกอิน (bcrypt + JWT), บล็อกบัญชีที่ถูกระงับ + Tests  [ต้า]
-│   │   │   │   ├── models/               # ดึงรายการ, ค้นหา, กรอง, แบ่งหน้า, รายละเอียด, Soft Delete  [เป้ก / แฮม]
-│   │   │   │   ├── payments/             # ซื้อรายชิ้นจำลอง, ล็อกราคา/License, สร้าง/Regenerate embed_key + Tests  [ภีม]
-│   │   │   │   ├── seller/               # ยอดขาย, โมเดลของคนขาย, เปิดโหมดคนขาย + Tests  [ภีม]
-│   │   │   │   ├── admin/                # (รอพัฒนาใน Phase 2) ภาพรวม, ซ่อน/คืนโมเดล, ระงับ/คืนบัญชี, รายการซื้อขาย  [ต้า / เป้ก]
-│   │   │   │   └── interactions/         # ถูกใจและความคิดเห็น (Likes/Comments)
+│   │   │   │   ├── admin/                # admin.routes.ts (8 endpoints) & admin.test.ts (20 test cases)  [เจี๊ยบ]
+│   │   │   │   ├── auth/                 # auth.routes.ts (check-email, register, login) & auth.test.ts (2 test cases)  [ต้า]
+│   │   │   │   ├── complaints/           # complaints.routes.ts (POST /api/complaints) & complaints.test.ts (5 test cases)  [เจี๊ยบ]
+│   │   │   │   ├── interactions/         # interactions.routes.ts (Likes/Comments — stub)
+│   │   │   │   ├── models/               # models.routes.ts (รายการ, ค้นหา/กรอง, รายละเอียด, Soft Delete)  [เป้ก / แฮม]
+│   │   │   │   ├── payments/             # payments.routes.ts & payments.test.ts (12 test cases)  [ภีม]
+│   │   │   │   └── seller/               # seller.routes.ts & seller.test.ts (5 test cases)  [ภีม]
 │   │   │   ├── scripts/
 │   │   │   │   └── seedAdmin.ts          # สคริปต์สร้างบัญชี Admin และ Creator เริ่มต้น  [แฮม]
-│   │   │   └── app.ts                    # Entry point ของ Core API (/api/*)
+│   │   │   └── app.ts                    # Entry point ของ Core API (/health, /api/*)
+│   │   ├── .dockerignore
 │   │   ├── .env.example
 │   │   ├── Dockerfile
-│   │   └── package.json
+│   │   ├── package.json
+│   │   └── tsconfig.json
 │   │
 │   └── cdn-service/                      # [Microservice 2] High-I/O Upload, Watermark & 3D Streaming CDN (Port 4001)
 │       ├── src/
-│       │   ├── config/                   # ตั้งค่า DB (PostgreSQL + Supabase REST Fallback), Env, Supabase Client
-│       │   ├── middlewares/              # JWT Auth (requireAuth / requireSeller / requireAdmin) & Error Handler  [แฮม]
-│       │   ├── storage/                  # StorageAdapter, LocalDiskStorage & SupabaseStorage (sha256)  [แฮม / นนท์]
+│       │   ├── config/                   # db.ts (PostgreSQL Pool + Supabase REST Fallback), env.ts, supabase.ts
+│       │   ├── middlewares/              # auth.middleware.ts & error.middleware.ts  [แฮม]
+│       │   ├── storage/                  # index.ts, storage.interface.ts, local.storage.ts, supabase.storage.ts  [แฮม / นนท์]
 │       │   ├── utils/
-│       │   │   ├── glbValidator.ts       # ตัวตรวจ Magic Bytes ของไฟล์ .glb (glTF v2) และการคำนวณ SHA-256  [แฮม]
-│       │   │   └── glbWatermark.ts       # ระบบฝังและตรวจลายน้ำ 2 ชั้น (Metadata HMAC + Vertex Steganography)
+│       │   │   ├── glbValidator.ts       # ตรวจ Magic Bytes ของไฟล์ .glb (glTF v2) และการคำนวณ SHA-256  [แฮม]
+│       │   │   └── glbWatermark.ts       # ฝังและตรวจลายน้ำ 2 ชั้น (Metadata HMAC + Vertex Steganography)  [นนท์]
 │       │   ├── modules/
-│       │   │   ├── upload/               # รับไฟล์ .glb, ฝังลายน้ำต้นฉบับ, บันทึกลง Storage + DB  [แฮม]
+│       │   │   ├── upload/               # upload.routes.ts (รับไฟล์ .glb/.webp, ฝังลายน้ำต้นฉบับ, ลง Storage + DB)  [แฮม]
 │       │   │   └── cdn/                  # สตรีมไฟล์ .glb/.webp, ตรวจ embed_key, ฝังลายน้ำผู้ซื้อ, Range, Cache  [นนท์]
 │       │   │       ├── cdn.routes.ts     #   Routes ของ /cdn/models/* และ POST /cdn/verify-watermark
-│       │   │       ├── cdn.service.ts    #   ตรวจสิทธิ์, ตรวจ embed_key, บันทึก watermark_hash และส่งสตรีม
+│       │   │       ├── cdn.service.ts    #   ตรวจสิทธิ์, constant-time embed_key, บันทึก watermark_hash และส่งสตรีม
 │       │   │       ├── range.ts          #   ตัวแปลง HTTP Range Header (RFC 9110 §14)
-│       │   │       └── cdn.test.ts       #   ชุดทดสอบ CDN & Watermark ครบทุกเงื่อนไข (23 test cases)
-│       │   └── app.ts                    # Entry point ของ CDN Service (/api/models, /cdn/*, /verify-watermark)
+│       │   │       ├── cdn.test-env.ts   #   ตั้งค่า Environment สำหรับรันเทสต์ CDN ในโหมด local
+│       │   │       └── cdn.test.ts       #   ชุดทดสอบ CDN & Watermark (23 test cases)
+│       │   └── app.ts                    # Entry point ของ CDN Service (/health, /api/models, /cdn/*, /verify-watermark)
+│       ├── storage_data/.gitkeep         # ไดเรกทอรีสำรองเมื่อใช้ STORAGE_PROVIDER=local
+│       ├── tmp_uploads/.gitkeep          # พื้นที่พักไฟล์ชั่วคราวระหว่างรับ Multipart upload
+│       ├── .dockerignore
 │       ├── .env.example
 │       ├── Dockerfile
-│       └── package.json
+│       ├── package.json
+│       └── tsconfig.json
 │
 ├── frontend/                             # Next.js 15 Frontend & WebGL Viewer (Port 3000)
 │   ├── public/
@@ -165,37 +181,69 @@ broken-design/
 │   ├── src/
 │   │   ├── app/
 │   │   │   ├── page.tsx                  # หน้าแรก Landing & Featured 3D Models
-│   │   │   ├── gallery/page.tsx          # หน้า Gallery ค้นหาและกรองโมเดล
-│   │   │   ├── creator/page.tsx          # หน้า Creator Landing (แนะนำสิ่งที่ครีเอเตอร์ทำได้) พร้อมผีเสื้อ 3 มิติ
-│   │   │   ├── login/page.tsx            # หน้าเข้าสู่ระบบและสมัครสมาชิก
-│   │   │   ├── forgot-password/page.tsx  # หน้ารีเซ็ตรหัสผ่าน (UI อย่างเดียว ยังไม่มี endpoint)
+│   │   │   ├── layout.tsx                # Root Layout (Fonts, Navbar, Footer, ReportProvider)
+│   │   │   ├── globals.css               # Tailwind & Theme styles
+│   │   │   ├── 403/page.tsx              # หน้า 403 Access Denied  [เป้ก]
+│   │   │   ├── not-found.tsx             # หน้า 404 Not Found ทั่วทั้งเว็บ  [เป้ก]
+│   │   │   ├── error.tsx                 # หน้า 500 Global Error Boundary  [เป้ก]
+│   │   │   ├── gallery/                  # page.tsx (ค้นหา/กรอง/แบ่งหน้า) & error.tsx  [เป้ก]
+│   │   │   ├── creator/page.tsx          # หน้า Creator Landing พร้อมผีเสื้อ 3 มิติ  [เจี๊ยบ]
+│   │   │   ├── creators/[handle]/        # page.tsx & not-found.tsx (หน้าโปรไฟล์ครีเอเตอร์)  [เจี๊ยบ]
+│   │   │   ├── models/[id]/              # page.tsx & not-found.tsx (รายละเอียดโมเดล + 3D Preview + Embed + ซื้อ/ดาวน์โหลด)  [นนท์]
+│   │   │   ├── embed/[id]/page.tsx       # หน้า Viewer สำหรับ Iframe (CSP frame-ancestors *)  [นนท์]
+│   │   │   ├── login/page.tsx            # หน้าเข้าสู่ระบบและสมัครสมาชิก  [ต้า]
+│   │   │   ├── forgot-password/page.tsx  # หน้ารีเซ็ตรหัสผ่าน (UI อย่างเดียว ยังไม่มี endpoint)  [ต้า]
 │   │   │   ├── upload/page.tsx           # หน้าอัปโหลด .glb + สร้างภาพ Poster ด้วย .toBlob()  [แฮม]
-│   │   │   ├── me/page.tsx               # รายการที่ซื้อ, embed_key, ปุ่ม Regenerate Key
-│   │   │   ├── models/[id]/page.tsx      # หน้ารายละเอียด + 3D Preview + Embed Snippets + ปุ่มซื้อ/ดาวน์โหลด
-│   │   │   ├── creators/[handle]/page.tsx# หน้าโปรไฟล์ครีเอเตอร์
-│   │   │   └── embed/[id]/page.tsx       # หน้า Viewer สำหรับ Iframe (CSP frame-ancestors *)  [นนท์]
+│   │   │   ├── me/page.tsx               # หน้า Dashboard ผู้ซื้อ (Placeholder — รอพัฒนาต่อใน Phase 2)  [ภีม]
+│   │   │   └── admin/                    # layout.tsx & 5 หน้าแดชบอร์ดแอดมิน (Overview, Models, Users, Purchases, Complaints)  [เจี๊ยบ]
 │   │   ├── components/
-│   │   │   ├── auth/                     # AuthForm.tsx เชื่อมต่อ /api/auth/check-email, login, register  [ต้า]
-│   │   │   ├── gallery/                  # การ์ดโมเดลและตัวกรอง
-│   │   │   ├── model/                    # ModelPreview (3D CDN), ModelActions (Download/Buy), EmbedSnippets
-│   │   │   └── viewer/                   # 3D Canvas Viewer & EmbedIframeViewer
-│   │   └── lib/
-│   │       ├── api.ts                    # เชื่อมต่อ CORE_API_URL (รองรับ INTERNAL_CORE_API_URL สำหรับ Docker) และ CDN_SERVICE_URL
-│   │       └── auth.ts                   # Auth API client (checkEmail, login, register)  [ต้า]
-│   ├── next.config.ts
-│   ├── .env.example
-│   ├── Dockerfile
-│   └── package.json
+│   │   │   ├── Navbar.tsx, Footer.tsx, AccountMenu.tsx, AdminOnlyRedirect.tsx, PixieCursor.tsx
+│   │   │   ├── admin/                    # AdminList.tsx, AdminShell.tsx, ComplaintCells.tsx, ui.tsx  [เจี๊ยบ]
+│   │   │   ├── auth/                     # AuthForm.tsx, Field.tsx, ForgotPasswordForm.tsx  [ต้า]
+│   │   │   ├── creator/                  # CreatorModel.tsx
+│   │   │   ├── gallery/                  # FilterBar.tsx, FilterDropdown.tsx, ModelCard.tsx, Pagination.tsx
+│   │   │   ├── landing/                  # Categories.tsx, PopularCarousel.tsx, SectionHeading.tsx
+│   │   │   ├── model/                    # EmbedSnippets.tsx, LicenseRules.tsx, ModelActions.tsx, ModelPreview.tsx
+│   │   │   ├── profile/                  # DonateCard.tsx, ProfileHeader.tsx
+│   │   │   ├── report/                   # ReportForm.tsx, ReportProvider.tsx  [เจี๊ยบ]
+│   │   │   ├── ui/                       # Modal.tsx  [เจี๊ยบ]
+│   │   │   └── viewer/                   # ButterflyScene.tsx, CreatorScene.tsx, CreatorViewer.tsx, EmbedIframeViewer.tsx, LilyScene.tsx, LilyViewer.tsx
+│   │   ├── lib/
+│   │   │   ├── api.ts, auth.ts, auth-paths.ts, session.ts
+│   │   │   ├── admin-api.ts, admin-view.ts, complaints.ts
+│   │   │   ├── creators.ts, format.ts, licenses.ts, mock-models.ts, types.ts
+│   │   │   └── pagination.ts & pagination.test.mjs (4 test cases)
+│   │   └── types/model-viewer.d.ts
+│   ├── next.config.ts, tailwind.config.ts, postcss.config.mjs, tsconfig.json
+│   ├── .dockerignore, .env.example, Dockerfile, package.json
 │
 ├── supabase/
-│   └── schema.sql                        # สคริปต์สร้างตาราง users, models, purchases, likes, comments + Seed
+│   └── schema.sql                        # สคริปต์สร้างตาราง users, models, purchases, likes, comments, complaints + Seed
+├── .gitignore
 ├── docker-compose.yml                    # รันทุก Microservices พร้อมกันด้วยคำสั่งเดียว
-├── AGENT.md                              # คู่มือสถาปัตยกรรมและแผนที่นำทาง (Roadmap) สำหรับ AI Agent ทุกตัว
-├── AGENTS.md                             # ตัวชี้กฎมาตรฐานสำหรับ OpenAI Codex / Cursor / Windsurf Agents
-├── CLAUDE.md                             # ตัวชี้กฎมาตรฐานสำหรับ Claude Code Agent
-├── GEMINI.md                             # ตัวชี้กฎมาตรฐานสำหรับ Google Antigravity / Gemini Agent
-└── README.md                             # เอกสารคู่มือหลักสำหรับผู้สนใจและผู้ร่วมพัฒนา
+├── AGENT.md                              # คู่มือสถาปัตยกรรม, Security Rules, API Contract และ Roadmap สำหรับ AI Agent
+├── AGENTS.md                             # ตัวชี้กฎ (Pointer) สำหรับ OpenAI Codex / Cursor / Windsurf / Copilot Agents
+├── CLAUDE.md                             # ตัวชี้กฎ + แนวทางทำงานเฉพาะสำหรับ Claude Code Agent
+├── GEMINI.md                             # ตัวชี้กฎ (Pointer) สำหรับ Google Antigravity / Gemini Agent
+└── README.md                             # เอกสารคู่มือหลักของโปรเจกต์
 ```
+
+### 5.1 สรุปหน้าที่ของไฟล์เอกสาร (`.md`) ในโปรเจกต์ (Single Source of Truth)
+
+เพื่อลดการเขียนข้อมูลซ้ำซ้อนกัน เอกสารแต่ละไฟล์มีขอบเขตหน้าที่รับผิดชอบแยกกันดังนี้:
+
+| ไฟล์ | กลุ่มเป้าหมาย | ขอบเขตหน้าที่ (Single Source of Truth) |
+| :--- | :--- | :--- |
+| [`README.md`](./README.md) | ทีมพัฒนา & บุคคลทั่วไป | ภาพรวมโปรเจกต์, โครงสร้างไฟล์, API Reference ฉบับย่อ, การแบ่งงานทีม 6 คน และคู่มือติดตั้ง/รัน Docker & Tests |
+| [`AGENT.md`](./AGENT.md) | AI Agent ทุกตัว | **ศูนย์กลางกฎวิศวกรรม:** Access Control Matrix, Security Invariants, สเปก API/DB/Watermark, Roadmap (§6) และ Verification Checklist (§7) |
+| [`AGENTS.md`](./AGENTS.md) | Codex / Cursor / Windsurf / Copilot | ตัวชี้กฎ (Pointer) ให้ปฏิบัติตาม `AGENT.md` และ `README.md` |
+| [`GEMINI.md`](./GEMINI.md) | Google Antigravity / Gemini | ตัวชี้กฎ (Pointer) ไปยัง `AGENT.md`, `DESIGN_SYSTEM.md`, `TASKS.md` และ `ARCHITECTURE.md` |
+| [`CLAUDE.md`](./CLAUDE.md) | Claude Code | ตัวชี้กฎไปยังเอกสารหลัก + กฎเฉพาะของการสื่อสาร/Three.js/`.claude/launch.json` โดยไม่คัดลอกซ้ำ |
+| [`.agents/rules/mandatory-agent-spec.md`](./.agents/rules/mandatory-agent-spec.md) | Workspace Rule (Agent) | กฎโหลดอัตโนมัติระดับ Workspace ชี้ไปยังหัวข้อสำคัญใน `AGENT.md` และ `docs/*` |
+| [`docs/PRD.md`](./docs/PRD.md) | Product / ทีม | เป้าหมายผลิตภัณฑ์, กลุ่มผู้ใช้, ขอบเขตฟีเจอร์ MVP vs Later, Content Rules และ Open Questions *(ไม่เก็บสถานะราย route)* |
+| [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) | Dev / Architecture | ผัง Component ระดับไฟล์, End-to-End Flows, การ Deploy และรายการ **Known Issues (§5)** ก่อนเปิดใช้งานจริง |
+| [`docs/DESIGN_SYSTEM.md`](./docs/DESIGN_SYSTEM.md) | Frontend / UI | โทเคนสี, ฟอนต์, Spacing, ปุ่ม, การ์ด, ไอคอน (`lucide-react`), รูปแบบหน้าและกฎ Accessibility |
+| [`docs/TASKS.md`](./docs/TASKS.md) | ทีมทุกคน | **Task Board หลัก:** ติดตามสถานะรายหน้า/ราย endpoint (`[x]` / `[~]` / `[ ]`) และผู้รับผิดชอบ |
 
 ---
 
@@ -229,6 +277,12 @@ broken-design/
 | **Payments** | `POST /api/purchases/:id/regenerate-key` | สุ่ม `embed_key` ใหม่และยกเลิกสิทธิ์ของคีย์เก่าทันที |
 | **Seller** | `POST /api/seller/enable` | เปิดโหมดคนขาย (`is_seller = true`) ให้บัญชีปัจจุบัน |
 | **Seller** | `GET /api/seller/models` & `/sales` | ดูรายการโมเดลของตัวเองและสรุปยอดขายทั้งหมด |
+| **Admin** | `GET /api/admin/overview` | ดูสรุปยอดรวมระบบ, สถิติ 7 วัน, Top 5 โมเดล, รายการซื้อ/ผู้ใช้ล่าสุด และคำร้องเรียนที่เปิดอยู่ (ตรวจ `role = 'admin'` จาก DB) |
+| **Admin** | `GET /api/admin/users` & `PATCH .../suspend` | ดูรายชื่อผู้ใช้ และระงับ/คืนสิทธิ์บัญชี (ห้ามแอดมินระงับตัวเอง) |
+| **Admin** | `GET /api/admin/models` & `PATCH .../hide` | ดูรายการโมเดลทั้งหมด (รวมซ่อน/ลบ) และซ่อน/แสดงผลโมเดล |
+| **Admin** | `GET /api/admin/purchases` | ดูรายการสั่งซื้อทั้งหมดพร้อมข้อมูลผู้ซื้อ โมเดล ราคา และ `watermark_hash` |
+| **Admin** | `GET /api/admin/complaints` & `PATCH .../:id` | ดูรายการคำร้องเรียนจากผู้ใช้ เปลี่ยนสถานะ (`open`/`in_review`/`resolved`/`dismissed`) และบันทึกโน้ต |
+| **Complaints** | `POST /api/complaints` | ผู้ใช้ที่ล็อกอินส่งคำร้องเรียน/แจ้งปัญหา (`model`/`account`/`purchase`/`other`, จำกัด 5 ครั้ง/ชั่วโมง) |
 
 ### 6.3 การฝังโมเดลข้ามโดเมน (Cross-Origin Embed Contract)
 
@@ -317,7 +371,7 @@ broken-design/
   npx tsc --noEmit -p .
   npm test
 
-  # 2. ทดสอบ Core API — Auth, Payments & Seller (19 test cases)
+  # 2. ทดสอบ Core API — Auth, Payments, Seller, Admin, Complaints & CORS (48 test cases)
   cd services/core-api
   npx tsc --noEmit -p .
   npm test

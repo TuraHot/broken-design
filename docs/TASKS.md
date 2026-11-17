@@ -1,6 +1,6 @@
 # TASKS — Lixyte task board
 
-อัปเดตล่าสุด: 2026-11-15 · สถานะตรวจจากโค้ดใน branch `kzwnjuy` หลัง merge `main` แล้ว (commit `fd653bd`) ยังไม่ได้รันเว็บหรือเทสต์ในรอบนี้
+อัปเดตล่าสุด: 2026-11-17 · สถานะตรวจจากโค้ดบน `main` หลัง merge PR #15 (`origin/kzwnjuy`) และ branch `origin/Pek` และสร้างตาราง `complaints` บน PostgreSQL จริงแล้ว (ผลเทสต์ล่าสุดผ่านครบทั้งระบบ: `cdn-service` 23/23, `core-api` 48/48, `frontend` 4/4 = **75/75**)
 คอลัมน์ **ผู้รับ** แบ่งตามหลักว่าแต่ละคนทำ Frontend ของ backend ที่ตัวเองดูแล แก้ได้เมื่อทีมปรับการแบ่งงาน (ตาราง §7 ใน `README.md`)
 
 สถานะ: `[x]` ใช้ได้ · `[~]` ทำบางส่วน (UI อย่างเดียว / placeholder / ทำแค่ฝั่งเดียว) · `[ ]` ยังไม่มี
@@ -18,7 +18,7 @@
 | [ ] | `/docs` | เจี๊ยบ | - | ลิงก์ในเมนูยังชี้ไปหน้าที่ไม่มี ต้องมีคนเขียนเนื้อหา |
 | [ ] | `/licenses` | เจี๊ยบ | - | อธิบายไลเซนส์แบบตาราง ทำได้/ทำไม่ได้ |
 | [ ] | หน้ากฎหมาย (Terms, Privacy, Seller terms, คืนเงิน, DMCA) | เจี๊ยบ | - | ต้องให้ผู้เชี่ยวชาญตรวจเนื้อหา |
-| [ ] | แจ้งโมเดลละเมิด | ยังไม่มีผู้รับ | ไม่มี | ต้องมีทั้งหน้าและ endpoint |
+| [x] | แจ้งโมเดลละเมิด | เจี๊ยบ | `POST /api/complaints` | มี popup ส่งคำร้องเรียนแล้ว (ขาดปุ่มเปิดจากหน้า `/models/[id]`) |
 | [x] | `/embed/[id]` | นนท์ | CDN | ถ้า key ผิดหรือถูกหมุน จะสลับไป `preview.glb` พร้อมแจ้งเตือน |
 | [ ] | Playground `/models/[id]/embed` | นนท์ | - | `components/playground/` ว่างอยู่ |
 | [x] | `/login` | ต้า | `POST /api/auth/check-email`, `/login`, `/register` | ต่อ core-api แล้ว เก็บ token ใน `localStorage` ปุ่ม Google ยังเป็น UI อย่างเดียว |
@@ -52,9 +52,9 @@
 ### หน้าระบบ
 | สถานะ | เส้นทาง | ผู้รับ | หมายเหตุ |
 |---|---|---|---|
-| [ ] | `app/not-found.tsx` (404 ทั้งเว็บ) | เป้ก | ลอกแบบจาก `models/[id]/not-found.tsx` |
-| [ ] | `app/403/page.tsx` | เป้ก | |
-| [ ] | `app/error.tsx` (500 ทั้งเว็บ) | เป้ก | อย่าแทนที่ `gallery/error.tsx` |
+| [x] | `app/not-found.tsx` (404 ทั้งเว็บ) | เป้ก | Merged จาก branch `Pek` |
+| [x] | `app/403/page.tsx` | เป้ก | Merged จาก branch `Pek` |
+| [x] | `app/error.tsx` (500 ทั้งเว็บ) | เป้ก | Merged จาก branch `Pek` |
 | [ ] | สถานะ WebGL ใช้ไม่ได้ | นนท์ | ทำใน viewer (`ModelPreview`, `EmbedIframeViewer`, `embed.js`) |
 
 ### ทำทีหลังได้
@@ -70,12 +70,13 @@
 ### ใช้ได้แล้ว
 | สถานะ | งาน | ผู้รับ | หมายเหตุ |
 |---|---|---|---|
-| [x] | `POST /api/auth/check-email`, `/register`, `/login` | ต้า | บัญชีที่ถูกระงับได้ `403 ACCOUNT_SUSPENDED` |
+| [x] | `POST /api/auth/check-email`, `/register`, `/login` | ต้า | บัญชีที่ถูกระงับได้ `403 ACCOUNT_SUSPENDED` (มีเทสต์ 2 ข้อ) |
 | [x] | `GET /api/models` (`q`, `tag`, `license`, `price`, `page`, `pageSize`), `GET /api/models/:id` | เป้ก | ซ่อนโมเดลที่ถูกซ่อน/ลบ/เจ้าของถูกระงับ |
 | [x] | `DELETE /api/models/:id` (soft delete) | แฮม | เจ้าของหรือแอดมิน |
-| [x] | payments: `checkout`, `confirm-mock`, `pay-mock`, `me/purchases`, `regenerate-key`, `purchases/:id` | ภีม | มีเทสต์ 12 ข้อ (นับจากไฟล์) |
-| [x] | `/api/seller/enable`, `status`, `models`, `sales` | ภีม | มีเทสต์ 5 ข้อ (นับจากไฟล์) |
-| [x] | cdn-service: อัปโหลด, สตรีม, ดาวน์โหลด, poster, ลายน้ำ 2 ชั้น, `verify-watermark`, rate limit | นนท์, แฮม | มีเทสต์ 23 ข้อ (นับจากไฟล์) |
+| [x] | payments: `checkout`, `confirm-mock`, `pay-mock`, `me/purchases`, `regenerate-key`, `purchases/:id` | ภีม | มีเทสต์ 12 ข้อ |
+| [x] | `/api/seller/enable`, `status`, `models`, `sales` | ภีม | มีเทสต์ 5 ข้อ |
+| [x] | `POST /api/complaints` & `/api/admin/complaints` (`GET`, `PATCH`) | เจี๊ยบ | มีเทสต์ complaints 5 ข้อ + admin 20 ข้อ + CORS 4 ข้อ (รวม Core API 48 ข้อ) |
+| [x] | cdn-service: อัปโหลด, สตรีม, ดาวน์โหลด, poster, ลายน้ำ 2 ชั้น, `verify-watermark`, rate limit | นนท์, แฮม | มีเทสต์ 23 ข้อ |
 
 ### ยังค้าง
 | สถานะ | งาน | ผู้รับ | หมายเหตุ |
@@ -90,7 +91,6 @@
 | [x] | `GET /api/admin/purchases` | เจี๊ยบ | ผู้ซื้อ โมเดล ราคา `watermark_hash` (ไม่ส่ง `embed_key`) |
 | [x] | `GET /api/admin/users`, `PATCH /api/admin/users/:id/suspend` | เจี๊ยบ | body `{ suspended: boolean }` ห้ามระงับตัวเอง |
 | [ ] | `/api/creators/:handle` | ยังไม่มีผู้รับ | ฝั่งหน้าเว็บเรียกไว้ตอนปิดข้อมูลตัวอย่าง |
-| [ ] | endpoint แจ้งโมเดลละเมิด | ยังไม่มีผู้รับ | |
 | [~] | `modules/interactions/` (ถูกใจ, คอมเมนต์) | ยังไม่มีผู้รับ | ยังเป็น stub |
 | [~] | Stripe webhook `POST /api/webhooks/stripe` | ภีม | stub ตอบ `received: true` ยังไม่ตรวจลายเซ็น (และต้องใช้ raw body) |
 
@@ -111,8 +111,8 @@
 
 | สถานะ | งาน | ผู้รับ | หมายเหตุ |
 |---|---|---|---|
-| [ ] | แก้ README ที่ชนกัน (`UU`) และ `CLAUDE.md` (`AA`) ที่เกิดจากการคืนไฟล์ใน stash หลัง merge | เจี๊ยบ | ต้องเลือกฉบับของ `main` หรือของ branch ก่อน commit |
-| [ ] | commit `docs/` (PRD, ARCHITECTURE, DESIGN_SYSTEM, TASKS) | เจี๊ยบ | ตอนนี้ยังไม่ได้ commit |
+| [x] | แก้ README ที่ชนกัน และอัปเดตเอกสาร `.md` ทั้งหมดหลัง merge PR #15 + `Pek` | เจี๊ยบ / ทีม | อัปเดตและจัดให้ตรงกับโค้ดบน `main` แล้ว |
+| [x] | commit `docs/` (PRD, ARCHITECTURE, DESIGN_SYSTEM, TASKS) | เจี๊ยบ | Merged ลง `main` ใน PR #15 แล้ว |
 | [x] | ทำ Navbar ให้อ่าน token แล้วเปลี่ยนเป็นเมนูบัญชี (Library, Seller, Admin เฉพาะแอดมิน, Log out) | เจี๊ยบ | `components/AccountMenu.tsx` + `lib/session.ts` ทดสอบในเบราว์เซอร์แล้วด้วยข้อมูล login จำลอง (ยังไม่ได้ลอง login จริงกับ core-api) ลิงก์ `/seller` ยังเป็น 404 จนกว่าจะมีหน้า (`/admin` มีแล้ว) ถ้าต้าทำตัวเก็บ token กลาง ให้ย้ายส่วนอ่านใน `session.ts` ไปใช้ของต้า |
 | [ ] | ทำตัวส่ง request กลาง (`apiFetch`) ที่แนบ token และจัดการ error รูปแบบเดียวกัน | ต้า | ตอนนี้ `lib/auth.ts` กับหน้าอื่นเรียก `fetch` แยกกัน |
 | [ ] | แยก `frontend/src/lib/api.ts` เป็น `lib/api/{models,auth,purchases,admin}.ts` | ต้า | กันคนแก้ไฟล์เดียวชนกัน |

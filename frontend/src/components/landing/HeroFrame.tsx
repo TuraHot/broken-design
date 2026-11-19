@@ -1,10 +1,11 @@
 'use client';
 
-// The framed area on the right of the hero: grid lines, a status chip, an info box and a corner tag. The 3D lily is
-// drawn into it by the scene (step 4); the chip and the info box show the scene's real numbers (lib/lily-telemetry.ts)
-// and read "standby" / dashes until the scene publishes any.
+// The framed area on the right of the hero: grid lines, the 3D lily, a status chip, an info box and a corner tag. The
+// scene fills the frame; the chip and the info box show its real numbers (lib/lily-telemetry.ts) and read "standby" /
+// dashes until the scene publishes any.
 import { Globe } from 'lucide-react';
 import { useSyncExternalStore } from 'react';
+import LilyViewer from '@/components/viewer/LilyViewer';
 import { useT } from '@/lib/i18n/client';
 import { formatTelemetry, getTelemetry, subscribeTelemetry } from '@/lib/lily-telemetry';
 
@@ -20,12 +21,13 @@ export default function HeroFrame() {
 
   return (
     <div
-      role="img"
+      role="group"
       aria-label={t('home.hero.frame')}
       id="hero-frame"
       className="relative min-h-[320px] border-line md:min-h-0 md:border-l"
       style={GRID}
     >
+      <LilyViewer />
       <div className="absolute left-3 top-3 bg-card px-2.5 py-1.5 font-mono text-[11px] leading-relaxed text-ink">
         <p>
           <span className="text-accent">&bull;</span> {text.chip}

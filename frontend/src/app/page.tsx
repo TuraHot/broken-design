@@ -9,7 +9,6 @@ import SectionDots, { ScrollCue } from "@/components/landing/SectionDots";
 import SectionHeading from "@/components/landing/SectionHeading";
 import ModelCard from "@/components/gallery/ModelCard";
 import PixieCursor from "@/components/PixieCursor";
-import LilyViewer from "@/components/viewer/LilyViewer";
 import { fetchModels } from "@/lib/api";
 import { getT } from "@/lib/i18n/server";
 
@@ -33,7 +32,6 @@ export default async function HomePage() {
 
   return (
     <main>
-      <LilyViewer />
       <PixieCursor />
       <SectionDots ids={sectionIds} />
 

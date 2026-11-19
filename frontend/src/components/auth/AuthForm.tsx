@@ -115,9 +115,19 @@ export default function AuthForm() {
 
     if (step === 'email') {
       setChecking(true);
-      const exists = await checkEmail(values.email);
-      setChecking(false);
-      goTo(exists ? 'login' : 'signup');
+      try {
+        const exists = await checkEmail(values.email);
+        goTo(exists ? 'login' : 'signup');
+      } catch (error) {
+        setErrors({
+          email:
+            error instanceof Error && error.message !== 'Failed to fetch'
+              ? error.message
+              : 'Cannot reach the server. Please try again.',
+        });
+      } finally {
+        setChecking(false);
+      }
       return;
     }
     if (step === 'login' || step === 'signup') {
@@ -132,13 +142,8 @@ export default function AuthForm() {
     // เก็บ Token สำหรับใช้ยืนยันตัวตนใน Request ถัดไป
     localStorage.setItem('accessToken', result.token);
 
-if (step === 'login') {
-  router.push('/gallery');
-  return;
-}
-
-setFlow(step);
-setDone(true);
+router.push('/gallery');
+    return;
   } catch (error) {
     setErrors({
       password:
@@ -273,26 +278,6 @@ setDone(true);
 
           {(step === 'login' || step === 'signup') && passwordField}
 
-          {step === 'otp' && (
-            <Field id="code" label="Verification code" error={errors.code}>
-              <input
-                id="code"
-                name="code"
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                maxLength={6}
-                autoComplete="one-time-code"
-                autoFocus
-                value={values.code}
-                onChange={updateCode}
-                aria-invalid={Boolean(errors.code)}
-                aria-describedby={described('code')}
-                placeholder="123456"
-                className={`${fieldClass('code')} text-center font-mono text-lg tracking-[0.5em]`}
-              />
-            </Field>
-          )}
 
           {step === 'login' && (
             <div className="-mt-2 text-right">

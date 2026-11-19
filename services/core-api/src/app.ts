@@ -12,7 +12,24 @@ import { errorHandler } from './middlewares/error.middleware';
 
 export const app = express();
 
-app.use(cors({ origin: env.frontendUrl, credentials: true }));
+const allowedOrigins = [
+  env.frontendUrl,
+  'http://localhost:3000',
+  'http://localhost:3001',
+];
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(null, false);
+      }
+    },
+    credentials: true,
+  })
+);
 app.use(express.json());
 
 app.get('/health', async (_req, res) => {

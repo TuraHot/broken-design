@@ -3,8 +3,15 @@ import { PAGE_SIZE, queryModels } from './pagination';
 import { MOCK_MODELS } from './mock-models';
 import type { Model, ModelsPage, ModelsParams } from './types';
 
-export const CORE_API_URL = process.env.NEXT_PUBLIC_CORE_API_URL || 'http://localhost:4000';
-export const CDN_SERVICE_URL = process.env.NEXT_PUBLIC_CDN_SERVICE_URL || 'http://localhost:4001';
+const isServer = typeof window === 'undefined';
+
+export const CORE_API_URL = isServer
+  ? (process.env.CORE_API_URL || process.env.INTERNAL_CORE_API_URL || (process.env.NODE_ENV === 'production' ? 'http://core-api:4000' : (process.env.NEXT_PUBLIC_CORE_API_URL || 'http://localhost:4000')))
+  : (process.env.NEXT_PUBLIC_CORE_API_URL || 'http://localhost:4000');
+
+export const CDN_SERVICE_URL = isServer
+  ? (process.env.CDN_SERVICE_URL || process.env.INTERNAL_CDN_SERVICE_URL || (process.env.NODE_ENV === 'production' ? 'http://cdn-service:4001' : (process.env.NEXT_PUBLIC_CDN_SERVICE_URL || 'http://localhost:4001')))
+  : (process.env.NEXT_PUBLIC_CDN_SERVICE_URL || 'http://localhost:4001');
 
 // Mock data is the default until core-api is ready; set NEXT_PUBLIC_USE_MOCK=false to call it.
 const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK !== 'false';
@@ -13,28 +20,38 @@ const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK !== 'false';
 export async function fetchModels(params: ModelsParams): Promise<ModelsPage> {
   if (USE_MOCK) return queryModels(MOCK_MODELS, params);
 
-  const sp = new URLSearchParams();
-  if (params.page) sp.set('page', String(params.page));
+  try {
+    const sp = new URLSearchParams();
+    if (params.page) sp.set('page', String(params.page));
 
-  const res = await fetch(`${CORE_API_URL}/api/models?${sp}`, { cache: 'no-store' });
-  if (!res.ok) throw new Error(`Failed to load models (${res.status})`);
-  const data = (await res.json()) as Partial<ModelsPage>;
-  return {
-    items: data.items ?? [],
-    page: data.page ?? 1,
-    pageSize: data.pageSize ?? PAGE_SIZE,
-    total: data.total ?? 0,
-  };
+    const res = await fetch(`${CORE_API_URL}/api/models?${sp}`, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`Failed to load models (${res.status})`);
+    const data = (await res.json()) as Partial<ModelsPage>;
+    return {
+      items: data.items ?? [],
+      page: data.page ?? 1,
+      pageSize: data.pageSize ?? PAGE_SIZE,
+      total: data.total ?? 0,
+    };
+  } catch (error) {
+    console.warn('[fetchModels] Backend unreachable, falling back to mock data:', error);
+    return queryModels(MOCK_MODELS, params);
+  }
 }
 
 /** One model for its detail page, or `null` when it does not exist. */
 export async function fetchModel(id: string): Promise<Model | null> {
   if (USE_MOCK) return MOCK_MODELS.find((m) => m.id === id) ?? null;
 
-  const res = await fetch(`${CORE_API_URL}/api/models/${encodeURIComponent(id)}`, { cache: 'no-store' });
-  if (res.status === 404) return null;
-  if (!res.ok) throw new Error(`Failed to load model (${res.status})`);
-  return (await res.json()) as Model;
+  try {
+    const res = await fetch(`${CORE_API_URL}/api/models/${encodeURIComponent(id)}`, { cache: 'no-store' });
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(`Failed to load model (${res.status})`);
+    return (await res.json()) as Model;
+  } catch (error) {
+    console.warn('[fetchModel] Backend unreachable, falling back to mock data:', error);
+    return MOCK_MODELS.find((m) => m.id === id) ?? null;
+  }
 }
 
 /** Other models by the same creator (most popular first), for the "More from" row. */

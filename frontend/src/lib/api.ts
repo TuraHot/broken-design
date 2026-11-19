@@ -1,6 +1,6 @@
 import { cache } from 'react';
 import { buildProfile, creatorHandle, type CreatorProfile } from './creators';
-import { PAGE_SIZE, queryModels } from './pagination';
+import { isPublicModel, PAGE_SIZE, queryModels } from './pagination';
 import type {
   Model,
   ModelsPage,
@@ -45,7 +45,7 @@ const fetchCoreApiModelsCached = cache(async (query: string): Promise<Model[]> =
     const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) return [];
     const data = (await res.json()) as Partial<ModelsPage>;
-    return Array.isArray(data.items) ? data.items : [];
+    return Array.isArray(data.items) ? data.items.filter(isPublicModel) : [];
   } catch {
     return [];
   }
@@ -64,7 +64,7 @@ const fetchCoreApiModelById = cache(async (id: string): Promise<Model | null> =>
     });
     if (!res.ok) return null;
     const data = (await res.json()) as Partial<Model>;
-    if (data && data.id && data.title !== 'Sample 3D Asset') {
+    if (data && data.id && data.title !== 'Sample 3D Asset' && isPublicModel(data as Model)) {
       return data as Model;
     }
     return null;
@@ -73,7 +73,7 @@ const fetchCoreApiModelById = cache(async (id: string): Promise<Model | null> =>
   }
 });
 
-/** List models for the gallery (paged, real database models from Core API). */
+/** List models for the gallery (paged, real database models from Core API, public visible only). */
 export async function fetchModels(params: ModelsParams): Promise<ModelsPage> {
   try {
     const sp = buildModelSearchParams(params);
@@ -81,11 +81,14 @@ export async function fetchModels(params: ModelsParams): Promise<ModelsPage> {
     if (res.ok) {
       const data = (await res.json()) as Partial<ModelsPage>;
       if (Array.isArray(data.items)) {
+        const visibleItems = data.items.filter(isPublicModel);
+        const hiddenCount = data.items.length - visibleItems.length;
+        const rawTotal = data.total ?? data.items.length;
         return {
-          items: data.items,
+          items: visibleItems,
           page: data.page ?? params.page ?? 1,
           pageSize: data.pageSize ?? PAGE_SIZE,
-          total: data.total ?? data.items.length,
+          total: Math.max(visibleItems.length, rawTotal - hiddenCount),
         };
       }
     }

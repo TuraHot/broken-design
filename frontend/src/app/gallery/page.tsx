@@ -1,10 +1,13 @@
-// Gallery — paged grid of 3D models. The page number lives in the URL (?page=). Search and filters are UI only.
+// Gallery — paged grid of publicly visible 3D models. Search, filters, and page live in URL params.
 import type { Metadata } from 'next';
 import FilterBar from '@/components/gallery/FilterBar';
 import ModelCard from '@/components/gallery/ModelCard';
 import Pagination from '@/components/gallery/Pagination';
 import { fetchModels } from '@/lib/api';
-import { parseParams } from '@/lib/pagination';
+import { isPublicModel, parseParams } from '@/lib/pagination';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export const metadata: Metadata = { title: 'Gallery — Lixyte' };
 
@@ -14,7 +17,13 @@ export default async function GalleryPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = parseParams(await searchParams);
-  const data = await fetchModels(params);
+  const rawData = await fetchModels(params);
+  const items = rawData.items.filter(isPublicModel);
+  const data = {
+    ...rawData,
+    items,
+    total: Math.max(items.length, rawData.total - (rawData.items.length - items.length)),
+  };
 
   return (
     <main className="mx-auto max-w-[1400px] px-4 pb-16 pt-24 md:px-6">

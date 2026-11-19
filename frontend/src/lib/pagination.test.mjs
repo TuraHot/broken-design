@@ -1,7 +1,7 @@
 // Run: npm test  (Node's built-in runner; imports the TS source via type stripping)
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildHref, parseParams, queryModels } from './pagination.ts';
+import { buildHref, isPublicModel, parseParams, queryModels } from './pagination.ts';
 
 const m = (id, o = {}) => ({
   id,
@@ -48,4 +48,24 @@ test('buildHref carries filters and page', () => {
   assert.equal(buildHref({ page: 1 }), '/gallery');
   assert.equal(buildHref({ page: 2 }), '/gallery?page=2');
   assert.equal(buildHref({ tag: 'vehicle', price: 'free', page: 2 }), '/gallery?tag=vehicle&price=free&page=2');
+});
+
+test('isPublicModel and queryModels exclude hidden, banned, deleted, and suspended-owner models', () => {
+  const models = [
+    m('visible'),
+    m('hidden-bool', { isHidden: true }),
+    m('hidden-camel', { hiddenAt: '2026-11-19T00:00:00Z' }),
+    m('hidden-snake', { hidden_at: '2026-11-19T00:00:00Z' }),
+    m('banned-bool', { isBanned: true }),
+    m('status-hidden', { status: 'hidden' }),
+    m('deleted-bool', { isDeleted: true }),
+    m('deleted-camel', { deletedAt: '2026-11-19T00:00:00Z' }),
+    m('deleted-snake', { deleted_at: '2026-11-19T00:00:00Z' }),
+    m('suspended-owner', { owner: { isSuspended: true } }),
+  ];
+
+  assert.equal(isPublicModel(models[0]), true);
+  assert.equal(isPublicModel(models[1]), false);
+  assert.deepEqual(queryModels(models, {}).items.map((x) => x.id), ['visible']);
+  assert.equal(queryModels(models, {}).total, 1);
 });

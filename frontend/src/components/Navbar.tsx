@@ -13,6 +13,7 @@ import { useT } from '@/lib/i18n/client';
 import type { MessageKey } from '@/lib/i18n/messages';
 import AccountMenu from './AccountMenu';
 import LanguageSwitch from './LanguageSwitch';
+import ThemeToggle from './ThemeToggle';
 
 // `desktopOnly` links are hidden below `sm` so the bar fits at 375px.
 const LINKS: { href: string; label: MessageKey; desktopOnly?: boolean }[] = [
@@ -152,6 +153,7 @@ export default function Navbar() {
           >
             {mobileSearch ? <X className="h-5 w-5" /> : <Search className="h-5 w-5" />}
           </button>
+          <ThemeToggle />
           <LanguageSwitch />
           <AccountMenu />
         </div>

@@ -25,6 +25,8 @@ const en = {
   'nav.login': 'Log in',
   'nav.register': 'Register',
   'lang.switchTo': 'Switch language to Thai',
+  'theme.toLight': 'Switch to light theme',
+  'theme.toDark': 'Switch to dark theme',
 
   // Account menu
   'menu.account': 'Account menu for {name}',
@@ -395,6 +397,8 @@ const th: Record<MessageKey, string> = {
   'nav.login': 'ล็อกอิน',
   'nav.register': 'สมัครสมาชิก',
   'lang.switchTo': 'Switch language to English',
+  'theme.toLight': 'เปลี่ยนเป็นโทนสว่าง',
+  'theme.toDark': 'เปลี่ยนเป็นโทนมืด',
 
   'menu.account': 'เมนูบัญชีของ {name}',
   'menu.admin': 'แดชบอร์ดผู้ดูแล',

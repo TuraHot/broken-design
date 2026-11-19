@@ -108,6 +108,24 @@ CREATE TABLE IF NOT EXISTS complaints (
 CREATE INDEX IF NOT EXISTS idx_complaints_status ON complaints (status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_complaints_reporter ON complaints (reporter_id, created_at DESC);
 
+-- 6.2 Creator Withdrawals Table (เงินที่เว็บถือไว้ให้ครีเอเตอร์ + คำนวณส่วนต่างค่าธรรมเนียมแพลตฟอร์มก่อนถอน)
+CREATE TABLE IF NOT EXISTS creator_withdrawals (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    seller_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    gross_amount_cents INTEGER NOT NULL CHECK (gross_amount_cents > 0),
+    platform_fee_cents INTEGER NOT NULL CHECK (platform_fee_cents >= 0),
+    net_amount_cents INTEGER NOT NULL CHECK (net_amount_cents >= 0),
+    fee_rate_bps INTEGER NOT NULL DEFAULT 700,
+    currency VARCHAR(10) NOT NULL DEFAULT 'USD',
+    payout_method VARCHAR(50) NOT NULL DEFAULT 'promptpay',
+    payout_account VARCHAR(255) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'paid', 'rejected')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    processed_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_creator_withdrawals_seller ON creator_withdrawals (seller_id, created_at DESC);
+
 -- 7. Seed Initial Accounts (Admin must be set in DB, cannot register via UI)
 INSERT INTO users (email, password_hash, display_name, role, is_seller)
 VALUES (

@@ -57,6 +57,62 @@ export interface PurchaseItem {
   purchasedAt: string;
 }
 
+export interface PurchaseDetail {
+  id: string;
+  modelId: string;
+  title: string;
+  sellerName?: string;
+  priceCents: number;
+  amountCents: number;
+  currency: string;
+  licenseType: License | string;
+  watermarkHash: string | null;
+  status: 'pending' | 'paid';
+  provider?: 'mock' | 'stripe';
+  paidAt: string | null;
+  createdAt: string;
+}
+
+export interface QrPaymentResponse {
+  provider: 'mock' | 'stripe';
+  purchaseId: string;
+  paymentIntentId?: string;
+  qrImageUrl: string | null;
+  hostedUrl?: string | null;
+  qrData?: string | null;
+  amountSatang: number;
+  currency: string;
+}
+
+export interface SellerWallet {
+  grossEarnedCents: number;
+  withdrawnGrossCents: number;
+  availableGrossCents: number;
+  feeRateBps: number;
+  feeRatePercent: number;
+  estimatedFeeCents: number;
+  estimatedNetCents: number;
+}
+
+export interface SellerWithdrawal {
+  id: string;
+  grossAmountCents: number;
+  platformFeeCents: number;
+  netAmountCents: number;
+  feeRateBps: number;
+  currency: string;
+  payoutMethod: string;
+  payoutAccount: string;
+  status: 'pending' | 'approved' | 'paid' | 'rejected';
+  createdAt: string;
+  processedAt: string | null;
+}
+
+export interface SellerWalletResponse {
+  wallet: SellerWallet;
+  withdrawals: SellerWithdrawal[];
+}
+
 export interface SellerModelItem {
   id: string;
   title: string;

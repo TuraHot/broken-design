@@ -161,7 +161,7 @@ adminRouter.get('/users', async (req, res) => {
 
   const total = await db.query(`SELECT COUNT(*)::int AS total FROM users ${where}`, filterParams);
   const rows = await db.query(
-    `SELECT id, email, display_name, role, is_seller, suspended_at, created_at
+    `SELECT id, email, display_name, role, is_seller, suspended_at, suspended_until, suspension_reason, created_at
      FROM users ${where}
      ORDER BY created_at DESC
      LIMIT $${filterParams.length + 1} OFFSET $${filterParams.length + 2}`,
@@ -176,6 +176,8 @@ adminRouter.get('/users', async (req, res) => {
       role: u.role,
       isSeller: u.is_seller,
       suspendedAt: u.suspended_at,
+      suspendedUntil: u.suspended_until,
+      suspensionReason: u.suspension_reason,
       createdAt: u.created_at,
     })),
     page,
@@ -185,35 +187,126 @@ adminRouter.get('/users', async (req, res) => {
 });
 
 // ─── 3. PATCH /api/admin/users/:id/suspend ──────────────────────────────────
-const suspendBody = z.object({ suspended: z.boolean() });
+// Suspending needs a written reason (10-1000 characters) and may have an end time (in the future, at most 365 days).
+// No end time = suspended until an admin restores the account. Restoring may carry a reason too.
+// One statement updates the user, writes the history row and creates the notice, so the three cannot be split.
+const MAX_SUSPENSION_MS = 365 * 24 * 60 * 60 * 1000;
+const suspendBody = z
+  .object({
+    suspended: z.boolean(),
+    reason: z.string().trim().max(1000).optional(),
+    until: z.string().datetime({ offset: true }).optional(),
+  })
+  .superRefine((b, ctx) => {
+    if (b.suspended) {
+      if (!b.reason || b.reason.length < 10) ctx.addIssue({ code: 'custom', path: ['reason'], message: 'reason is required (10-1000 characters)' });
+      if (b.until) {
+        const ms = new Date(b.until).getTime() - Date.now();
+        if (ms <= 0 || ms > MAX_SUSPENSION_MS) ctx.addIssue({ code: 'custom', path: ['until'], message: 'until must be in the future and within 365 days' });
+      }
+    } else if (b.until) {
+      ctx.addIssue({ code: 'custom', path: ['until'], message: 'a restore has no end time' });
+    }
+  });
 
 adminRouter.patch('/users/:id/suspend', async (req, res) => {
   const targetId = String(req.params.id);
   requireUuid(targetId);
 
-  const body = suspendBody.safeParse(req.body);
-  if (!body.success) {
-    throw new AppError(400, 'INVALID_BODY', 'Body must be { "suspended": true | false }');
-  }
   if (targetId === req.user!.id) {
     throw new AppError(400, 'CANNOT_SUSPEND_SELF', 'Admins cannot suspend their own account');
   }
 
-  const result = await db.query(
-    `UPDATE users
-     SET suspended_at = CASE WHEN $2::boolean THEN COALESCE(suspended_at, NOW()) ELSE NULL END
-     WHERE id = $1
-     RETURNING id, suspended_at`,
-    [targetId, body.data.suspended],
+  const body = suspendBody.safeParse(req.body);
+  if (!body.success) {
+    throw new AppError(
+      400,
+      'INVALID_BODY',
+      'Body must be { "suspended": boolean, "reason": 10-1000 characters (required to suspend), "until": future ISO date within 365 days (optional, suspend only) }',
+    );
+  }
+
+  const { suspended } = body.data;
+  const reason = body.data.reason ? body.data.reason : null;
+  const until = suspended && body.data.until ? new Date(body.data.until).toISOString() : null;
+
+  const result = await db.query<{ found: number; changed: number; target_role: string | null; suspended_at: string | null; suspended_until: string | null }>(
+    `WITH old AS (
+       SELECT id, role, suspended_at, suspended_until FROM users WHERE id = $1 FOR UPDATE
+     ),
+     upd AS (
+       UPDATE users u
+       SET suspended_at = CASE WHEN $2::boolean THEN COALESCE(old.suspended_at, NOW()) ELSE NULL END,
+           suspended_until = CASE WHEN $2::boolean THEN $3::timestamptz ELSE NULL END,
+           suspension_reason = CASE WHEN $2::boolean THEN $4::text ELSE NULL END
+       FROM old
+       WHERE u.id = old.id
+         AND (NOT $2::boolean OR old.role <> 'admin') -- an admin cannot be suspended, but one suspended earlier can be restored
+         AND ($2::boolean OR old.suspended_at IS NOT NULL)
+       RETURNING u.id, u.suspended_at, u.suspended_until
+     ),
+     hist AS (
+       INSERT INTO user_suspensions (user_id, admin_id, action, reason, until)
+       SELECT id, $5::uuid, CASE WHEN $2::boolean THEN 'suspend' ELSE 'restore' END::varchar, $4::text, $3::timestamptz FROM upd
+       RETURNING id
+     ),
+     note AS (
+       INSERT INTO notifications (user_id, kind, data)
+       SELECT id, CASE WHEN $2::boolean THEN 'account_suspended' ELSE 'account_restored' END::varchar,
+              jsonb_build_object('reason', $4::text, 'until', $3::timestamptz)
+       FROM upd
+       RETURNING id
+     )
+     SELECT (SELECT COUNT(*) FROM old)::int AS found,
+            (SELECT COUNT(*) FROM upd)::int AS changed,
+            (SELECT role::text FROM old) AS target_role,
+            CASE WHEN EXISTS (SELECT 1 FROM upd) THEN (SELECT suspended_at FROM upd) ELSE (SELECT suspended_at FROM old) END AS suspended_at,
+            CASE WHEN EXISTS (SELECT 1 FROM upd) THEN (SELECT suspended_until FROM upd) ELSE (SELECT suspended_until FROM old) END AS suspended_until`,
+    [targetId, suspended, until, reason, req.user!.id],
   );
-  if (result.rowCount === 0) {
+
+  const row = result.rows[0];
+  if (!row || row.found === 0) {
     throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
+  }
+  if (suspended && row.target_role === 'admin') {
+    // Two admins suspending each other would leave nobody able to restore anyone. Admins are managed in the database.
+    throw new AppError(403, 'CANNOT_SUSPEND_ADMIN', 'Admin accounts cannot be suspended');
   }
 
   res.json({
-    id: result.rows[0].id,
-    isSuspended: result.rows[0].suspended_at !== null,
-    suspendedAt: result.rows[0].suspended_at,
+    id: targetId,
+    isSuspended: row.suspended_at !== null,
+    suspendedAt: row.suspended_at,
+    suspendedUntil: row.suspended_until,
+  });
+});
+
+// ─── 3b. GET /api/admin/users/:id/suspensions ───────────────────────────────
+// Who suspended or restored this account, when, why and until when (newest first, latest 50).
+// admin is null when the suspension ended by itself.
+adminRouter.get('/users/:id/suspensions', async (req, res) => {
+  const id = String(req.params.id);
+  requireUuid(id);
+
+  const result = await db.query(
+    `SELECT s.id, s.action, s.reason, s.until, s.created_at, a.id AS admin_id, a.display_name AS admin_name
+     FROM user_suspensions s
+     LEFT JOIN users a ON a.id = s.admin_id
+     WHERE s.user_id = $1
+     ORDER BY s.created_at DESC
+     LIMIT 50`,
+    [id],
+  );
+  res.json({
+    items: result.rows.map((h) => ({
+      id: h.id,
+      action: h.action,
+      reason: h.reason,
+      until: h.until,
+      createdAt: h.created_at,
+      admin: h.admin_id ? { id: h.admin_id, displayName: h.admin_name } : null,
+    })),
   });
 });
 
@@ -267,7 +360,16 @@ adminRouter.get('/models', async (req, res) => {
 });
 
 // ─── 5. PATCH /api/admin/models/:id/hide ────────────────────────────────────
-const hideBody = z.object({ hidden: z.boolean() });
+// Hiding a model blocks it everywhere (gallery and CDN, buyers included), so it needs a written reason like a
+// suspension does. One statement updates the model, writes the history row and notifies the owner.
+// Hiding a model that is already hidden (or restoring a visible one) changes nothing and writes nothing.
+const hideBody = z
+  .object({ hidden: z.boolean(), reason: z.string().trim().max(1000).optional() })
+  .superRefine((b, ctx) => {
+    if (b.hidden && (!b.reason || b.reason.length < 10)) {
+      ctx.addIssue({ code: 'custom', path: ['reason'], message: 'reason is required (10-1000 characters)' });
+    }
+  });
 
 adminRouter.patch('/models/:id/hide', async (req, res) => {
   const modelId = String(req.params.id);
@@ -275,37 +377,193 @@ adminRouter.patch('/models/:id/hide', async (req, res) => {
 
   const body = hideBody.safeParse(req.body);
   if (!body.success) {
-    throw new AppError(400, 'INVALID_BODY', 'Body must be { "hidden": true | false }');
+    throw new AppError(
+      400,
+      'INVALID_BODY',
+      'Body must be { "hidden": boolean, "reason": 10-1000 characters (required to hide, optional to restore) }',
+    );
   }
+  const { hidden } = body.data;
+  const reason = body.data.reason ? body.data.reason : null;
 
-  const result = await db.query(
-    `UPDATE models
-     SET hidden_at = CASE WHEN $2::boolean THEN COALESCE(hidden_at, NOW()) ELSE NULL END
-     WHERE id = $1
-     RETURNING id, hidden_at`,
-    [modelId, body.data.hidden],
+  const result = await db.query<{ found: number; changed: number; hidden_at: string | null }>(
+    `WITH old AS (
+       SELECT id, owner_id, title, hidden_at FROM models WHERE id = $1 AND deleted_at IS NULL FOR UPDATE
+     ),
+     upd AS (
+       UPDATE models m
+       SET hidden_at = CASE WHEN $2::boolean THEN NOW() ELSE NULL END
+       FROM old
+       WHERE m.id = old.id AND ($2::boolean = (old.hidden_at IS NULL)) -- hide only a visible model, restore only a hidden one
+       RETURNING m.id, m.hidden_at, old.owner_id, old.title
+     ),
+     hist AS (
+       INSERT INTO model_visibility_changes (model_id, admin_id, action, reason)
+       SELECT id, $3::uuid, CASE WHEN $2::boolean THEN 'hide' ELSE 'restore' END::varchar, $4::text FROM upd
+       RETURNING id
+     ),
+     note AS (
+       INSERT INTO notifications (user_id, kind, model_id, data)
+       SELECT owner_id, CASE WHEN $2::boolean THEN 'model_hidden' ELSE 'model_restored' END::varchar, id,
+              jsonb_build_object('modelTitle', title, 'reason', $4::text)
+       FROM upd
+       RETURNING id
+     )
+     SELECT (SELECT COUNT(*) FROM old)::int AS found,
+            (SELECT COUNT(*) FROM upd)::int AS changed,
+            CASE WHEN EXISTS (SELECT 1 FROM upd) THEN (SELECT hidden_at FROM upd) ELSE (SELECT hidden_at FROM old) END AS hidden_at`,
+    [modelId, hidden, req.user!.id, reason],
   );
-  if (result.rowCount === 0) {
+
+  const row = result.rows[0];
+  if (!row || row.found === 0) {
     throw new AppError(404, 'MODEL_NOT_FOUND', 'Model not found');
   }
 
   res.json({
-    id: result.rows[0].id,
-    isHidden: result.rows[0].hidden_at !== null,
-    hiddenAt: result.rows[0].hidden_at,
+    id: modelId,
+    isHidden: row.hidden_at !== null,
+    hiddenAt: row.hidden_at,
+  });
+});
+
+// ─── 5b. PATCH /api/admin/models/:id/license ────────────────────────────────
+// Changes the license, records who/why and notifies the owner in ONE statement, so the three
+// writes can never be split. Existing purchases keep purchases.license_type (locked at purchase).
+const LICENSES = ['CC0', 'CC-BY', 'CC-BY-NC', 'COMMERCIAL'] as const;
+const licenseBody = z.object({
+  license: z.enum(LICENSES),
+  reason: z.string().trim().min(10).max(1000),
+});
+
+adminRouter.patch('/models/:id/license', async (req, res) => {
+  const modelId = String(req.params.id);
+  requireUuid(modelId);
+
+  const body = licenseBody.safeParse(req.body);
+  if (!body.success) {
+    throw new AppError(
+      400,
+      'INVALID_BODY',
+      'Body must be { "license": "CC0" | "CC-BY" | "CC-BY-NC" | "COMMERCIAL", "reason": 10-1000 characters }',
+    );
+  }
+  const { license, reason } = body.data;
+
+  const result = await db.query<{ found: number; changed: number }>(
+    `WITH old AS (
+       SELECT id, owner_id, title, license FROM models WHERE id = $1 AND deleted_at IS NULL FOR UPDATE
+     ),
+     upd AS (
+       UPDATE models m SET license = $2::license_type
+       FROM old
+       WHERE m.id = old.id AND old.license <> $2::license_type
+       RETURNING m.id, old.owner_id, old.title, old.license AS old_license
+     ),
+     hist AS (
+       INSERT INTO model_license_changes (model_id, admin_id, old_license, new_license, reason)
+       SELECT id, $3::uuid, old_license, $2::license_type, $4::text FROM upd
+       RETURNING id
+     ),
+     note AS (
+       INSERT INTO notifications (user_id, kind, model_id, data)
+       SELECT owner_id, 'license_changed'::varchar, id,
+              jsonb_build_object('modelTitle', title, 'oldLicense', old_license, 'newLicense', $2::text, 'reason', $4::text)
+       FROM upd
+       RETURNING id
+     )
+     SELECT (SELECT COUNT(*) FROM old)::int AS found, (SELECT COUNT(*) FROM upd)::int AS changed`,
+    [modelId, license, req.user!.id, reason],
+  );
+
+  const row = result.rows[0];
+  if (!row || row.found === 0) {
+    throw new AppError(404, 'MODEL_NOT_FOUND', 'Model not found');
+  }
+  if (row.changed === 0) {
+    throw new AppError(400, 'LICENSE_UNCHANGED', 'The model already has this license');
+  }
+
+  res.json({ id: modelId, license });
+});
+
+// ─── 5c. GET /api/admin/models/:id/history ──────────────────────────────────
+// Every license change and every hide / restore of one model, with the reason and the admin (newest first, latest 50).
+adminRouter.get('/models/:id/history', async (req, res) => {
+  const id = String(req.params.id);
+  requireUuid(id);
+
+  const result = await db.query(
+    `SELECT 'license'::text AS kind, c.id, c.old_license::text AS old_license, c.new_license::text AS new_license,
+            NULL::text AS action, c.reason, c.created_at, a.id AS admin_id, a.display_name AS admin_name
+     FROM model_license_changes c
+     LEFT JOIN users a ON a.id = c.admin_id
+     WHERE c.model_id = $1
+     UNION ALL
+     SELECT 'visibility'::text, v.id, NULL::text, NULL::text, v.action::text, v.reason, v.created_at, a.id, a.display_name
+     FROM model_visibility_changes v
+     LEFT JOIN users a ON a.id = v.admin_id
+     WHERE v.model_id = $1
+     ORDER BY created_at DESC
+     LIMIT 50`,
+    [id],
+  );
+  res.json({
+    items: result.rows.map((h) => {
+      const admin = h.admin_id ? { id: h.admin_id, displayName: h.admin_name } : null;
+      return h.kind === 'license'
+        ? { kind: 'license', id: h.id, oldLicense: h.old_license, newLicense: h.new_license, reason: h.reason, createdAt: h.created_at, admin }
+        : { kind: 'visibility', id: h.id, action: h.action, reason: h.reason, createdAt: h.created_at, admin };
+    }),
   });
 });
 
 // ─── 6. GET /api/admin/purchases ────────────────────────────────────────────
 // ไม่ส่ง embed_key กลับ (เป็นความลับของผู้ซื้อ); ส่ง watermark_hash ไว้ตรวจย้อนรอย
+// Filters for the list: ?status=paid|pending and ?from= / ?to= (YYYY-MM-DD, both days included, by created_at).
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+// A text like 2026-02-30 or 2026-13-40 is not a date; toISOString() throws on an invalid Date, so test it first.
+const isRealDate = (v: string) => {
+  if (!DATE_RE.test(v)) return false;
+  const d = new Date(`${v}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v;
+};
+const purchaseFilters = z
+  .object({
+    status: z.enum(['paid', 'pending']).optional(),
+    from: z.string().refine(isRealDate).optional(),
+    to: z.string().refine(isRealDate).optional(),
+  })
+  .refine((f) => !f.from || !f.to || f.from <= f.to);
+
 adminRouter.get('/purchases', async (req, res) => {
   const { page, pageSize, offset, q } = parsePaging(req.query);
-  const search = q ? likePattern(q) : null;
+  const filters = purchaseFilters.safeParse(req.query);
+  if (!filters.success) {
+    throw new AppError(400, 'INVALID_QUERY', 'status must be paid or pending; from and to must be real dates (YYYY-MM-DD) with from not after to');
+  }
+  const { status, from, to } = filters.data;
 
-  const where = search
-    ? `WHERE m.title ILIKE $1 ESCAPE '\\' OR u.email ILIKE $1 ESCAPE '\\' OR u.display_name ILIKE $1 ESCAPE '\\'`
-    : '';
-  const filterParams = search ? [search] : [];
+  const conditions: string[] = [];
+  const filterParams: unknown[] = [];
+  if (q) {
+    filterParams.push(likePattern(q));
+    const n = filterParams.length;
+    conditions.push(`(m.title ILIKE $${n} ESCAPE '\\' OR u.email ILIKE $${n} ESCAPE '\\' OR u.display_name ILIKE $${n} ESCAPE '\\')`);
+  }
+  if (status) {
+    filterParams.push(status);
+    conditions.push(`p.status = $${filterParams.length}::purchase_status`);
+  }
+  if (from) {
+    filterParams.push(from);
+    conditions.push(`p.created_at >= $${filterParams.length}::date`);
+  }
+  if (to) {
+    filterParams.push(to);
+    conditions.push(`p.created_at < ($${filterParams.length}::date + 1)`);
+  }
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
   const joins = `FROM purchases p
      JOIN users u ON u.id = p.user_id
      JOIN models m ON m.id = p.model_id`;
@@ -339,6 +597,51 @@ adminRouter.get('/purchases', async (req, res) => {
     page,
     pageSize,
     total: total.rows[0].total,
+  });
+});
+
+// ─── 6b. GET /api/admin/purchases/:id ───────────────────────────────────────
+// One order in full, for checking it. embed_key is never selected (it is the buyer's secret).
+adminRouter.get('/purchases/:id', async (req, res) => {
+  const id = String(req.params.id);
+  requireUuid(id);
+
+  const result = await db.query(
+    `SELECT p.id, p.status, p.amount_cents, p.currency, p.license_type, p.watermark_hash,
+            p.provider_session_id, p.paid_at, p.created_at,
+            u.id AS buyer_id, u.email AS buyer_email, u.display_name AS buyer_name, u.suspended_at AS buyer_suspended_at,
+            m.id AS model_id, m.title AS model_title, m.license AS model_license,
+            m.hidden_at AS model_hidden_at, m.deleted_at AS model_deleted_at,
+            o.id AS owner_id, o.email AS owner_email, o.display_name AS owner_name
+     FROM purchases p
+     JOIN users u ON u.id = p.user_id
+     JOIN models m ON m.id = p.model_id
+     JOIN users o ON o.id = m.owner_id
+     WHERE p.id = $1`,
+    [id],
+  );
+  const p = result.rows[0];
+  if (!p) throw new AppError(404, 'PURCHASE_NOT_FOUND', 'Purchase not found');
+
+  res.json({
+    id: p.id,
+    status: p.status,
+    amountCents: p.amount_cents,
+    currency: p.currency,
+    licenseType: p.license_type,
+    watermarkHash: p.watermark_hash,
+    providerSessionId: p.provider_session_id,
+    paidAt: p.paid_at,
+    createdAt: p.created_at,
+    buyer: { id: p.buyer_id, email: p.buyer_email, displayName: p.buyer_name, isSuspended: p.buyer_suspended_at !== null },
+    model: {
+      id: p.model_id,
+      title: p.model_title,
+      currentLicense: p.model_license,
+      isHidden: p.model_hidden_at !== null,
+      isDeleted: p.model_deleted_at !== null,
+    },
+    owner: { id: p.owner_id, email: p.owner_email, displayName: p.owner_name },
   });
 });
 

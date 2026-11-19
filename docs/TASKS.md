@@ -43,9 +43,10 @@
 | สถานะ | เส้นทาง | ผู้รับ | Backend ที่ใช้ | หมายเหตุ |
 |---|---|---|---|---|
 | [x] | `/admin` ภาพรวม | เจี๊ยบ | `GET /api/admin/overview` | ทำแล้ว ทดสอบในเบราว์เซอร์กับ API จำลอง (ยังไม่ได้ลองกับ core-api + Postgres จริง) |
-| [x] | `/admin/models` | เจี๊ยบ | `GET /api/admin/models`, `PATCH .../hide` | ทำแล้ว ทดสอบในเบราว์เซอร์กับ API จำลอง (ยังไม่ได้ลองกับ core-api + Postgres จริง) |
-| [x] | `/admin/users` | เจี๊ยบ | `GET /api/admin/users`, `PATCH .../suspend` | ทำแล้ว ทดสอบในเบราว์เซอร์กับ API จำลอง (ยังไม่ได้ลองกับ core-api + Postgres จริง) |
-| [x] | `/admin/purchases` | เจี๊ยบ | `GET /api/admin/purchases` | ทำแล้ว ใช้ชื่อ purchases (ยังไม่ได้ลองกับ core-api + Postgres จริง) |
+| [x] | `/admin/models` | เจี๊ยบ | `GET /api/admin/models`, `PATCH .../hide`, `PATCH .../license` | ทำแล้ว (ปุ่ม "แก้ไข" ปุ่มเดียวต่อแถว เปิดกล่องที่แก้ license พร้อมเหตุผล (ส่งใบเตือนให้เจ้าของ) และซ่อน/คืนสถานะ) ทดสอบในเบราว์เซอร์กับ API จำลอง (ยังไม่ได้ลองกับ core-api + Postgres จริง ต้องรัน SQL ของตาราง `model_license_changes` และ `notifications` ใน `schema.sql` ก่อน) |
+| [x] | กล่องใบเตือนของเจ้าของ (`/seller` + ตัวนับในเมนู) | เจี๊ยบ | `GET /api/me/notifications`, `PATCH .../read`, `PATCH .../read-all` | ทำแล้ว ยังไม่มีอีเมล (จุดสร้างใบเตือนอยู่ที่เดียวใน SQL ของ route แก้ license) ไฟล์ `/seller` และ `AccountMenu` เป็นของคนอื่นร่วมกัน ควรให้เจ้าของไฟล์ตรวจ |
+| [x] | `/admin/users` | เจี๊ยบ | `GET /api/admin/users`, `PATCH .../suspend` | ทำแล้ว ปุ่ม "ระงับ/คืนสถานะ" เปิดกล่องเลือกระยะเวลา (1/3/7/30 วัน, ถึงวันที่กำหนด, ไม่มีกำหนด) + เหตุผล และแสดงวันสิ้นสุดในรายการ ผู้ใช้ได้รับใบเตือนทุกครั้ง (ระงับ, ปลดเอง, หมดเวลาอัตโนมัติ) อ่านได้ใน `/me` และ `/seller` ทดสอบในเบราว์เซอร์กับ API จำลอง (ยังไม่ได้ลองกับ core-api + Postgres จริง ต้องรัน SQL ส่วนที่ 10 ใน `schema.sql` ก่อน: คอลัมน์ `suspended_until`, `suspension_reason` และตาราง `user_suspensions`) |
+| [x] | `/admin/purchases` | เจี๊ยบ | `GET /api/admin/purchases`, `GET .../purchases/:id` | ทำแล้ว กรองสถานะ + ช่วงวันที่ และปุ่ม "รายละเอียด" เปิดกล่องดูการซื้อรายการเดียว (อ่านอย่างเดียว ไม่แสดง `embed_key`) ทดสอบในเบราว์เซอร์กับ API จำลอง (ยังไม่ได้ลองกับ core-api + Postgres จริง) ยังไม่มีคืนเงิน/ยกเลิกสิทธิ์ |
 | [x] | popup ส่งคำร้องเรียน (เมนู user + footer) + `/admin/complaints` | เจี๊ยบ | `POST /api/complaints`, `GET` / `PATCH /api/admin/complaints` ทดสอบแล้วในเบราว์เซอร์กับ API จำลอง (ยังไม่ได้ลองกับ Postgres จริง ต้องรัน SQL ของตาราง `complaints` ใน `schema.sql` ก่อน) |
 | [ ] | ปุ่ม "Report" บนหน้า `/models/[id]` เรียก `useReport().openReport()` (เปิด popup และกรอกลิงก์โมเดลให้เอง) | นนท์ | ไฟล์ของนนท์ ยังไม่ได้แก้ |
 
@@ -74,9 +75,9 @@
 | [x] | `POST /api/auth/check-email`, `/register`, `/login` | ต้า | บัญชีที่ถูกระงับได้ `403 ACCOUNT_SUSPENDED` (มีเทสต์ 2 ข้อ) |
 | [x] | `GET /api/models` (`q`, `tag`, `license`, `price`, `page`, `pageSize`), `GET /api/models/:id` | เป้ก | ซ่อนโมเดลที่ถูกซ่อน/ลบ/เจ้าของถูกระงับ |
 | [x] | `DELETE /api/models/:id` (soft delete) | แฮม | เจ้าของหรือแอดมิน |
-| [x] | payments: `checkout`, `confirm-mock`, `pay-mock`, `me/purchases`, `regenerate-key`, `purchases/:id` | ภีม | มีเทสต์ 12 ข้อ |
+| [x] | payments: `checkout`, `confirm-mock`, `pay-mock`, `me/purchases`, `regenerate-key`, `purchases/:id` | ภีม | มีเทสต์ 15 ข้อ (เพิ่ม 3 ข้อ: บัญชีที่ถูกระงับซื้อ/แก้คีย์ไม่ได้, ไม่พบบัญชี = 401, อ่านรายการซื้อยังได้) |
 | [x] | `/api/seller/enable`, `status`, `models`, `sales` | ภีม | มีเทสต์ 5 ข้อ |
-| [x] | `POST /api/complaints` & `/api/admin/complaints` (`GET`, `PATCH`) | เจี๊ยบ | มีเทสต์ complaints 5 ข้อ + admin 20 ข้อ + CORS 4 ข้อ (รวม Core API 48 ข้อ) |
+| [x] | `POST /api/complaints` & `/api/admin/complaints` (`GET`, `PATCH`) | เจี๊ยบ | มีเทสต์ complaints 5 ข้อ + admin 38 ข้อ (รวม sweeper 2) + notifications 6 ข้อ + CORS 4 ข้อ (รวม Core API 83 ข้อ รวมเทสต์ schema 2 ข้อและเทสต์ล็อกอิน) |
 | [x] | cdn-service: อัปโหลด, สตรีม, ดาวน์โหลด, poster, ลายน้ำ 2 ชั้น, `verify-watermark`, rate limit | นนท์, แฮม | มีเทสต์ 23 ข้อ |
 
 ### ยังค้าง
@@ -88,9 +89,9 @@
 | [x] | สร้าง `modules/admin/admin.routes.ts` และผูก `/api/admin` ใน `app.ts` | เจี๊ยบ | ตรวจ admin + `suspended_at` จากฐานข้อมูลในโมดูลเอง (`requireActiveAdmin`) แฮมจะย้ายไปรวมใน `auth.middleware.ts` ภายหลังก็ได้ |
 | [x] | `GET /api/admin/overview` | เจี๊ยบ | ผู้ใช้ โมเดล คำสั่งซื้อ `paid` ยอดรวม (`amount_cents`) |
 | [x] | `GET /api/admin/models` | เจี๊ยบ | รวมโมเดลที่ซ่อนและถูกลบ + เจ้าของ |
-| [x] | `PATCH /api/admin/models/:id/hide` | เจี๊ยบ | body `{ hidden: boolean }` |
-| [x] | `GET /api/admin/purchases` | เจี๊ยบ | ผู้ซื้อ โมเดล ราคา `watermark_hash` (ไม่ส่ง `embed_key`) |
-| [x] | `GET /api/admin/users`, `PATCH /api/admin/users/:id/suspend` | เจี๊ยบ | body `{ suspended: boolean }` ห้ามระงับตัวเอง |
+| [x] | `PATCH /api/admin/models/:id/hide` | เจี๊ยบ | body `{ hidden, reason? }` ซ่อนต้องมีเหตุผล บันทึกประวัติและส่งใบเตือนเจ้าของ (ต้องรัน SQL ส่วนที่ 11 ใน `schema.sql`: ตาราง `model_visibility_changes`); ปุ่มซ่อน/คืนสถานะใน `/admin/complaints` ใช้ฟอร์มเหตุผลเดียวกัน (คืนสถานะมีช่องเหตุผลไม่บังคับ) และ API ปฏิเสธโมเดลที่ถูกลบแล้ว (404) |
+| [x] | `GET /api/admin/purchases` และ `GET /api/admin/purchases/:id` | เจี๊ยบ | ผู้ซื้อ โมเดล ราคา `watermark_hash` (ไม่ส่ง `embed_key`) กรอง `status`, `from`, `to` |
+| [x] | `GET /api/admin/users`, `PATCH /api/admin/users/:id/suspend` | เจี๊ยบ | body `{ suspended, reason?, until? }` ระงับต้องมีเหตุผล ห้ามระงับตัวเองและห้ามระงับแอดมิน; `GET .../users/:id/suspensions` และ `GET .../models/:id/history` ดูประวัติ (แสดงในกล่องระงับและกล่องแก้ไขโมเดล); ตัวกวาดใน core-api ปลดเมื่อหมดเวลา (ทุก 60 วินาที) |
 | [ ] | `/api/creators/:handle` | ยังไม่มีผู้รับ | ฝั่งหน้าเว็บเรียกไว้ตอนปิดข้อมูลตัวอย่าง |
 | [~] | `modules/interactions/` (ถูกใจ, คอมเมนต์) | ยังไม่มีผู้รับ | ยังเป็น stub |
 | [~] | Stripe webhook `POST /api/webhooks/stripe` | ภีม | stub ตอบ `received: true` ยังไม่ตรวจลายเซ็น (และต้องใช้ raw body) |

@@ -10,7 +10,7 @@ Lixyte is a **3D asset repository and WebGL CDN** — a library of 3D models you
 - **Web developers / designers** who want 3D on a site with one line of code and no hosting.
 - **3D creators** who want to publish models (free or paid), reach developers, and see usage.
 - **Buyers** (a developer who buys a paid model) who need a stable embed key for their site.
-- **Admins** who moderate the catalogue (hide models, suspend accounts, resolve complaints, view all orders). Admin is set in the database only, cannot be self-registered, and cannot buy or sell.
+- **Admins** who moderate the catalogue (hide models, suspend accounts for a set time or until restored with a written reason the user is notified of, resolve complaints, view all orders). Admin is set in the database only, cannot be self-registered, and cannot buy or sell.
 
 One account covers buyer and seller: any user can switch on **seller mode** (`is_seller`).
 
@@ -41,7 +41,7 @@ Model editing in the browser, formats other than `.glb`, real-time collaboration
 - **Docs, Licenses & Legal Pages:** `/docs` (embed guide: `<vm-model>` attributes, iframe, embed keys, downloading, selling, CDN addresses, troubleshooting), `/licenses` (the four licenses compared in plain words) and five **draft** legal pages (`/terms`, `/privacy`, `/seller-terms`, `/refunds`, `/dmca`) linked from the footer. The legal text describes how the platform works today and marks every undecided point as `[TO DECIDE]`; it must be reviewed by a qualified person before real payments.
 - **Languages (English / Thai):** a language button in the Navbar and the admin layout; the choice is kept in a cookie. Translated: Navbar, Footer, account menu, report popup, `/contact`, `/settings`, `/docs`, `/licenses`, the legal pages and `/admin/*`. The other pages are still English until their owners move their text into `lib/i18n/messages.ts`.
 - **Contact & Settings:** `/contact` (report popup button, DMCA / Docs / Licenses / Refunds links) and `/settings` (profile, Log out). Changing the password or profile and deleting the account are not available yet (no API).
-- **Moderation, Complaints & System Error Pages:** User report modal (`openReport`) for flagging models/accounts/purchases, Admin dashboards (`/admin/*`) for overview, model hide/restore, user suspend/restore, purchases, and complaint resolution, plus global `403` / `404` / `500` error pages.
+- **Moderation, Complaints & System Error Pages:** User report modal (`openReport`) for flagging models/accounts/purchases, Admin dashboards (`/admin/*`) for overview, model hide/restore, model license change with a written reason (the owner gets a notice in `/seller`; no email yet), user suspend/restore, purchases, and complaint resolution, plus global `403` / `404` / `500` error pages.
 
 ### Later (Post-v1)
 "Report" trigger button directly on `/models/[id]`, forgot-password email flow, creator profile accounts/avatars/donations, embed playground (`/models/[id]/embed`), watermark inspector UI (`/verify`), creator usage stats, key domain locking, real Stripe checkout, likes/comments moderation, and automatic 3D compression (Draco / Meshopt).

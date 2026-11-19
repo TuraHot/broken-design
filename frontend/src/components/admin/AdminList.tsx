@@ -32,6 +32,7 @@ export default function AdminList<T extends { id: string }>({
   searchLabel,
   columns,
   filter,
+  dateRange,
 }: {
   path: string;
   heading: MessageKey;
@@ -39,6 +40,8 @@ export default function AdminList<T extends { id: string }>({
   columns: Column<T>[];
   /** Optional dropdown sent to the API as `?<param>=<value>` (an empty value means "no filter"). */
   filter?: { param: string; label: MessageKey; initial: string; options: { value: string; label: MessageKey }[] };
+  /** Adds two date fields sent to the API as `?from=YYYY-MM-DD&to=YYYY-MM-DD` (both days included). */
+  dateRange?: boolean;
 }) {
   const t = useT();
   const [page, setPage] = useState(1);
@@ -50,6 +53,8 @@ export default function AdminList<T extends { id: string }>({
   const [notice, setNotice] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [filterValue, setFilterValue] = useState(filter?.initial ?? '');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -57,6 +62,8 @@ export default function AdminList<T extends { id: string }>({
     const sp = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) });
     if (q) sp.set('q', q);
     if (filter && filterValue) sp.set(filter.param, filterValue);
+    if (dateRange && from) sp.set('from', from);
+    if (dateRange && to) sp.set('to', to);
 
     adminFetch<Paged<T>>(`${path}?${sp}`, { signal: ctrl.signal })
       .then((res) => {
@@ -72,7 +79,7 @@ export default function AdminList<T extends { id: string }>({
     return () => ctrl.abort();
     // `filter` is a fresh object each render; only the chosen value matters.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [path, page, q, attempt, filterValue]);
+  }, [path, page, q, attempt, filterValue, from, to]);
 
   const api: RowApi<T> = {
     update: useCallback((id, change) => {
@@ -126,6 +133,50 @@ export default function AdminList<T extends { id: string }>({
               <option key={o.value} value={o.value}>{t(o.label)}</option>
             ))}
           </select>
+        )}
+        {dateRange && (
+          // One date range: two dates that belong together, kept side by side with visible labels.
+          <div role="group" aria-label={t('admin.dateRange')} className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <label className="flex items-center gap-2 text-sm text-white/65">
+              {t('admin.dateFromShort')}
+              <input
+                type="date"
+                value={from}
+                max={to || undefined}
+                onChange={(e) => {
+                  setPage(1);
+                  setFrom(e.target.value);
+                }}
+                className="h-9 rounded-lg border border-white/15 bg-black px-3 text-sm text-white focus:border-white/50 focus:outline-none"
+              />
+            </label>
+            <label className="flex items-center gap-2 text-sm text-white/65">
+              {t('admin.dateToShort')}
+              <input
+                type="date"
+                value={to}
+                min={from || undefined}
+                onChange={(e) => {
+                  setPage(1);
+                  setTo(e.target.value);
+                }}
+                className="h-9 rounded-lg border border-white/15 bg-black px-3 text-sm text-white focus:border-white/50 focus:outline-none"
+              />
+            </label>
+            {(from || to) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setPage(1);
+                  setFrom('');
+                  setTo('');
+                }}
+                className="h-9 rounded-lg px-2 text-sm text-white/65 underline underline-offset-4 hover:text-white"
+              >
+                {t('admin.dateClear')}
+              </button>
+            )}
+          </div>
         )}
       </form>
 

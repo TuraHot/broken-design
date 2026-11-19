@@ -196,3 +196,27 @@ export async function deleteModel(modelId: string, token: string): Promise<void>
     method: 'DELETE',
   });
 }
+
+export interface NoticeItem {
+  id: string;
+  kind: string;
+  modelId: string | null;
+  data: { modelTitle?: string; oldLicense?: string; newLicense?: string; reason?: string | null; until?: string | null; auto?: boolean };
+  readAt: string | null;
+  createdAt: string;
+}
+
+/** The signed-in user's notices (`GET /api/me/notifications`). */
+export async function fetchNotices(token: string): Promise<{ unread: number; items: NoticeItem[] }> {
+  return coreApiFetch('/api/me/notifications', token, { cache: 'no-store' });
+}
+
+/** Mark one notice as read (`PATCH /api/me/notifications/:id/read`). */
+export async function markNoticeRead(id: string, token: string): Promise<void> {
+  await coreApiFetch(`/api/me/notifications/${encodeURIComponent(id)}/read`, token, { method: 'PATCH' });
+}
+
+/** Mark every notice as read (`PATCH /api/me/notifications/read-all`). */
+export async function markAllNoticesRead(token: string): Promise<void> {
+  await coreApiFetch('/api/me/notifications/read-all', token, { method: 'PATCH' });
+}

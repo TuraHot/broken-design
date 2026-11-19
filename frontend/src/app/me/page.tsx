@@ -3,6 +3,7 @@
 // User Dashboard — profile overview, seller toggle, purchased models, embed keys & GLB downloads
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import NoticeBox from '@/components/notifications/NoticeBox';
 import {
   Check,
   Code2,
@@ -215,6 +216,9 @@ export default function MePage() {
 
   return (
     <main className="mx-auto max-w-[1200px] px-4 pb-16 pt-24 md:px-6">
+      {/* Notices from admins: a suspension or its end, a license change, with the reason */}
+      <NoticeBox token={token} />
+
       {/* Toast / Notification */}
       {statusMsg && (
         <div className="mb-6 flex items-center justify-between rounded-lg border border-hud/30 bg-hud/10 px-4 py-3 text-sm text-hud">

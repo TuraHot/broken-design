@@ -7,6 +7,7 @@ import { db } from '../../config/db';
 import { env } from '../../config/env';
 import { requireAuth } from '../../middlewares/auth.middleware';
 import { AppError } from '../../middlewares/error.middleware';
+import { liftExpiredSuspensions } from '../admin/suspensionSweeper';
 
 export const authRouter = Router();
 
@@ -146,7 +147,7 @@ authRouter.post('/login', async (req, res) => {
   const { email, password } = parsed.data;
 
   const result = await db.query(
-    `SELECT id, email, password_hash, display_name, role, is_seller, avatar_hash, suspended_at
+    `SELECT id, email, password_hash, display_name, role, is_seller, avatar_hash, suspended_at, suspended_until, suspension_reason
      FROM users
      WHERE email = $1`,
     [email.toLowerCase()],
@@ -165,8 +166,25 @@ authRouter.post('/login', async (req, res) => {
     throw new AppError(401, 'INVALID_CREDENTIALS', 'Email or password is incorrect');
   }
 
+  // The end time has passed but the sweeper has not run yet: lift it now so the person is not turned away.
+  if (user.suspended_at && user.suspended_until && new Date(user.suspended_until).getTime() <= Date.now()) {
+    await liftExpiredSuspensions();
+    // The sweep uses the DATABASE clock and this check the app clock, so it may have lifted nothing yet.
+    // Read the row again instead of assuming; a suspended account never gets a token.
+    const fresh = await db.query(
+      `SELECT suspended_at, suspended_until, suspension_reason FROM users WHERE id = $1`,
+      [user.id],
+    );
+    if (fresh.rows[0]) Object.assign(user, fresh.rows[0]);
+  }
+
   if (user.suspended_at) {
-    throw new AppError(403, 'ACCOUNT_SUSPENDED', 'This account has been suspended');
+    // The person cannot sign in to read their notices, so the reason and the end date are in this message.
+    const ends = user.suspended_until
+      ? `until ${new Date(user.suspended_until).toISOString().slice(0, 10)} (UTC)`
+      : 'until an administrator restores the account';
+    const why = user.suspension_reason ? ` Reason: ${user.suspension_reason}` : '';
+    throw new AppError(403, 'ACCOUNT_SUSPENDED', `This account is suspended ${ends}.${why}`);
   }
 
   const token = jwt.sign(

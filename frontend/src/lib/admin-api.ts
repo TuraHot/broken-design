@@ -57,6 +57,8 @@ export interface AdminUser {
   role: 'user' | 'creator' | 'admin';
   isSeller: boolean;
   suspendedAt: string | null;
+  suspendedUntil: string | null;
+  suspensionReason: string | null;
   createdAt: string;
 }
 
@@ -85,6 +87,21 @@ export interface AdminPurchase {
   createdAt: string;
   buyer: { id: string; email: string; displayName: string };
   model: { id: string; title: string };
+}
+
+export interface AdminPurchaseDetail {
+  id: string;
+  status: 'pending' | 'paid';
+  amountCents: number;
+  currency: string;
+  licenseType: string;
+  watermarkHash: string | null;
+  providerSessionId: string | null;
+  paidAt: string | null;
+  createdAt: string;
+  buyer: { id: string; email: string; displayName: string; isSuspended: boolean };
+  model: { id: string; title: string; currentLicense: string; isHidden: boolean; isDeleted: boolean };
+  owner: { id: string; email: string; displayName: string };
 }
 
 export type ComplaintStatus = 'open' | 'in_review' | 'resolved' | 'dismissed';
@@ -135,17 +152,52 @@ export async function adminFetch<T>(path: string, init: RequestInit = {}): Promi
   return data as T;
 }
 
-export const setUserSuspended = (id: string, suspended: boolean) =>
-  adminFetch<{ id: string; isSuspended: boolean; suspendedAt: string | null }>(
+/** Suspend (reason required, `until` optional: no end time = until an admin restores) or restore (reason optional). */
+export const setUserSuspended = (id: string, body: { suspended: boolean; reason?: string; until?: string }) =>
+  adminFetch<{ id: string; isSuspended: boolean; suspendedAt: string | null; suspendedUntil: string | null }>(
     `/users/${encodeURIComponent(id)}/suspend`,
-    { method: 'PATCH', body: JSON.stringify({ suspended }) },
+    { method: 'PATCH', body: JSON.stringify(body) },
   );
 
-export const setModelHidden = (id: string, hidden: boolean) =>
+/** Hide (reason required, the owner is notified) or restore (reason optional). */
+export const setModelHidden = (id: string, body: { hidden: boolean; reason?: string }) =>
   adminFetch<{ id: string; isHidden: boolean; hiddenAt: string | null }>(
     `/models/${encodeURIComponent(id)}/hide`,
-    { method: 'PATCH', body: JSON.stringify({ hidden }) },
+    { method: 'PATCH', body: JSON.stringify(body) },
   );
+
+export const fetchPurchaseDetail = (id: string) =>
+  adminFetch<AdminPurchaseDetail>(`/purchases/${encodeURIComponent(id)}`);
+
+export interface SuspensionEntry {
+  id: string;
+  action: 'suspend' | 'restore' | 'expire';
+  reason: string | null;
+  until: string | null;
+  createdAt: string;
+  admin: { id: string; displayName: string } | null;
+}
+
+/** One line of a model's history: a license change or a hide / restore. */
+export type ModelHistoryEntry =
+  | { kind: 'license'; id: string; oldLicense: string; newLicense: string; reason: string; createdAt: string; admin: { id: string; displayName: string } | null }
+  | { kind: 'visibility'; id: string; action: 'hide' | 'restore'; reason: string | null; createdAt: string; admin: { id: string; displayName: string } | null };
+
+export const fetchSuspensions = (userId: string) =>
+  adminFetch<{ items: SuspensionEntry[] }>(`/users/${encodeURIComponent(userId)}/suspensions`);
+
+export const fetchModelHistory = (modelId: string) =>
+  adminFetch<{ items: ModelHistoryEntry[] }>(`/models/${encodeURIComponent(modelId)}/history`);
+
+/** The written reason of an admin action (license change, hide, suspend): the API accepts 10 to 1000 characters. */
+export const REASON_MIN = 10;
+export const REASON_MAX = 1000;
+
+export const setModelLicense = (id: string, license: string, reason: string) =>
+  adminFetch<{ id: string; license: string }>(`/models/${encodeURIComponent(id)}/license`, {
+    method: 'PATCH',
+    body: JSON.stringify({ license, reason }),
+  });
 
 export const updateComplaint = (id: string, status: ComplaintStatus, adminNote?: string) =>
   adminFetch<{ id: string; status: ComplaintStatus; adminNote: string | null; handledAt: string | null }>(

@@ -10,8 +10,6 @@ import { formatDate } from '@/lib/format';
 import { useT } from '@/lib/i18n/client';
 import NoticeContent from './NoticeContent';
 
-const SHOWN = 8;
-
 export default function NotificationBell({
   token,
   unread,
@@ -72,7 +70,7 @@ export default function NotificationBell({
   };
 
   const label = unread > 0 ? t('bell.labelUnread', { n: unread }) : t('bell.label');
-  const list = (items ?? []).slice(0, SHOWN);
+  const list = items ?? [];
 
   return (
     <div ref={rootRef} className="relative">

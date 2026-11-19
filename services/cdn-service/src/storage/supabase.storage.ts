@@ -3,6 +3,7 @@ import fsp from 'fs/promises';
 import path from 'path';
 import { Readable } from 'stream';
 import { StorageAdapter, ByteRange } from './storage.interface';
+import { assertSafeKey } from './keys';
 import { supabase } from '../config/supabase';
 import { db } from '../config/db';
 import { env } from '../config/env';
@@ -32,6 +33,9 @@ export async function ensureSupabaseModelsBucket(bucketName: string): Promise<vo
         DO $$ BEGIN
           CREATE POLICY "Allow Updates on models bucket" ON storage.objects FOR UPDATE USING (bucket_id = '${bucketName}') WITH CHECK (bucket_id = '${bucketName}');
         EXCEPTION WHEN duplicate_object THEN null; END $$;
+        DO $$ BEGIN
+          CREATE POLICY "Allow Deletes from models bucket" ON storage.objects FOR DELETE USING (bucket_id = '${bucketName}');
+        EXCEPTION WHEN duplicate_object THEN null; END $$;
       `);
       return;
     } catch {
@@ -55,7 +59,7 @@ export async function uploadBufferToSupabaseBucket(
   if (!supabase) return false;
   await ensureSupabaseModelsBucket(bucketName);
 
-  const cleanKey = path.basename(hashKey);
+  const cleanKey = assertSafeKey(hashKey);
   const contentType = cleanKey.endsWith('.glb')
     ? 'model/gltf-binary'
     : cleanKey.endsWith('.webp')
@@ -84,7 +88,12 @@ export class SupabaseStorage implements StorageAdapter {
   private localCacheDir = path.resolve(env.storageDir);
 
   private resolveLocalCachePath(hashKey: string): string {
-    return path.join(this.localCacheDir, path.basename(hashKey));
+    const cleanKey = assertSafeKey(hashKey);
+    const resolved = path.resolve(this.localCacheDir, ...cleanKey.split('/'));
+    if (!resolved.startsWith(this.localCacheDir + path.sep)) {
+      throw new Error('Resolved cache path escapes localCacheDir');
+    }
+    return resolved;
   }
 
   async put(hashKey: string, tempFilePath: string): Promise<void> {
@@ -92,19 +101,31 @@ export class SupabaseStorage implements StorageAdapter {
       throw new Error('Supabase client is not configured');
     }
 
+    const cleanKey = assertSafeKey(hashKey);
     const fileBuffer = await fsp.readFile(tempFilePath);
 
     // 1. Upload to Supabase Storage bucket ('models')
-    await uploadBufferToSupabaseBucket(this.bucket, hashKey, fileBuffer);
+    await uploadBufferToSupabaseBucket(this.bucket, cleanKey, fileBuffer);
 
     // 2. Also keep a copy in local storage_data/ for fast streaming & fallback
-    await fsp.mkdir(this.localCacheDir, { recursive: true });
-    await fsp.writeFile(this.resolveLocalCachePath(hashKey), fileBuffer);
+    const localPath = this.resolveLocalCachePath(cleanKey);
+    await fsp.mkdir(path.dirname(localPath), { recursive: true });
+    await fsp.writeFile(localPath, fileBuffer);
     await fsp.unlink(tempFilePath).catch(() => undefined);
   }
 
   async getStream(hashKey: string, range?: ByteRange): Promise<{ stream: Readable; size: number }> {
-    const cleanKey = path.basename(hashKey);
+    const cleanKey = assertSafeKey(hashKey);
+    const localPath = this.resolveLocalCachePath(cleanKey);
+
+    // Check local disk cache first so warm assets and Range requests avoid re-downloading from Supabase Cloud.
+    try {
+      const stat = await fsp.stat(localPath);
+      const stream = fs.createReadStream(localPath, range ? { start: range.start, end: range.end } : undefined);
+      return { stream, size: stat.size };
+    } catch {
+      // Cache miss — download from Supabase Storage and populate local cache.
+    }
 
     if (supabase) {
       const { data, error } = await supabase.storage.from(this.bucket).download(cleanKey);
@@ -112,6 +133,15 @@ export class SupabaseStorage implements StorageAdapter {
         const arrayBuffer = await data.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
         const totalSize = buffer.length;
+
+        try {
+          await fsp.mkdir(path.dirname(localPath), { recursive: true });
+          const tmpPath = `${localPath}.tmp.${process.pid}.${Date.now()}`;
+          await fsp.writeFile(tmpPath, buffer);
+          await fsp.rename(tmpPath, localPath);
+        } catch {
+          // Ignore cache write errors and stream from memory.
+        }
 
         let targetBuffer = buffer;
         if (range) {
@@ -124,15 +154,14 @@ export class SupabaseStorage implements StorageAdapter {
       }
     }
 
-    // Fallback to local cache if object is not yet in Supabase bucket
-    const localPath = this.resolveLocalCachePath(cleanKey);
+    // Fallback stat surfaces ENOENT when object does not exist in cloud or cache.
     const stat = await fsp.stat(localPath);
     const stream = fs.createReadStream(localPath, range ? { start: range.start, end: range.end } : undefined);
     return { stream, size: stat.size };
   }
 
   async delete(hashKey: string): Promise<void> {
-    const cleanKey = path.basename(hashKey);
+    const cleanKey = assertSafeKey(hashKey);
     if (supabase) {
       await supabase.storage.from(this.bucket).remove([cleanKey]).catch(() => undefined);
     }

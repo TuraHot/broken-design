@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import { buildProfile, creatorHandle, type CreatorProfile } from './creators';
 import { PAGE_SIZE, queryModels } from './pagination';
 import { MOCK_MODELS } from './mock-models';
@@ -37,9 +38,8 @@ function buildModelSearchParams(params: ModelsParams, pageSize?: number): URLSea
   return sp;
 }
 
-async function fetchCoreApiModels(params: ModelsParams = {}, pageSize = 100): Promise<Model[]> {
+const fetchCoreApiModelsCached = cache(async (query: string): Promise<Model[]> => {
   try {
-    const query = buildModelSearchParams(params, pageSize).toString();
     const url = `${getServerCoreApiUrl()}/api/models${query ? `?${query}` : ''}`;
     const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) return [];
@@ -48,9 +48,14 @@ async function fetchCoreApiModels(params: ModelsParams = {}, pageSize = 100): Pr
   } catch {
     return [];
   }
+});
+
+export async function fetchCoreApiModels(params: ModelsParams = {}, pageSize = 100): Promise<Model[]> {
+  const query = buildModelSearchParams(params, pageSize).toString();
+  return fetchCoreApiModelsCached(query);
 }
 
-async function fetchCoreApiModelById(id: string): Promise<Model | null> {
+const fetchCoreApiModelById = cache(async (id: string): Promise<Model | null> => {
   if (!UUID_RE.test(id)) return null;
   try {
     const res = await fetch(`${getServerCoreApiUrl()}/api/models/${encodeURIComponent(id)}`, {
@@ -65,7 +70,7 @@ async function fetchCoreApiModelById(id: string): Promise<Model | null> {
   } catch {
     return null;
   }
-}
+});
 
 /** List models for the gallery (paged, real database models from Core API + optional mock catalogue). */
 export async function fetchModels(params: ModelsParams): Promise<ModelsPage> {

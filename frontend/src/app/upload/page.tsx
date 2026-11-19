@@ -66,6 +66,7 @@ export default function UploadPage() {
   const [isDragging, setIsDragging] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState<{ id: string; file_hash: string } | null>(null);
   const [capturingPoster, setCapturingPoster] = useState(false);
@@ -154,7 +155,11 @@ export default function UploadPage() {
 
     try {
       setCapturingPoster(true);
-      const blob: Blob | null = await viewerRef.current.toBlob({ idealAspect: true });
+      const blob: Blob | null = await viewerRef.current.toBlob({
+        mimeType: 'image/webp',
+        qualityArgument: 0.85,
+        idealAspect: true,
+      });
       if (!blob) throw new Error('Could not capture frame from 3D viewer');
 
       const posterBlobFile = new File([blob], `${title || 'model'}-poster.webp`, { type: 'image/webp' });
@@ -171,6 +176,7 @@ export default function UploadPage() {
   // Handle Form Submit
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submittingRef.current || isSubmitting) return;
     if (!file) {
       setValidationError('Please upload a 3D model file (.glb).');
       return;
@@ -181,6 +187,7 @@ export default function UploadPage() {
     }
 
     try {
+      submittingRef.current = true;
       setIsSubmitting(true);
       setSubmitError(null);
 
@@ -220,6 +227,7 @@ export default function UploadPage() {
     } catch (err: any) {
       setSubmitError(err.message || 'An unexpected error occurred during upload.');
     } finally {
+      submittingRef.current = false;
       setIsSubmitting(false);
     }
   };

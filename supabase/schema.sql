@@ -128,6 +128,7 @@ VALUES (
 SET role = 'creator', is_seller = true, suspended_at = NULL;
 
 -- 8. Supabase Storage Bucket ('models') & RLS Policies
+-- Stored object keys follow `<model_id>/{model,preview,poster}.<sha256>.<ext>` (with flat legacy key fallback).
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('models', 'models', true)
 ON CONFLICT (id) DO UPDATE SET public = true;

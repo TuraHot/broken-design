@@ -1,13 +1,15 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import multer from 'multer';
+import sharp from 'sharp';
 import path from 'path';
 import fs from 'fs';
 import fsp from 'fs/promises';
 import { env } from '../../config/env';
 import { db } from '../../config/db';
 import { supabase } from '../../config/supabase';
-import { getStorage } from '../../storage';
+import { getStorage, type StorageAdapter } from '../../storage';
+import { assetKey } from '../../storage/keys';
 import { validateGlbFile, computeFileSha256 } from '../../utils/glbValidator';
 import { embedLicenseAndWatermark } from '../../utils/glbWatermark';
 import { requireAuth, requireSeller } from '../../middlewares/auth.middleware';
@@ -56,6 +58,8 @@ uploadRouter.post(
   uploadFields,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
+    const uploadedKeys: string[] = [];
+    let storage: StorageAdapter | null = null;
 
     try {
       // 0. Verify seller account status in database (ensure account is active and not suspended)
@@ -160,6 +164,16 @@ uploadRouter.post(
         if (!allowedMime.includes(posterFile.mimetype) && !['.webp', '.png', '.jpg', '.jpeg'].includes(ext)) {
           throw new AppError(400, 'INVALID_POSTER', 'Poster must be a valid image file (.webp, .png, or .jpg)');
         }
+        try {
+          const webpBuffer = await sharp(posterFile.path).webp({ quality: 82 }).toBuffer();
+          await fsp.writeFile(posterFile.path, webpBuffer);
+        } catch {
+          throw new AppError(
+            400,
+            'INVALID_POSTER',
+            'Poster could not be processed as a valid image (.webp, .png, or .jpg)'
+          );
+        }
       }
 
       const modelId = crypto.randomUUID();
@@ -182,24 +196,30 @@ uploadRouter.post(
         throw new AppError(400, 'INVALID_GLB', wmErr?.message || 'Failed to parse and watermark GLB structure');
       }
 
-      const storage = getStorage();
+      storage = getStorage();
 
-      // Store main model by content hash
+      // Store main model under <model_id>/model.<hash>.glb
       const fileHash = await computeFileSha256(modelFile.path);
-      await storage.put(`${fileHash}.glb`, modelFile.path);
+      const mainKey = assetKey(modelId, 'model', fileHash);
+      await storage.put(mainKey, modelFile.path);
+      uploadedKeys.push(mainKey);
 
       // 3. Store the preview file (already checked above)
       let previewHash: string | null = null;
       if (previewFile) {
         previewHash = await computeFileSha256(previewFile.path);
-        await storage.put(`${previewHash}.glb`, previewFile.path);
+        const previewKey = assetKey(modelId, 'preview', previewHash);
+        await storage.put(previewKey, previewFile.path);
+        uploadedKeys.push(previewKey);
       }
 
-      // 4. Store the poster image (already checked above)
+      // 4. Store the poster image (already validated & converted to WebP above)
       let posterHash: string | null = null;
       if (posterFile) {
         posterHash = await computeFileSha256(posterFile.path);
-        await storage.put(`${posterHash}.webp`, posterFile.path);
+        const posterKey = assetKey(modelId, 'poster', posterHash);
+        await storage.put(posterKey, posterFile.path);
+        uploadedKeys.push(posterKey);
       }
 
       // 5. Sanitize Tags
@@ -276,6 +296,9 @@ uploadRouter.post(
       });
     } catch (err) {
       await cleanupFiles(files);
+      if (storage && uploadedKeys.length > 0) {
+        await Promise.all(uploadedKeys.map((key) => storage!.delete(key).catch(() => undefined)));
+      }
       next(err);
     }
   }

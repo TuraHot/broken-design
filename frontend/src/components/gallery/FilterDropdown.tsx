@@ -1,9 +1,9 @@
 'use client';
 
 // Dropdown button for one gallery filter — updates the URL query parameter when an option is selected.
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Check, ChevronDown } from 'lucide-react';
+import { Check, ChevronDown, Loader2 } from 'lucide-react';
 import { buildHref } from '@/lib/pagination';
 import type { License, ModelsParams } from '@/lib/types';
 
@@ -20,6 +20,7 @@ export default function FilterDropdown({
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [isPending, startTransition] = useTransition();
   const rootRef = useRef<HTMLDivElement>(null);
 
   const currentParam = params[paramKey];
@@ -44,6 +45,7 @@ export default function FilterDropdown({
   }, [open]);
 
   const selectOption = (o: string) => {
+    if (isPending) return;
     setOpen(false);
     const isAll = o === options[0];
     const next: ModelsParams = { ...params, page: 1 };
@@ -54,23 +56,30 @@ export default function FilterDropdown({
     } else if (paramKey === 'price') {
       next.price = isAll ? undefined : (o.toLowerCase() as 'free' | 'paid');
     }
-    router.push(buildHref(next));
+    startTransition(() => {
+      router.push(buildHref(next));
+    });
   };
 
   return (
     <div ref={rootRef} className="relative">
       <button
         type="button"
+        disabled={isPending}
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="true"
-        className={`inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm transition-colors ${
+        className={`inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm transition-colors disabled:cursor-wait disabled:opacity-60 ${
           chosen ? 'border-white text-white' : 'border-white/15 text-white/65 hover:border-white/30 hover:text-white'
         } bg-white/5`}
       >
         <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70">{label}</span>
         <span>{value}</span>
-        <ChevronDown aria-hidden className={`h-4 w-4 transition-transform ${open ? 'rotate-180' : ''}`} />
+        {isPending ? (
+          <Loader2 aria-hidden className="h-4 w-4 animate-spin text-hud motion-reduce:animate-none" />
+        ) : (
+          <ChevronDown aria-hidden className={`h-4 w-4 transition-transform ${open ? 'rotate-180' : ''}`} />
+        )}
       </button>
 
       {open && (

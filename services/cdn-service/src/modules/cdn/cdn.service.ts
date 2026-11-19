@@ -280,8 +280,8 @@ export async function savePurchaseWatermarkHash(
   }
 }
 
-export async function readAssetBuffer(storageKey: string): Promise<Buffer> {
-  const { stream } = await openStream(storageKey);
+export async function readAssetBuffer(storageKeys: string | string[]): Promise<Buffer> {
+  const { stream } = await openStream(storageKeys);
   const chunks: Buffer[] = [];
   for await (const chunk of stream) {
     chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
@@ -319,7 +319,7 @@ export const CONTENT_TYPES = {
 } as const;
 
 export interface SendAssetOptions {
-  storageKey: string; // e.g. `${hash}.glb`
+  storageKey: string | string[]; // e.g. candidateKeys(modelId, 'model', hash)
   etag: string; // content hash
   contentType: string;
   cacheControl: string;
@@ -341,27 +341,34 @@ function isNotFoundError(err: any): boolean {
 }
 
 async function openStream(
-  storageKey: string,
+  storageKeys: string | string[],
   range?: { start: number; end: number },
 ) {
-  try {
-    return await getStorage().getStream(storageKey, range);
-  } catch (primaryErr) {
-    // Fallback between LocalDiskStorage and SupabaseStorage if the file exists in the other store
+  const candidates = Array.isArray(storageKeys) ? storageKeys : [storageKeys];
+  let firstPrimaryErr: unknown = null;
+
+  for (const key of candidates) {
     try {
-      if (env.storageProvider === "local" && supabase) {
-        return await new SupabaseStorage().getStream(storageKey, range);
+      return await getStorage().getStream(key, range);
+    } catch (primaryErr) {
+      if (firstPrimaryErr === null) firstPrimaryErr = primaryErr;
+      // Fallback between LocalDiskStorage and SupabaseStorage if the file exists in the other store
+      try {
+        if (env.storageProvider === "local" && supabase) {
+          return await new SupabaseStorage().getStream(key, range);
+        }
+        if (env.storageProvider === "supabase") {
+          return await new LocalDiskStorage().getStream(key, range);
+        }
+      } catch {
+        // Ignore secondary error and continue to next candidate key
       }
-      if (env.storageProvider === "supabase") {
-        return await new LocalDiskStorage().getStream(storageKey, range);
-      }
-    } catch {
-      // Ignore secondary error and handle primaryErr below
     }
-    if (isNotFoundError(primaryErr))
-      throw new AppError(404, "FILE_NOT_FOUND", "File not found in storage");
-    throw primaryErr;
   }
+
+  if (isNotFoundError(firstPrimaryErr))
+    throw new AppError(404, "FILE_NOT_FOUND", "File not found in storage");
+  throw firstPrimaryErr;
 }
 
 /** ASCII fallback + RFC 5987 UTF-8 filename (titles may be Thai). */

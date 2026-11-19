@@ -3,8 +3,9 @@
 // Top navigation — logo, Gallery / Docs / Creator, search box (goes to /gallery?q=), Log in or account menu
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { FormEvent, useState } from 'react';
-import { Search, X } from 'lucide-react';
+import { FormEvent, MouseEvent, useEffect, useState, useTransition } from 'react';
+import { Loader2, Search, X } from 'lucide-react';
+import { startNavigationLoading } from '@/components/ui/NavigationProgress';
 import { hidesPublicChrome } from '@/lib/auth-paths';
 import { useT } from '@/lib/i18n/client';
 import type { MessageKey } from '@/lib/i18n/messages';
@@ -24,18 +25,45 @@ export default function Navbar() {
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [mobileSearch, setMobileSearch] = useState(false);
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    setPendingHref(null);
+  }, [pathname]);
+
+  const handleNavClick = (href: string) => (e: MouseEvent<HTMLAnchorElement>) => {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+    if (pendingHref !== null || pathname === href) {
+      e.preventDefault();
+      return;
+    }
+    setPendingHref(href);
+  };
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
+    if (isPending || pendingHref !== null) return;
     const q = query.trim();
-    router.push(q ? `/gallery?q=${encodeURIComponent(q)}` : '/gallery');
+    const target = q ? `/gallery?q=${encodeURIComponent(q)}` : '/gallery';
+    startNavigationLoading('/gallery');
+    startTransition(() => {
+      router.push(target);
+    });
   };
 
   if (hidesPublicChrome(pathname)) return null;
 
   const searchField = (
-    <form onSubmit={submit} role="search" className="relative w-full">
-      <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/50" />
+    <form onSubmit={submit} role="search" aria-busy={isPending} className="relative w-full">
+      {isPending ? (
+        <Loader2
+          aria-hidden
+          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-hud motion-reduce:animate-none"
+        />
+      ) : (
+        <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/50" />
+      )}
       <input
         type="search"
         value={query}
@@ -50,21 +78,39 @@ export default function Navbar() {
   return (
     <header className="fixed inset-x-0 top-0 z-50 border-b border-white/10 bg-black/90 backdrop-blur">
       <nav aria-label="Main" className="mx-auto flex h-16 max-w-[1400px] items-center gap-2 px-4 sm:gap-5 md:px-6">
-        <Link href="/" className="whitespace-nowrap text-[15px] font-semibold tracking-wide text-white sm:text-base">
-          Lixyte
+        <Link
+          href="/"
+          onClick={handleNavClick('/')}
+          aria-busy={pendingHref === '/'}
+          className={`inline-flex items-center gap-1.5 whitespace-nowrap text-[15px] font-semibold tracking-wide text-white sm:text-base ${
+            pendingHref !== null ? 'pointer-events-none' : ''
+          }`}
+        >
+          <span>Lixyte</span>
+          {pendingHref === '/' && (
+            <Loader2 aria-hidden className="h-3.5 w-3.5 animate-spin text-hud motion-reduce:animate-none" />
+          )}
         </Link>
 
-        <ul className="flex items-center gap-3 text-sm sm:gap-5 sm:text-[15px]">
+        <ul className={`flex items-center gap-3 text-sm sm:gap-5 sm:text-[15px] ${pendingHref !== null ? 'pointer-events-none' : ''}`}>
           {LINKS.map(({ href, label, desktopOnly }) => {
             const active = pathname === href || pathname.startsWith(`${href}/`);
+            const loading = pendingHref === href;
             return (
               <li key={href} className={desktopOnly ? 'hidden sm:block' : undefined}>
                 <Link
                   href={href}
+                  onClick={handleNavClick(href)}
                   aria-current={active ? 'page' : undefined}
-                  className={`whitespace-nowrap ${active ? 'text-white' : 'text-white/65 transition-colors hover:text-white'}`}
+                  aria-busy={loading}
+                  className={`inline-flex items-center gap-1.5 whitespace-nowrap ${
+                    loading ? 'text-hud' : active ? 'text-white' : 'text-white/65 transition-colors hover:text-white'
+                  }`}
                 >
-                  {t(label)}
+                  <span>{t(label)}</span>
+                  {loading && (
+                    <Loader2 aria-hidden className="h-3.5 w-3.5 animate-spin text-hud motion-reduce:animate-none" />
+                  )}
                 </Link>
               </li>
             );

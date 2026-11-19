@@ -2,13 +2,14 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { Download, Heart } from 'lucide-react';
+import { Download } from 'lucide-react';
 import ModelCard from '@/components/gallery/ModelCard';
 import EmbedSnippets from '@/components/model/EmbedSnippets';
 import LicenseRules from '@/components/model/LicenseRules';
 import ModelActions from '@/components/model/ModelActions';
+import ModelLikeButton from '@/components/model/ModelLikeButton';
 import ModelPreview from '@/components/model/ModelPreview';
-import { fetchModel, fetchMoreFromCreator } from '@/lib/api';
+import { fetchCoreApiModels, fetchModel, fetchMoreFromCreator } from '@/lib/api';
 import { creatorHandle, initials } from '@/lib/creators';
 import { formatCount, formatPrice } from '@/lib/format';
 
@@ -23,7 +24,8 @@ const CARD = 'rounded-lg border border-white/10 bg-white/5 p-5';
 const LABEL = 'font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70';
 
 export default async function ModelDetailPage({ params }: Props) {
-  const model = await fetchModel((await params).id);
+  const { id } = await params;
+  const [model] = await Promise.all([fetchModel(id), fetchCoreApiModels()]);
   if (!model) notFound();
 
   const more = await fetchMoreFromCreator(model);
@@ -89,12 +91,8 @@ export default async function ModelDetailPage({ params }: Props) {
               </div>
             </div>
 
-            <dl className="flex flex-wrap gap-x-5 gap-y-2 border-t border-white/10 pt-5 font-mono text-[12px] text-white/65">
-              <div className="flex items-center gap-1.5">
-                <Heart aria-hidden className="h-4 w-4" />
-                <dt className="sr-only">Likes</dt>
-                <dd>{formatCount(model.likeCount)}</dd>
-              </div>
+            <dl className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-white/10 pt-5 font-mono text-[12px] text-white/65">
+              <ModelLikeButton modelId={model.id} initialCount={model.likeCount} />
               <div className="flex items-center gap-1.5">
                 <Download aria-hidden className="h-4 w-4" />
                 <dt className="sr-only">Downloads</dt>

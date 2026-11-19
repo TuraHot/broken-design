@@ -7,8 +7,11 @@ export const TEST_STORAGE_DIR = fs.mkdtempSync(
   path.join(os.tmpdir(), "cdn-test-"),
 );
 
+process.env.NODE_ENV = "test";
 process.env.STORAGE_PROVIDER = "local";
 process.env.STORAGE_DIR = TEST_STORAGE_DIR;
+process.env.SUPABASE_URL = "";
+process.env.SUPABASE_KEY = "";
 process.env.JWT_SECRET = "cdn-test-secret";
 process.env.CDN_KEY_FAILURES_PER_15MIN = "10000";
 process.env.CDN_DOWNLOADS_PER_MIN = "10000";

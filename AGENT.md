@@ -46,7 +46,8 @@ Agent ทุกตัว **ห้ามละเมิด** กฎต่อไ�
    - ตรวจ 12 ไบต์แรกของไฟล์ `.glb` เสมอ (`magic === 0x46546C67` (`"glTF"`), `version === 2`, และ `totalLength === file.size`)
    - จำกัดขนาดไฟล์: Main `.glb` ≤ `50 MB`, Preview `.glb` ≤ `5 MB`, Poster `.webp/.png/.jpg` ≤ `1 MB`
    - โมเดลเสียเงิน (`price_cents > 0`) **บังคับ** ต้องแนบไฟล์ `preview` เสมอ
-   - ตั้งชื่อไฟล์ใน Storage ด้วยค่า `sha256` (`<hash>.glb`, `<hash>.webp`) ห้ามนำชื่อไฟล์จากผู้ใช้มาเป็น path
+   - จัดเก็บไฟล์ใน Storage Bucket `models` แบบแยกโฟลเดอร์ตาม `model_id` โดยตั้งชื่อด้วย `sha256`: `<model_id>/model.<hash>.glb`, `<model_id>/preview.<hash>.glb`, และ `<model_id>/poster.<hash>.webp` (พร้อมคงการอ่าน Fallback จาก `<hash>.glb` / `<hash>.webp` เดิมเพื่อไม่ให้กระทบไฟล์เก่า) และห้ามนำชื่อไฟล์จากผู้ใช้มาเป็น path
+   - รูปภาพหน้าปก (`poster`) ที่อัปโหลดเข้ามา (`.webp`, `.png`, `.jpg`) จะถูกแปลงเป็น `.webp` ที่บีบอัดแล้วโดยอัตโนมัติก่อนคำนวณ `sha256` และจัดเก็บ
 4. **Multi-Layer GLB Watermarking (`glbWatermark.ts`):**
    - ทุกไฟล์ `.glb` ที่อัปโหลดผ่าน `POST /api/models` ต้องผ่าน `embedLicenseAndWatermark` เพื่อฝังลายน้ำต้นฉบับ (`purchaseId: 'original'`) ก่อนบันทึกลง Storage
    - เมื่อผู้ซื้อที่ชำระเงินแล้ว (`status = 'paid'`) ดาวน์โหลดไฟล์ผ่าน `GET /cdn/models/:id/download` ระบบต้องฝัง `purchaseId` และ `license_type` ของผู้ซื้อลงในไฟล์ `.glb` (ทั้งใน `asset.extras` และพิกัด `POSITION` 64 จุดแรก) พร้อมบันทึก `watermark_hash` ลงตาราง `purchases`
@@ -68,7 +69,7 @@ Agent ทุกตัว **ห้ามละเมิด** กฎต่อไ�
 ### 4.1 CDN Service (`services/cdn-service/` — พอร์ต `4001`)
 - **`POST /api/models`** (`requireAuth`, `requireSeller`, `multipart/form-data`):
   - Fields: `file` (required `.glb`), `preview` (required ถ้า `price_cents > 0`), `poster` (optional image), `title`, `description`, `tags`, `license` (`CC0` | `CC-BY` | `CC-BY-NC` | `COMMERCIAL`), `price_cents`, `currency`
-  - ตรวจไฟล์ด้วย `validateGlbFile` → ฝังลายน้ำต้นฉบับด้วย `embedLicenseAndWatermark` (`purchaseId: 'original'`) → คำนวณ `sha256` → บันทึกลง Storage (`LocalDiskStorage` / `SupabaseStorage`) และฐานข้อมูล
+  - ตรวจไฟล์ด้วย `validateGlbFile` → ฝังลายน้ำต้นฉบับด้วย `embedLicenseAndWatermark` (`purchaseId: 'original'`) → แปลง `poster` (`.png`/`.jpg`/`.webp`) เป็น `.webp` ด้วย `sharp` → คำนวณ `sha256` → บันทึกลง Storage ใต้ `<model_id>/{model,preview,poster}.<hash>.<ext>` (`LocalDiskStorage` / `SupabaseStorage`) และฐานข้อมูล (พร้อมลบไฟล์ที่อัปโหลดออกอัตโนมัติหากบันทึกฐานข้อมูลไม่สำเร็จ)
 - **`GET /cdn/models/:id/:hash.glb`**:
   - สตรีมไฟล์ตาม Content Hash (อนุญาตเฉพาะไฟล์ของโมเดลฟรี หรือ `preview_hash` ของโมเดลเสียเงิน หากขอ `file_hash` ของโมเดลเสียเงินจะตอบ `401 KEY_REQUIRED`)
   - Headers: `Cache-Control: public, max-age=31536000, immutable`, `Accept-Ranges: bytes`, `ETag: "<hash>"`, `Cross-Origin-Resource-Policy: cross-origin`

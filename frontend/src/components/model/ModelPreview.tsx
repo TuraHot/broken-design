@@ -2,7 +2,7 @@
 
 // 3D Model Preview wired to the CDN (/cdn/models/:id/preview.glb & /file.glb?key=)
 import { useEffect, useRef, useState } from "react";
-import { Box, KeyRound, RotateCw } from "lucide-react";
+import { Box, KeyRound, Loader2, RotateCw } from "lucide-react";
 import { CDN_SERVICE_URL } from "@/lib/api";
 
 const UUID_RE =
@@ -21,6 +21,7 @@ export default function ModelPreview({
 }) {
   const isRealModel = UUID_RE.test(id);
   const [viewerReady, setViewerReady] = useState(false);
+  const [modelLoading, setModelLoading] = useState(isRealModel);
   const [loadFailed, setLoadFailed] = useState(!isRealModel);
   const [autoRotate, setAutoRotate] = useState(true);
   const [embedKey, setEmbedKey] = useState("");
@@ -38,14 +39,22 @@ export default function ModelPreview({
     if (!isRealModel) return;
     import("@google/model-viewer")
       .then(() => setViewerReady(true))
-      .catch(() => setLoadFailed(true));
+      .catch(() => {
+        setModelLoading(false);
+        setLoadFailed(true);
+      });
   }, [isRealModel]);
+
+  useEffect(() => {
+    if (isRealModel) setModelLoading(true);
+  }, [activeSrc, isRealModel]);
 
   useEffect(() => {
     const el = viewerRef.current;
     if (!el || !viewerReady) return;
 
     const onError = () => {
+      setModelLoading(false);
       if (appliedKey) {
         setKeyError(
           "Invalid or expired embed_key — switched back to public preview.",
@@ -57,6 +66,7 @@ export default function ModelPreview({
     };
 
     const onLoad = () => {
+      setModelLoading(false);
       if (appliedKey) setKeyError(null);
     };
 
@@ -90,6 +100,21 @@ export default function ModelPreview({
                 backgroundColor: "transparent",
               }}
             />
+            {modelLoading && (
+              <div
+                role="status"
+                aria-live="polite"
+                className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/45 backdrop-blur-[2px]"
+              >
+                <Loader2
+                  aria-hidden
+                  className="h-5 w-5 animate-spin text-hud motion-reduce:animate-none"
+                />
+                <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud">
+                  [ Streaming 3D mesh… ]
+                </span>
+              </div>
+            )}
             <div className=" absolute bottom-3 right-3 flex items-center gap-2">
               <button
                 type="button"
@@ -129,12 +154,22 @@ export default function ModelPreview({
             />
             <button
               type="button"
+              disabled={modelLoading}
               onClick={() => {
+                if (modelLoading) return;
+                const nextKey = embedKey.trim();
                 setKeyError(null);
-                setAppliedKey(embedKey.trim());
+                if (nextKey === appliedKey) return;
+                setAppliedKey(nextKey);
               }}
-              className="rounded border border-white/20 bg-white/10 px-3 py-1 font-mono text-xs text-white transition-colors hover:bg-white/20"
+              className="inline-flex items-center gap-1.5 rounded border border-white/20 bg-white/10 px-3 py-1 font-mono text-xs text-white transition-colors hover:bg-white/20 disabled:cursor-wait disabled:opacity-50"
             >
+              {modelLoading && (
+                <Loader2
+                  aria-hidden
+                  className="h-3.5 w-3.5 animate-spin text-hud motion-reduce:animate-none"
+                />
+              )}
               {appliedKey ? "Update Key" : "Stream Full"}
             </button>
           </div>

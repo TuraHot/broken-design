@@ -13,6 +13,13 @@ import { errorHandler } from "../../middlewares/error.middleware";
 import { cdnRouter } from "./cdn.routes";
 import { parseRangeSpec, resolveRange } from "./range";
 import { contentDisposition } from "./cdn.service";
+import {
+  assertSafeKey,
+  assetKey,
+  candidateKeys,
+  legacyKey,
+} from "../../storage/keys";
+import { LocalDiskStorage } from "../../storage";
 import { Document, NodeIO } from "@gltf-transform/core";
 import {
   embedLicenseAndWatermark,
@@ -548,4 +555,98 @@ test("download paid real GLB: embeds buyer purchaseId + license_type, updates wa
   assert.equal(body.extractedMetadata.purchaseId, purchaseId);
   assert.equal(body.extractedMetadata.license, "CC-BY");
   assert.equal(body.extractedMetadata.signature, purchases[0].watermark_hash);
+});
+
+// ─── Storage Keys, Scoped Folder Layout & Legacy Fallback ───────────────────
+test("storage keys: assertSafeKey & helpers validate scoped and legacy formats cleanly", () => {
+  const validScoped = assetKey(PAID_ID, "model", FULL_HASH);
+  assert.equal(validScoped, `${PAID_ID}/model.${FULL_HASH}.glb`);
+  assert.equal(assetKey(PAID_ID, "preview", PREVIEW_HASH), `${PAID_ID}/preview.${PREVIEW_HASH}.glb`);
+  assert.equal(assetKey(PAID_ID, "poster", POSTER_HASH), `${PAID_ID}/poster.${POSTER_HASH}.webp`);
+  assert.equal(legacyKey("poster", POSTER_HASH), `${POSTER_HASH}.webp`);
+  assert.deepEqual(candidateKeys(PAID_ID, "model", FULL_HASH), [
+    `${PAID_ID}/model.${FULL_HASH}.glb`,
+    `${FULL_HASH}.glb`,
+  ]);
+  assert.equal(assertSafeKey(`/${PAID_ID.toUpperCase()}/MODEL.${FULL_HASH.toUpperCase()}.GLB`), validScoped);
+
+  const invalidKeys = [
+    `../${FULL_HASH}.glb`,
+    `${PAID_ID}/../${FULL_HASH}.glb`,
+    `${PAID_ID}\\model.${FULL_HASH}.glb`,
+    `not-a-uuid/model.${FULL_HASH}.glb`,
+    `${PAID_ID}/model.short.glb`,
+    `${PAID_ID}/other.${FULL_HASH}.glb`,
+    `${PAID_ID}/poster.${POSTER_HASH}.glb`,
+    `${PAID_ID}/model.${FULL_HASH}.webp`,
+    `${PAID_ID}/hero.glb`,
+  ];
+  for (const bad of invalidKeys) {
+    assert.throws(() => assertSafeKey(bad), /Invalid or unsafe storage key/, bad);
+  }
+});
+
+test("scoped storage layout: streams from <model_id>/ folder even without flat files, and falls back to flat legacy keys", async () => {
+  const scopedModel = Buffer.from("glTF-SCOPED-FULL-0123456789");
+  const scopedPreview = Buffer.from("glTF-SCOPED-PREVIEW");
+  const scopedPoster = Buffer.from("RIFF....WEBPscopedPoster");
+  const scopedModelHash = crypto.createHash("sha256").update(scopedModel).digest("hex");
+  const scopedPreviewHash = crypto.createHash("sha256").update(scopedPreview).digest("hex");
+  const scopedPosterHash = crypto.createHash("sha256").update(scopedPoster).digest("hex");
+
+  const SCOPED_ID = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+  const local = new LocalDiskStorage();
+  const tmpDir = fs.mkdtempSync(path.join(TEST_STORAGE_DIR, "tmp-scoped-"));
+
+  const putScoped = async (kind: "model" | "preview" | "poster", hash: string, buf: Buffer) => {
+    const tmpFile = path.join(tmpDir, `${kind}.tmp`);
+    fs.writeFileSync(tmpFile, buf);
+    await local.put(assetKey(SCOPED_ID, kind, hash), tmpFile);
+  };
+
+  await putScoped("model", scopedModelHash, scopedModel);
+  await putScoped("preview", scopedPreviewHash, scopedPreview);
+  await putScoped("poster", scopedPosterHash, scopedPoster);
+
+  models[SCOPED_ID] = {
+    id: SCOPED_ID,
+    owner_id: OWNER,
+    title: "Scoped Cube",
+    file_hash: scopedModelHash,
+    preview_hash: scopedPreviewHash,
+    poster_hash: scopedPosterHash,
+    price_cents: 500,
+    hidden_at: null,
+    deleted_at: null,
+    owner_suspended_at: null,
+  };
+  purchases.push({ user_id: BUYER, model_id: SCOPED_ID, status: "paid", embed_key: "d".repeat(48) });
+
+  const prevRes = await get(`/models/${SCOPED_ID}/preview.glb`);
+  assert.equal(prevRes.status, 200);
+  assert.deepEqual(Buffer.from(await prevRes.arrayBuffer()), scopedPreview);
+
+  const hashRes = await get(`/models/${SCOPED_ID}/${scopedPreviewHash}.glb`);
+  assert.equal(hashRes.status, 200);
+  assert.deepEqual(Buffer.from(await hashRes.arrayBuffer()), scopedPreview);
+
+  const fullRes = await get(`/models/${SCOPED_ID}/file.glb?key=${"d".repeat(48)}`);
+  assert.equal(fullRes.status, 200);
+  assert.deepEqual(Buffer.from(await fullRes.arrayBuffer()), scopedModel);
+
+  const posterRes = await get(`/models/${SCOPED_ID}/poster.webp`);
+  assert.equal(posterRes.status, 200);
+  assert.deepEqual(Buffer.from(await posterRes.arrayBuffer()), scopedPoster);
+
+  // Verify delete() removes scoped object cleanly (e.g., upload rollback)
+  await local.delete(assetKey(SCOPED_ID, "poster", scopedPosterHash));
+  const deletedPoster = await get(`/models/${SCOPED_ID}/poster.webp`);
+  assert.equal(deletedPoster.status, 404);
+
+  // Verify legacy fallback still serves unmigrated models (PAID_ID only exists flat in fixtures)
+  const legacyRes = await get(`/models/${PAID_ID}/preview.glb`);
+  assert.equal(legacyRes.status, 200);
+  assert.deepEqual(Buffer.from(await legacyRes.arrayBuffer()), PREVIEW);
+
+  fs.rmSync(tmpDir, { recursive: true, force: true });
 });

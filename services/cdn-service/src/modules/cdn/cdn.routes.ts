@@ -39,6 +39,7 @@ import {
   sendAsset,
   type PaidDownloadAccess,
 } from "./cdn.service";
+import { candidateKeys } from "../../storage/keys";
 
 export { verifyEmbedKeyConstantTime } from "./cdn.service";
 
@@ -135,7 +136,7 @@ cdnRouter.get("/models/:id/file.glb", keyFailureLimiter, async (req, res) => {
   if (!isPaid(model)) {
     assertServable(model);
     await sendAsset(req, res, {
-      storageKey: `${model.file_hash}.glb`,
+      storageKey: candidateKeys(model.id, "model", model.file_hash),
       etag: model.file_hash,
       contentType: CONTENT_TYPES.glb,
       cacheControl: CACHE.publicShort,
@@ -146,7 +147,7 @@ cdnRouter.get("/models/:id/file.glb", keyFailureLimiter, async (req, res) => {
   assertServable(model, { allowDeleted: true }); // buyers keep access after soft delete
   await assertValidEmbedKey(model.id, req.query.key);
   await sendAsset(req, res, {
-    storageKey: `${model.file_hash}.glb`,
+    storageKey: candidateKeys(model.id, "model", model.file_hash),
     etag: model.file_hash,
     contentType: CONTENT_TYPES.glb,
     cacheControl: CACHE.private,
@@ -158,7 +159,8 @@ cdnRouter.get("/models/:id/preview.glb", async (req, res) => {
   const model = await loadModel(req.params.id);
   assertServable(model);
 
-  const hash = isPaid(model) ? model.preview_hash : model.file_hash;
+  const paid = isPaid(model);
+  const hash = paid ? model.preview_hash : model.file_hash;
   if (!hash)
     throw new AppError(
       404,
@@ -167,7 +169,7 @@ cdnRouter.get("/models/:id/preview.glb", async (req, res) => {
     );
 
   await sendAsset(req, res, {
-    storageKey: `${hash}.glb`,
+    storageKey: candidateKeys(model.id, paid ? "preview" : "model", hash),
     etag: hash,
     contentType: CONTENT_TYPES.glb,
     cacheControl: CACHE.publicShort,
@@ -196,7 +198,9 @@ cdnRouter.get("/models/:id/download", downloadLimiter, async (req, res) => {
   // If a paid buyer is downloading the full file (no Range header), dynamically embed their purchaseId & license_type
   // into the GLB (Layer 1 metadata + Layer 2 vertex steganography) and store watermark_hash in purchases.
   if (purchaseInfo?.purchaseId && !req.headers.range) {
-    const rawBuffer = await readAssetBuffer(`${model.file_hash}.glb`);
+    const rawBuffer = await readAssetBuffer(
+      candidateKeys(model.id, "model", model.file_hash),
+    );
     if (validateGlbHeader(rawBuffer, rawBuffer.length)) {
       const licenseToEmbed =
         purchaseInfo.licenseType || model.license || "COMMERCIAL";
@@ -234,7 +238,7 @@ cdnRouter.get("/models/:id/download", downloadLimiter, async (req, res) => {
   }
 
   const result = await sendAsset(req, res, {
-    storageKey: `${model.file_hash}.glb`,
+    storageKey: candidateKeys(model.id, "model", model.file_hash),
     etag: model.file_hash,
     contentType: CONTENT_TYPES.glb,
     cacheControl: CACHE.private,
@@ -333,7 +337,7 @@ cdnRouter.get("/models/:id/poster.webp", async (req, res) => {
     throw new AppError(404, "POSTER_NOT_FOUND", "This model has no poster");
 
   await sendAsset(req, res, {
-    storageKey: `${model.poster_hash}.webp`,
+    storageKey: candidateKeys(model.id, "poster", model.poster_hash),
     etag: model.poster_hash,
     contentType: CONTENT_TYPES.webp,
     cacheControl: CACHE.publicShort,
@@ -363,7 +367,11 @@ cdnRouter.get("/models/:id/:hash.glb", async (req, res) => {
   }
 
   await sendAsset(req, res, {
-    storageKey: `${hash}.glb`,
+    storageKey: candidateKeys(
+      model.id,
+      hash === model.file_hash ? "model" : "preview",
+      hash,
+    ),
     etag: hash,
     contentType: CONTENT_TYPES.glb,
     cacheControl: CACHE.immutable,

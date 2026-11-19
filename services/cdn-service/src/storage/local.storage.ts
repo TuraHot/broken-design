@@ -2,6 +2,7 @@ import fs from 'fs';
 import fsp from 'fs/promises';
 import path from 'path';
 import { StorageAdapter, ByteRange } from './storage.interface';
+import { assertSafeKey } from './keys';
 import { env } from '../config/env';
 import { supabase } from '../config/supabase';
 import { uploadBufferToSupabaseBucket } from './supabase.storage';
@@ -10,13 +11,18 @@ export class LocalDiskStorage implements StorageAdapter {
   private baseDir = path.resolve(env.storageDir);
 
   private resolveSafePath(hashKey: string): string {
-    const cleanKey = path.basename(hashKey);
-    return path.join(this.baseDir, cleanKey);
+    const cleanKey = assertSafeKey(hashKey);
+    const resolved = path.resolve(this.baseDir, ...cleanKey.split('/'));
+    if (!resolved.startsWith(this.baseDir + path.sep)) {
+      throw new Error('Resolved storage path escapes baseDir');
+    }
+    return resolved;
   }
 
   async put(hashKey: string, tempFilePath: string): Promise<void> {
-    await fsp.mkdir(this.baseDir, { recursive: true });
-    const targetPath = this.resolveSafePath(hashKey);
+    const cleanKey = assertSafeKey(hashKey);
+    const targetPath = this.resolveSafePath(cleanKey);
+    await fsp.mkdir(path.dirname(targetPath), { recursive: true });
     try {
       await fsp.rename(tempFilePath, targetPath);
     } catch (err: any) {
@@ -31,7 +37,7 @@ export class LocalDiskStorage implements StorageAdapter {
     // Sync uploaded asset to Supabase Storage bucket ('models') when Supabase is configured
     if (supabase && process.env.NODE_ENV !== 'test') {
       const fileBuffer = await fsp.readFile(targetPath);
-      await uploadBufferToSupabaseBucket(env.supabaseStorageBucket || 'models', hashKey, fileBuffer);
+      await uploadBufferToSupabaseBucket(env.supabaseStorageBucket || 'models', cleanKey, fileBuffer);
     }
   }
 
@@ -43,7 +49,11 @@ export class LocalDiskStorage implements StorageAdapter {
   }
 
   async delete(hashKey: string): Promise<void> {
-    const targetPath = this.resolveSafePath(hashKey);
+    const cleanKey = assertSafeKey(hashKey);
+    const targetPath = this.resolveSafePath(cleanKey);
     await fsp.unlink(targetPath).catch(() => undefined);
+    if (supabase && process.env.NODE_ENV !== 'test') {
+      await supabase.storage.from(env.supabaseStorageBucket || 'models').remove([cleanKey]).catch(() => undefined);
+    }
   }
 }

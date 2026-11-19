@@ -1,4 +1,5 @@
 
+import crypto from 'crypto';
 import { Router } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
@@ -284,4 +285,129 @@ authRouter.patch('/profile', requireAuth, async (req, res) => {
       avatar_url: buildAvatarUrl(user.id, user.avatar_hash),
     },
   });
+});
+
+// ---- Password reset (email -> 6-digit OTP -> one-time reset token -> new password) ----
+const OTP_TTL_MINUTES = 10;
+const RESET_TOKEN_TTL_MINUTES = 15;
+const MAX_OTP_ATTEMPTS = 5;
+const hashResetToken = (token: string) => crypto.createHash('sha256').update(token).digest('hex');
+const hashOtp = (userId: string, otp: string) => hashResetToken(`${userId}:${otp}`);
+
+const forgotPasswordSchema = z.object({ email: z.string().trim().email().max(255) });
+const verifyOtpSchema = z.object({
+  email: z.string().trim().email().max(255),
+  otp: z.string().regex(/^\d{6}$/),
+});
+const resetPasswordSchema = z.object({
+  token: z.string().min(20).max(200),
+  password: z.string().min(8).max(72),
+});
+
+// POST /api/auth/forgot-password
+// Always answers the same way so it cannot be used to discover which emails have an account.
+// No mail provider is configured: the OTP is logged, and outside production also returned as `devOtp`
+// (mock mailbox) so the page can show it instead of an email.
+authRouter.post('/forgot-password', async (req, res) => {
+  const parsed = forgotPasswordSchema.safeParse(req.body);
+  if (!parsed.success) {
+    throw new AppError(400, 'INVALID_INPUT', 'Invalid email address');
+  }
+
+  const found = await db.query(
+    `SELECT id, email FROM users WHERE email = $1 AND suspended_at IS NULL`,
+    [parsed.data.email.toLowerCase()],
+  );
+  const user = found.rows[0];
+  const mockMailbox = process.env.NODE_ENV !== 'production';
+  let devOtp: string | undefined;
+
+  if (user) {
+    const otp = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
+    await db.query(`DELETE FROM password_resets WHERE user_id = $1 AND used_at IS NULL`, [user.id]);
+    await db.query(
+      `INSERT INTO password_resets (user_id, token_hash, expires_at)
+       VALUES ($1, $2, NOW() + ($3 || ' minutes')::interval)`,
+      [user.id, hashOtp(user.id, otp), String(OTP_TTL_MINUTES)],
+    );
+    console.log(`[password-reset] OTP for ${user.email} (valid ${OTP_TTL_MINUTES} min): ${otp}`);
+    if (mockMailbox) devOtp = otp;
+  }
+
+  res.json({
+    message: 'If that email has an account, a verification code has been sent.',
+    ...(devOtp ? { devOtp } : {}),
+  });
+});
+
+// POST /api/auth/verify-reset-otp
+// Checks the code (max 5 tries) and swaps it for a one-time reset token to use with /reset-password.
+authRouter.post('/verify-reset-otp', async (req, res) => {
+  const parsed = verifyOtpSchema.safeParse(req.body);
+  if (!parsed.success) {
+    throw new AppError(400, 'INVALID_INPUT', 'Enter the 6-digit code');
+  }
+  const invalid = () => new AppError(400, 'INVALID_OTP', 'The code is incorrect or has expired');
+
+  const found = await db.query(`SELECT id FROM users WHERE email = $1`, [parsed.data.email.toLowerCase()]);
+  const user = found.rows[0];
+  if (!user) throw invalid();
+
+  const row = (
+    await db.query(
+      `SELECT id, token_hash, attempts FROM password_resets
+       WHERE user_id = $1 AND used_at IS NULL AND expires_at > NOW()
+       ORDER BY created_at DESC LIMIT 1`,
+      [user.id],
+    )
+  ).rows[0];
+  if (!row || row.attempts >= MAX_OTP_ATTEMPTS) throw invalid();
+
+  if (row.token_hash !== hashOtp(user.id, parsed.data.otp)) {
+    await db.query(`UPDATE password_resets SET attempts = attempts + 1 WHERE id = $1`, [row.id]);
+    throw invalid();
+  }
+
+  const token = crypto.randomBytes(32).toString('hex');
+  await db.query(
+    `UPDATE password_resets
+     SET token_hash = $1, attempts = 0, expires_at = NOW() + ($2 || ' minutes')::interval
+     WHERE id = $3`,
+    [hashResetToken(token), String(RESET_TOKEN_TTL_MINUTES), row.id],
+  );
+  res.json({ token });
+});
+
+// POST /api/auth/reset-password
+authRouter.post('/reset-password', async (req, res) => {
+  const parsed = resetPasswordSchema.safeParse(req.body);
+  if (!parsed.success) {
+    throw new AppError(400, 'INVALID_INPUT', 'Password must be at least 8 characters');
+  }
+
+  const passwordHash = await bcrypt.hash(parsed.data.password, 12);
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+    // Mark the token used first; only one request can win, and it must be unused and unexpired.
+    const used = await client.query(
+      `UPDATE password_resets SET used_at = NOW()
+       WHERE token_hash = $1 AND used_at IS NULL AND expires_at > NOW()
+       RETURNING user_id`,
+      [hashResetToken(parsed.data.token)],
+    );
+    if (used.rowCount === 0) {
+      await client.query('ROLLBACK');
+      throw new AppError(400, 'INVALID_TOKEN', 'This reset link is invalid or has expired');
+    }
+    await client.query(`UPDATE users SET password_hash = $1 WHERE id = $2`, [passwordHash, used.rows[0].user_id]);
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+
+  res.json({ message: 'Password updated. You can now log in.' });
 });

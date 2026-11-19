@@ -110,7 +110,6 @@ export default function AuthForm() {
 
         // Store tokens for authentication across the app
         localStorage.setItem('token', result.token);
-        localStorage.setItem('accessToken', result.token);
         if (result.user) {
           localStorage.setItem('user', JSON.stringify(result.user));
         }

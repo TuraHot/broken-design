@@ -265,3 +265,17 @@ CREATE TABLE IF NOT EXISTS model_visibility_changes (
 );
 CREATE INDEX IF NOT EXISTS idx_visibility_changes_model ON model_visibility_changes (model_id, created_at DESC);
 ALTER TABLE model_visibility_changes ENABLE ROW LEVEL SECURITY;
+
+-- 12. Password reset: a 6-digit OTP (10 min, 5 tries) is swapped for a one-time reset token (15 min). Only SHA-256 hashes are stored.
+CREATE TABLE IF NOT EXISTS password_resets (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash CHAR(64) NOT NULL UNIQUE,
+    expires_at TIMESTAMPTZ NOT NULL,
+    used_at TIMESTAMPTZ,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ALTER TABLE password_resets ADD COLUMN IF NOT EXISTS attempts INTEGER NOT NULL DEFAULT 0;
+CREATE INDEX IF NOT EXISTS idx_password_resets_user ON password_resets (user_id);
+ALTER TABLE password_resets ENABLE ROW LEVEL SECURITY;

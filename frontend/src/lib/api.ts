@@ -5,9 +5,13 @@ import type {
   Model,
   ModelsPage,
   ModelsParams,
+  PurchaseDetail,
   PurchaseItem,
+  QrPaymentResponse,
   SellerModelItem,
   SellerSalesSummary,
+  SellerWalletResponse,
+  SellerWithdrawal,
 } from './types';
 
 export const CORE_API_URL = process.env.NEXT_PUBLIC_CORE_API_URL || 'http://localhost:4000';
@@ -161,6 +165,38 @@ export async function regenerateEmbedKey(
   });
 }
 
+/** Fetch a single purchase by ID (`GET /api/purchases/:id`). */
+export async function fetchPurchaseById(purchaseId: string, token: string): Promise<PurchaseDetail> {
+  return coreApiFetch<PurchaseDetail>(`/api/purchases/${encodeURIComponent(purchaseId)}`, token, {
+    cache: 'no-store',
+  });
+}
+
+/** Confirm mock payment for a pending purchase (`POST /api/purchases/:id/confirm-mock`). */
+export async function confirmMockPayment(
+  purchaseId: string,
+  token: string,
+): Promise<{
+  purchaseId: string;
+  modelId: string;
+  embedKey: string;
+  amountCents: number;
+  currency: string;
+  licenseType: string;
+  paidAt: string;
+}> {
+  return coreApiFetch(`/api/purchases/${encodeURIComponent(purchaseId)}/confirm-mock`, token, {
+    method: 'POST',
+  });
+}
+
+/** Create or retrieve QR payment (PromptPay via Stripe or mock) (`POST /api/purchases/:id/qr`). */
+export async function createQrPayment(purchaseId: string, token: string): Promise<QrPaymentResponse> {
+  return coreApiFetch<QrPaymentResponse>(`/api/purchases/${encodeURIComponent(purchaseId)}/qr`, token, {
+    method: 'POST',
+  });
+}
+
 /** Enable seller mode for user (`POST /api/seller/enable`). */
 export async function enableSellerMode(token: string): Promise<void> {
   await coreApiFetch('/api/seller/enable', token, { method: 'POST' });
@@ -188,6 +224,23 @@ export async function fetchSellerModels(token: string): Promise<SellerModelItem[
 /** Fetch seller sales summary (`GET /api/seller/sales`). */
 export async function fetchSellerSales(token: string): Promise<SellerSalesSummary> {
   return coreApiFetch<SellerSalesSummary>('/api/seller/sales', token, { cache: 'no-store' });
+}
+
+/** Fetch seller platform escrow wallet & withdrawal history (`GET /api/seller/wallet`). */
+export async function fetchSellerWallet(token: string): Promise<SellerWalletResponse> {
+  return coreApiFetch<SellerWalletResponse>('/api/seller/wallet', token, { cache: 'no-store' });
+}
+
+/** Request a withdrawal with platform fee/difference calculation (`POST /api/seller/withdraw`). */
+export async function requestSellerWithdrawal(
+  token: string,
+  payload: { amountCents?: number; payoutMethod: 'promptpay' | 'bank'; payoutAccount: string },
+): Promise<{ withdrawal: SellerWithdrawal }> {
+  return coreApiFetch<{ withdrawal: SellerWithdrawal }>('/api/seller/withdraw', token, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
 }
 
 /** Soft delete a model (`DELETE /api/models/:id`). */

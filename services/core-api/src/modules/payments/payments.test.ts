@@ -151,7 +151,7 @@ test('POST /api/models/:id/checkout - creates pending purchase with price from d
     assert.equal(res.status, 200);
     const body = await res.json();
     assert.equal(body.purchaseId, 'purchase-123');
-    assert.equal(body.checkoutUrl, '/pay/mock/purchase-123');
+    assert.equal(body.checkoutUrl, '/checkout/purchase-123');
     assert.equal(body.provider, 'mock');
     assert.equal(insertedData.userId, 'buyer-1');
     assert.equal(insertedData.modelId, 'm-paid');

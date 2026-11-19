@@ -10,5 +10,6 @@ export const env = {
   paymentProvider: (process.env.PAYMENT_PROVIDER || 'mock') as 'mock' | 'stripe',
   stripeSecretKey: process.env.STRIPE_SECRET_KEY || '',
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET || '',
+  platformFeeBps: Number(process.env.PLATFORM_FEE_BPS) || 700, // 700 bps = 7% platform fee
 };
 

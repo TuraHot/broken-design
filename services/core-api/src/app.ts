@@ -16,6 +16,8 @@ import { errorHandler } from "./middlewares/error.middleware";
 export const app = express();
 
 app.use(cors({ origin: allowedOrigins(), credentials: true }));
+// Stripe webhook requires the raw request body for signature verification
+app.use("/api/webhooks/stripe", express.raw({ type: "application/json" }));
 app.use(express.json());
 
 app.get("/health", async (_req, res) => {

@@ -2,6 +2,7 @@
 
 //  Model download & checkout actions connected to CDN (/cdn/models/:id/download) & Core API
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { CDN_SERVICE_URL, CORE_API_URL } from "@/lib/api";
@@ -21,8 +22,8 @@ export default function ModelActions({
   free: boolean;
   priceLabel: string;
 }) {
+  const router = useRouter();
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
-  const [embedKey, setEmbedKey] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
@@ -127,32 +128,28 @@ export default function ModelActions({
         },
       );
       const checkoutData = await checkoutRes.json().catch(() => null);
-      if (
-        !checkoutRes.ok &&
-        checkoutData?.error?.code !== "ALREADY_PURCHASED"
-      ) {
+
+      if (checkoutData?.error?.code === "ALREADY_PURCHASED") {
+        setStatusMsg("You already own this model — starting download…");
+        await performDownload(modelId, session.token);
+        return;
+      }
+
+      if (!checkoutRes.ok) {
         throw new Error(
           checkoutData?.error?.message ||
             `Checkout failed (${checkoutRes.status})`,
         );
       }
 
-      const payRes = await fetch(
-        `${CORE_API_URL}/api/models/${encodeURIComponent(modelId)}/pay-mock`,
-        {
-          method: "POST",
-          headers: { Authorization: `Bearer ${session.token}` },
-        },
-      );
-      const payData = await payRes.json().catch(() => null);
-      if (payRes.ok && payData?.embedKey) {
-        setEmbedKey(payData.embedKey);
-        setStatusMsg("Purchase completed! Your embed_key is ready below.");
+      if (checkoutData?.checkoutUrl) {
+        router.push(checkoutData.checkoutUrl);
         return;
       }
 
-      // If already purchased, trigger download directly
-      await performDownload(modelId, session.token);
+      throw new Error(
+        checkoutData?.message || "Payment checkout URL is not available.",
+      );
     } catch (err: any) {
       setStatusMsg(err?.message || "Checkout could not be completed.");
     } finally {
@@ -196,15 +193,6 @@ export default function ModelActions({
           </Link>{" "}
           to download or purchase this model.
         </p>
-      )}
-
-      {embedKey && (
-        <div className="rounded border border-hud/40 bg-black/70 p-2.5 font-mono text-xs text-hud">
-          <div className="text-[10px] uppercase tracking-wider text-white/60">
-            Your embed_key
-          </div>
-          <div className="mt-1 break-all select-all">{embedKey}</div>
-        </div>
       )}
 
       {statusMsg && (

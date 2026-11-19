@@ -17,6 +17,7 @@ import {
   Store,
   Trash2,
   User,
+  Wallet,
 } from 'lucide-react';
 import {
   deleteModel,
@@ -24,10 +25,17 @@ import {
   fetchSellerModels,
   fetchSellerSales,
   fetchSellerStatus,
+  fetchSellerWallet,
+  requestSellerWithdrawal,
 } from '@/lib/api';
 import { creatorHandle } from '@/lib/creators';
-import { formatPrice } from '@/lib/format';
-import type { AuthUser, SellerModelItem, SellerSalesSummary } from '@/lib/types';
+import { formatMoney, formatPrice } from '@/lib/format';
+import type {
+  AuthUser,
+  SellerModelItem,
+  SellerSalesSummary,
+  SellerWalletResponse,
+} from '@/lib/types';
 
 const CARD = 'rounded-lg border border-white/10 bg-white/5 p-5 sm:p-6';
 const LABEL = 'font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70';
@@ -38,6 +46,10 @@ export default function SellerPage() {
   const [isSeller, setIsSeller] = useState<boolean | null>(null);
   const [models, setModels] = useState<SellerModelItem[]>([]);
   const [salesSummary, setSalesSummary] = useState<SellerSalesSummary | null>(null);
+  const [walletData, setWalletData] = useState<SellerWalletResponse | null>(null);
+  const [withdrawAmountUsd, setWithdrawAmountUsd] = useState('');
+  const [payoutMethod, setPayoutMethod] = useState<'promptpay' | 'bank'>('promptpay');
+  const [payoutAccount, setPayoutAccount] = useState('');
   const [loading, setLoading] = useState(true);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
@@ -66,12 +78,19 @@ export default function SellerPage() {
       setIsSeller(sellerStatus);
 
       if (sellerStatus) {
-        const [modelsList, sales] = await Promise.all([
+        const [modelsList, sales, wallet] = await Promise.all([
           fetchSellerModels(authToken).catch(() => []),
           fetchSellerSales(authToken).catch(() => null),
+          fetchSellerWallet(authToken).catch(() => null),
         ]);
         setModels(modelsList);
         setSalesSummary(sales);
+        setWalletData(wallet);
+        if (wallet && wallet.wallet.availableGrossCents > 0) {
+          setWithdrawAmountUsd((wallet.wallet.availableGrossCents / 100).toFixed(2));
+        } else {
+          setWithdrawAmountUsd('');
+        }
       }
     } catch (err: any) {
       setStatusMsg(err?.message || 'Could not load seller data.');
@@ -272,6 +291,164 @@ export default function SellerPage() {
           <p className="mt-1 font-mono text-[11px] text-white/40">Published to Lixyte CDN</p>
         </div>
       </div>
+
+      {/* Platform Wallet & Withdrawal (with Fee / Difference Calculation) */}
+      <section className="mt-10">
+        <div className="flex items-center gap-2 border-b border-white/10 pb-3">
+          <Wallet className="h-4 w-4 text-hud" />
+          <h2 className="font-display text-lg uppercase text-white">Platform Wallet &amp; Withdrawal</h2>
+        </div>
+
+        <div className="mt-5 grid gap-6 lg:grid-cols-[1fr_1.2fr]">
+          <div className={CARD}>
+            <span className={LABEL}>[ Held on Platform ]</span>
+            <p className="mt-2 font-display text-3xl uppercase text-white">
+              {formatMoney(walletData?.wallet.availableGrossCents ?? 0, 'USD')}
+            </p>
+            <p className="mt-1 text-xs text-white/55">
+              เงินจากการขายจะถูกเก็บไว้ในระบบเว็บก่อน และคำนวณส่วนต่างค่าธรรมเนียมแพลตฟอร์มเมื่อทำรายการถอน
+            </p>
+
+            {(() => {
+              const availableCents = walletData?.wallet.availableGrossCents ?? 0;
+              const feeBps = walletData?.wallet.feeRateBps ?? 700;
+              const parsedInputCents = Math.round((Number(withdrawAmountUsd) || 0) * 100);
+              const previewGross = parsedInputCents > 0 ? parsedInputCents : availableCents;
+              const previewFee = Math.round((previewGross * feeBps) / 10000);
+              const previewNet = Math.max(0, previewGross - previewFee);
+
+              return (
+                <dl className="mt-5 space-y-2 border-t border-white/10 pt-4 font-mono text-xs">
+                  <div className="flex justify-between text-white/70">
+                    <dt>ยอดขอถอน (Gross)</dt>
+                    <dd>{formatMoney(previewGross, 'USD')}</dd>
+                  </div>
+                  <div className="flex justify-between text-amber">
+                    <dt>ส่วนต่างค่าธรรมเนียมเว็บ ({feeBps / 100}%)</dt>
+                    <dd>-{formatMoney(previewFee, 'USD')}</dd>
+                  </div>
+                  <div className="flex justify-between border-t border-white/10 pt-2 text-sm font-semibold text-hud">
+                    <dt>ยอดสุทธิที่จะได้รับ (Net)</dt>
+                    <dd>{formatMoney(previewNet, 'USD')}</dd>
+                  </div>
+                </dl>
+              );
+            })()}
+          </div>
+
+          <form
+            className={CARD}
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (!token || !walletData) return;
+              const amountCents = Math.round((Number(withdrawAmountUsd) || 0) * 100);
+              try {
+                setBusyAction('withdraw');
+                setStatusMsg(null);
+                await requestSellerWithdrawal(token, {
+                  amountCents: amountCents > 0 ? amountCents : undefined,
+                  payoutMethod,
+                  payoutAccount,
+                });
+                setPayoutAccount('');
+                setStatusMsg('Withdrawal request submitted! Fee breakdown has been recorded.');
+                await loadData(token);
+              } catch (err: any) {
+                setStatusMsg(err?.message || 'Withdrawal request failed.');
+              } finally {
+                setBusyAction(null);
+              }
+            }}
+          >
+            <span className={LABEL}>[ Request Withdrawal ]</span>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <div>
+                <label htmlFor="withdraw-amount" className="block text-xs text-white/75">
+                  Amount (USD)
+                </label>
+                <input
+                  id="withdraw-amount"
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  value={withdrawAmountUsd}
+                  onChange={(e) => setWithdrawAmountUsd(e.target.value)}
+                  placeholder="0.00"
+                  className="mt-1.5 h-10 w-full rounded-lg border border-white/15 bg-black/50 px-3 font-mono text-sm text-white focus:border-hud/60 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label htmlFor="payout-method" className="block text-xs text-white/75">
+                  Payout Method
+                </label>
+                <select
+                  id="payout-method"
+                  value={payoutMethod}
+                  onChange={(e) => setPayoutMethod(e.target.value as 'promptpay' | 'bank')}
+                  className="mt-1.5 h-10 w-full rounded-lg border border-white/15 bg-black/50 px-3 text-sm text-white focus:border-hud/60 focus:outline-none"
+                >
+                  <option value="promptpay">PromptPay</option>
+                  <option value="bank">Bank Transfer</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <label htmlFor="payout-account" className="block text-xs text-white/75">
+                {payoutMethod === 'promptpay' ? 'PromptPay Phone / National ID' : 'Bank Name & Account Number'}
+              </label>
+              <input
+                id="payout-account"
+                type="text"
+                required
+                value={payoutAccount}
+                onChange={(e) => setPayoutAccount(e.target.value)}
+                placeholder={payoutMethod === 'promptpay' ? 'e.g. 081-234-5678' : 'e.g. KBANK 123-4-56789-0'}
+                className="mt-1.5 h-10 w-full rounded-lg border border-white/15 bg-black/50 px-3 text-sm text-white focus:border-hud/60 focus:outline-none"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={busyAction === 'withdraw' || (walletData?.wallet.availableGrossCents ?? 0) <= 0}
+              className="mt-5 inline-flex h-10 items-center justify-center rounded-lg bg-white px-5 font-mono text-xs font-semibold uppercase tracking-wider text-black transition-colors hover:bg-white/85 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {busyAction === 'withdraw' ? 'Processing…' : 'Request Withdrawal'}
+            </button>
+          </form>
+        </div>
+
+        {walletData && walletData.withdrawals.length > 0 && (
+          <div className="mt-5 overflow-x-auto rounded-lg border border-white/10">
+            <table className="w-full text-left font-mono text-xs">
+              <thead className="border-b border-white/10 bg-white/5 text-[11px] uppercase tracking-wider text-white/50">
+                <tr>
+                  <th className="px-4 py-3">Gross</th>
+                  <th className="px-4 py-3">Platform Fee</th>
+                  <th className="px-4 py-3">Net Payout</th>
+                  <th className="px-4 py-3">Destination</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Date</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {walletData.withdrawals.map((w) => (
+                  <tr key={w.id} className="hover:bg-white/[0.02]">
+                    <td className="px-4 py-3 text-white">{formatMoney(w.grossAmountCents, w.currency)}</td>
+                    <td className="px-4 py-3 text-amber">-{formatMoney(w.platformFeeCents, w.currency)}</td>
+                    <td className="px-4 py-3 font-medium text-hud">{formatMoney(w.netAmountCents, w.currency)}</td>
+                    <td className="px-4 py-3 text-white/70">
+                      {w.payoutMethod.toUpperCase()} · {w.payoutAccount}
+                    </td>
+                    <td className="px-4 py-3 uppercase text-white/80">{w.status}</td>
+                    <td className="px-4 py-3 text-white/40">{new Date(w.createdAt).toLocaleDateString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
       {/* Uploaded Models Table */}
       <section className="mt-10">

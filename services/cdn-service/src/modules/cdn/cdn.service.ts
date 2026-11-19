@@ -7,7 +7,7 @@ import type { Request, Response } from "express";
 import { db } from "../../config/db";
 import { env } from "../../config/env";
 import { supabase } from "../../config/supabase";
-import { getStorage, LocalDiskStorage, SupabaseStorage } from "../../storage";
+import { getStorage, SupabaseStorage } from "../../storage";
 import { AppError } from "../../middlewares/error.middleware";
 import { parseRangeSpec, resolveRange, type ResolvedRange } from "./range";
 
@@ -390,16 +390,14 @@ async function openStream(
       return await getStorage(bucketName).getStream(key, range);
     } catch (primaryErr) {
       if (firstPrimaryErr === null) firstPrimaryErr = primaryErr;
-      // Fallback between LocalDiskStorage and SupabaseStorage if the file exists in the other store
-      try {
-        if (env.storageProvider === "local" && supabase) {
+      // Fallback to SupabaseStorage when STORAGE_PROVIDER=local and Supabase is configured
+      // (SupabaseStorage.getStream already checks local storage_data/ before hitting Supabase).
+      if (env.storageProvider === "local" && supabase) {
+        try {
           return await new SupabaseStorage(bucketName).getStream(key, range);
+        } catch {
+          // Ignore secondary error and continue to next candidate key
         }
-        if (env.storageProvider === "supabase") {
-          return await new LocalDiskStorage(bucketName).getStream(key, range);
-        }
-      } catch {
-        // Ignore secondary error and continue to next candidate key
       }
     }
   }

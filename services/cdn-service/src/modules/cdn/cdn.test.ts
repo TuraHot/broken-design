@@ -984,6 +984,22 @@ test("patch assets guard: enforces ownership, blocks foreign watermarked replace
   assert.equal(conflictRes.status, 409);
   assert.equal(await errCode(conflictRes), "WATERMARK_CONFLICT");
 
+  // Pre-seed old scoped assets to verify orphan cleanup deletes previous hashes upon replacement
+  const local = new LocalDiskStorage();
+  const seedDir = fs.mkdtempSync(path.join(TEST_STORAGE_DIR, "seed-patch-"));
+  const oldMainKey = assetKey(PAID_ID, "model", models[PAID_ID].file_hash);
+  const oldPreviewKey = assetKey(PAID_ID, "preview", models[PAID_ID].preview_hash);
+  const seedMainTmp = path.join(seedDir, "old-main.glb");
+  const seedPreviewTmp = path.join(seedDir, "old-preview.glb");
+  fs.writeFileSync(seedMainTmp, FULL);
+  fs.writeFileSync(seedPreviewTmp, PREVIEW);
+  await local.put(oldMainKey, seedMainTmp);
+  await local.put(oldPreviewKey, seedPreviewTmp);
+  const oldMainDiskPath = path.join(TEST_STORAGE_DIR, ...oldMainKey.split("/"));
+  const oldPreviewDiskPath = path.join(TEST_STORAGE_DIR, ...oldPreviewKey.split("/"));
+  assert.equal(fs.existsSync(oldMainDiskPath), true);
+  assert.equal(fs.existsSync(oldPreviewDiskPath), true);
+
   // 3. Owner replacing with fresh GLBs -> 200 and stored with valid watermarks under model & preview keys
   const newMain = await createSampleGlbBuffer(74);
   const newPreview = await createSampleGlbBuffer(66);
@@ -999,6 +1015,11 @@ test("patch assets guard: enforces ownership, blocks foreign watermarked replace
   const body = (await okRes.json()) as any;
   assert.ok(body.model?.fileHash);
   assert.ok(body.model?.previewHash);
+
+  // Old scoped assets must be removed once DB update succeeds
+  assert.equal(fs.existsSync(oldMainDiskPath), false);
+  assert.equal(fs.existsSync(oldPreviewDiskPath), false);
+  fs.rmSync(seedDir, { recursive: true, force: true });
 
   const storedMain = await readStoredAsset(assetKey(PAID_ID, "model", body.model.fileHash));
   const verifiedMain = await verifyGlbWatermark(storedMain, PAID_ID);

@@ -8,9 +8,18 @@ export const env = {
   databaseUrl: process.env.DATABASE_URL || '',
   jwtSecret: process.env.JWT_SECRET || 'dev-secret',
   watermarkSecret: process.env.WATERMARK_SECRET || 'lixyte-broken-design-watermark-secret-2026',
+  frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
   storageProvider: (process.env.STORAGE_PROVIDER || 'local') as 'local' | 'supabase',
   storageDir: process.env.STORAGE_DIR || './storage_data',
   tmpUploadDir: process.env.TMP_UPLOAD_DIR || './tmp_uploads',
+  maxCacheBytes:
+    process.env.MAX_CACHE_BYTES !== undefined
+      ? Math.max(0, Number(process.env.MAX_CACHE_BYTES) || 0)
+      : 1024 * 1024 * 1024,
+  tmpCleanupMaxAgeMs:
+    process.env.TMP_CLEANUP_MAX_AGE_MS !== undefined
+      ? Math.max(0, Number(process.env.TMP_CLEANUP_MAX_AGE_MS) || 0)
+      : 60 * 60 * 1000,
   supabaseUrl: process.env.SUPABASE_URL || '',
   supabaseKey: process.env.SUPABASE_KEY || '',
   supabaseStorageBucket: process.env.SUPABASE_STORAGE_BUCKET || 'models',

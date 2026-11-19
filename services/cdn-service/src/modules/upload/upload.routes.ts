@@ -364,27 +364,58 @@ uploadRouter.patch(
       const userId = req.user!.id;
       const userRole = req.user!.role;
 
+      let dbUser: { id: string; role: string; is_seller: boolean; suspended_at: Date | string | null } | undefined;
       try {
         const userCheck = await db.query(
           `SELECT id, role, is_seller, suspended_at FROM users WHERE id = $1`,
           [userId]
         );
-        if (userCheck.rows.length > 0 && userCheck.rows[0].suspended_at !== null) {
-          throw new AppError(403, 'ACCOUNT_SUSPENDED', 'Your account has been suspended by an administrator.');
-        }
+        dbUser = userCheck.rows[0];
       } catch (err) {
         if (err instanceof AppError) throw err;
+        if (supabase) {
+          const { data } = await supabase
+            .from('users')
+            .select('id, role, is_seller, suspended_at')
+            .eq('id', userId)
+            .maybeSingle();
+          dbUser = (data as typeof dbUser | null) ?? undefined;
+        }
+      }
+      if (dbUser && dbUser.suspended_at !== null) {
+        throw new AppError(403, 'ACCOUNT_SUSPENDED', 'Your account has been suspended by an administrator.');
       }
 
-      const existingRes = await db.query(
-        `SELECT id, owner_id, license, file_hash, file_size, preview_hash, poster_hash, deleted_at
-         FROM models WHERE id = $1`,
-        [modelId]
-      );
-      if (existingRes.rowCount === 0 || existingRes.rows[0].deleted_at !== null) {
+      let existing: {
+        id: string;
+        owner_id: string;
+        license: string;
+        file_hash: string;
+        file_size: string | number;
+        preview_hash: string | null;
+        poster_hash: string | null;
+        deleted_at: Date | string | null;
+      } | undefined;
+      try {
+        const existingRes = await db.query(
+          `SELECT id, owner_id, license, file_hash, file_size, preview_hash, poster_hash, deleted_at
+           FROM models WHERE id = $1`,
+          [modelId]
+        );
+        existing = existingRes.rows[0];
+      } catch (dbErr) {
+        if (!supabase) throw dbErr;
+        const { data, error } = await supabase
+          .from('models')
+          .select('id, owner_id, license, file_hash, file_size, preview_hash, poster_hash, deleted_at')
+          .eq('id', modelId)
+          .maybeSingle();
+        if (error) throw dbErr;
+        existing = (data as typeof existing | null) ?? undefined;
+      }
+      if (!existing || existing.deleted_at !== null) {
         throw new AppError(404, 'MODEL_NOT_FOUND', 'Model not found');
       }
-      const existing = existingRes.rows[0];
       if (existing.owner_id !== userId && userRole !== 'admin') {
         throw new AppError(403, 'FORBIDDEN', 'You do not have permission to edit this model');
       }
@@ -418,10 +449,14 @@ uploadRouter.patch(
         await preparePosterToWebp(posterFile);
       }
 
-      let nextFileHash: string = existing.file_hash;
+      const existingFileHash = existing.file_hash?.trim() || null;
+      const existingPreviewHash = existing.preview_hash?.trim() || null;
+      const existingPosterHash = existing.poster_hash?.trim() || null;
+
+      let nextFileHash: string = existingFileHash || existing.file_hash;
       let nextFileSize: number = Number(existing.file_size);
-      let nextPreviewHash: string | null = existing.preview_hash;
-      let nextPosterHash: string | null = existing.poster_hash;
+      let nextPreviewHash: string | null = existingPreviewHash;
+      let nextPosterHash: string | null = existingPosterHash;
 
       try {
         if (modelFile && rawGlbBuffer) {
@@ -491,6 +526,24 @@ uploadRouter.patch(
           })
           .eq('id', modelId);
         if (error) throw dbErr;
+      }
+
+      const oldKeysToDelete: string[] = [];
+      try {
+        if (modelFile && existingFileHash && existingFileHash !== nextFileHash) {
+          oldKeysToDelete.push(assetKey(modelId, 'model', existingFileHash));
+        }
+        if (previewFile && existingPreviewHash && existingPreviewHash !== nextPreviewHash) {
+          oldKeysToDelete.push(assetKey(modelId, 'preview', existingPreviewHash));
+        }
+        if (posterFile && existingPosterHash && existingPosterHash !== nextPosterHash) {
+          oldKeysToDelete.push(assetKey(modelId, 'poster', existingPosterHash));
+        }
+      } catch {
+        // Ignore unexpected legacy/non-sha256 values when building old scoped key names.
+      }
+      if (oldKeysToDelete.length > 0 && storage) {
+        await Promise.all(oldKeysToDelete.map((key) => storage!.delete(key).catch(() => undefined)));
       }
 
       await cleanupFiles(files);

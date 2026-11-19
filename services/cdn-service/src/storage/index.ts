@@ -27,4 +27,5 @@ export function getAvatarStorage(): StorageAdapter {
 export * from './storage.interface';
 export * from './local.storage';
 export * from './supabase.storage';
+export * from './cacheManager';
 

@@ -149,10 +149,13 @@ SET password_hash = EXCLUDED.password_hash, role = 'creator', is_seller = true, 
 
 -- 8. Supabase Storage Bucket ('models') & RLS Policies
 -- Stored object keys follow `<model_id>/{model,preview,poster}.<sha256>.<ext>` (with flat legacy key fallback).
+-- Bucket is PRIVATE (`public = false`) so paid/hidden models cannot bypass CDN controls via direct public URLs.
 INSERT INTO storage.buckets (id, name, public)
-VALUES ('models', 'models', true)
-ON CONFLICT (id) DO UPDATE SET public = true;
+VALUES ('models', 'models', false)
+ON CONFLICT (id) DO UPDATE SET public = false;
 
+-- Temporary dev policies for `sb_publishable_` keys. When `SUPABASE_KEY` uses `sb_secret_...` / `service_role`,
+-- cdn-service drops these permissive policies automatically (and you may also run DROP POLICY IF EXISTS manually).
 DO $$ BEGIN
     CREATE POLICY "Public Read Access for models bucket"
     ON storage.objects FOR SELECT

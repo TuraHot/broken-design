@@ -6,6 +6,7 @@ import { BellRing } from 'lucide-react';
 import { fetchNotices, markAllNoticesRead, markNoticeRead, type NoticeItem } from '@/lib/api';
 import { formatDate } from '@/lib/format';
 import { useT } from '@/lib/i18n/client';
+import NoticeContent from './NoticeContent';
 
 export default function NoticeBox({ token }: { token: string }) {
   const t = useT();
@@ -70,55 +71,7 @@ export default function NoticeBox({ token }: { token: string }) {
                 {isNew && <span className="rounded border border-amber/50 px-1.5 py-0.5 font-mono uppercase tracking-[0.12em] text-amber">{t('notice.new')}</span>}
                 <time dateTime={n.createdAt}>{formatDate(n.createdAt)}</time>
               </div>
-              {n.kind === 'license_changed' ? (
-                <>
-                  <p className="mt-2 text-sm text-white">
-                    {t('notice.licenseChanged', {
-                      model: n.data.modelTitle ?? '',
-                      from: n.data.oldLicense ?? '',
-                      to: n.data.newLicense ?? '',
-                    })}
-                  </p>
-                  <p className="mt-2 text-xs text-white/50">{t('notice.reason')}</p>
-                  {/* The reason is the admin's own text, shown as written. */}
-                  <p className="mt-1 whitespace-pre-wrap break-words text-sm text-white/80">{n.data.reason}</p>
-                  <p className="mt-2 text-xs text-white/50">{t('notice.buyers')}</p>
-                </>
-              ) : n.kind === 'model_hidden' || n.kind === 'model_restored' ? (
-                <>
-                  <p className="mt-2 text-sm text-white">
-                    {t(n.kind === 'model_hidden' ? 'notice.modelHidden' : 'notice.modelRestored', { model: n.data.modelTitle ?? '' })}
-                  </p>
-                  {n.data.reason && (
-                    <>
-                      <p className="mt-2 text-xs text-white/50">{t('notice.reason')}</p>
-                      {/* The reason is the admin's own text, shown as written. */}
-                      <p className="mt-1 whitespace-pre-wrap break-words text-sm text-white/80">{n.data.reason}</p>
-                    </>
-                  )}
-                </>
-              ) : n.kind === 'account_suspended' || n.kind === 'account_restored' ? (
-                <>
-                  <p className="mt-2 text-sm text-white">
-                    {n.kind === 'account_suspended'
-                      ? n.data.until
-                        ? t('notice.suspendedUntil', { date: formatDate(n.data.until) })
-                        : t('notice.suspendedNoEnd')
-                      : n.data.auto
-                        ? t('notice.restoredAuto')
-                        : t('notice.restored')}
-                  </p>
-                  {n.data.reason && (
-                    <>
-                      <p className="mt-2 text-xs text-white/50">{t('notice.reason')}</p>
-                      {/* The reason is the admin's own text, shown as written. */}
-                      <p className="mt-1 whitespace-pre-wrap break-words text-sm text-white/80">{n.data.reason}</p>
-                    </>
-                  )}
-                </>
-              ) : (
-                <p className="mt-2 text-sm text-white">{t('notice.other')}</p>
-              )}
+              <NoticeContent n={n} />
               {isNew && (
                 <button
                   type="button"

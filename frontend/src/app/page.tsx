@@ -36,8 +36,8 @@ export default async function HomePage() {
       <SectionDots ids={sectionIds} />
 
       <section id="hero" className="relative z-10 min-h-dvh">
-        <div className="mx-auto grid min-h-dvh max-w-[1400px] grid-cols-1 pt-16 md:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
-          <div className="relative flex flex-col justify-center py-10 pb-24 pl-12 pr-6 md:pl-16 md:pr-10">
+        <div className="mx-auto grid min-h-dvh w-full max-w-[2400px] grid-cols-1 pt-16 md:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+          <div className="relative flex flex-col justify-center py-10 pb-24 pl-12 pr-6 md:pl-16 md:pr-10 min-[1500px]:pl-[calc((100vw-1400px)/2+2rem)]">
             <div className="absolute inset-y-0 left-0 flex w-8 items-center justify-center border-r border-line">
               <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-accent [writing-mode:vertical-rl] rotate-180">
                 {t("home.hero.side")}

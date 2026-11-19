@@ -3,7 +3,7 @@
 Rules for every page in `frontend/`. **Read this before writing or changing any UI**, and update it in the same change when you add a new pattern. Status tags: **[in use]** exists in code today, **[planned]** agreed but not built yet. If code and this file disagree, fix one of them — don't leave both. Last checked against `main` after merging PR #15 (`kzwnjuy`) and `Pek` (2026-11-17). Pages still to design are listed in `docs/TASKS.md`.
 
 ## 1. Principles
-- **Dark-first, HUD/x-ray look.** Black canvas, thin light lines, glowing accents. The reference is the spectral lily landing page. (Light/Dark switching was discussed earlier and is deferred; build dark only until it is requested.)
+- **Dark by default, HUD/x-ray look; light on migrated pages.** Dark: black canvas, thin light lines, glowing accents (the spectral lily landing page is the reference). Light: off-white canvas, near-black ink, purple accent, lime highlight (the cyber brutalism reference). The theme follows the system setting until the visitor uses the Navbar toggle (cookie `theme`); see "Theme" below.
 - **One system.** Reuse the tokens and components below. No one-off colors, font sizes or radii.
 - **Content over chrome.** Thin borders, low-contrast panels, accent color only for the one thing that matters on screen.
 - **No new dependencies** for UI. Stack is Next.js 15 (App Router), React 19, Tailwind 3, `lucide-react`, `three`.
@@ -111,3 +111,21 @@ One primary button per view. Destructive actions need confirmation and never use
 4. Verify visually in the browser at desktop and 375px before saying a UI change is done.
 5. Don't run `next build` while `npm run dev` is running — they share `.next` and break the dev server. Use `npx tsc --noEmit` for type checks instead.
 6. `/docs` exists now; don't change the Navbar link to it.
+
+## Theme (light / dark)
+
+Colours are CSS variables (space-separated RGB, so opacity modifiers work) mapped to Tailwind names. Dark values are today's look.
+
+| Tailwind | Dark | Light | Use |
+| --- | --- | --- | --- |
+| `canvas` | `0 0 0` | `246 246 244` | page background |
+| `ink` | `255 255 255` | `13 13 13` | text, solid buttons |
+| `ink-soft` | `166 166 166` | `59 59 59` | secondary text |
+| `line` | `26 26 26` | `207 207 207` | hairlines |
+| `card` | `11 16 24` | `255 255 255` | panels |
+| `accent` | `143 211 255` | `123 79 224` | labels, links, focus |
+| `highlight` | `184 146 255` | `201 242 61` | highlights (a fill with dark text in light, never text) |
+
+Light values were read by eye from the reference image and are still to be confirmed. Purple on the light canvas is about 4.8:1.
+
+**A route is light-ready only when it is listed in `THEME_READY_ROUTES` (`lib/theme.ts`); every other route is always dark and the toggle is hidden there.** To migrate a page: convert its classes (`text-white` to `text-ink`, `bg-black` to `bg-canvas`, `border-white/10` to `border-line`, `text-hud` to `text-accent`, `bg-white text-black` to `bg-ink text-canvas`), add the route, then check both themes at desktop and 360 px, reduced motion, no flash on reload, body-text contrast of at least 4.5:1, `npx tsc --noEmit`, English and Thai. The Navbar, Footer and landing page must be converted before `/` is added.

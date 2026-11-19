@@ -182,18 +182,11 @@ export default function AccountMenu() {
                   </Link>
                 </li>
                 {user.is_seller && (
-                  <>
-                    <li>
-                      <Link href="/seller" className={itemClass}>
-                        {t('menu.seller')}
-                      </Link>
-                    </li>
-                    <li>
-                      <Link href={`/creators/${creatorHandle(name)}`} className={itemClass}>
-                        {t('menu.creatorProfile')}
-                      </Link>
-                    </li>
-                  </>
+                  <li>
+                    <Link href={`/creators/${creatorHandle(name)}`} className={itemClass}>
+                      {t('menu.creatorProfile')}
+                    </Link>
+                  </li>
                 )}
                 <li>
                   <Link href="/settings" className={itemClass}>

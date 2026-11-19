@@ -209,9 +209,73 @@ modelsRouter.get('/:id', async (req, res, next) => {
   }
 });
 
-// [Member 3] PATCH /api/models/:id (Update metadata)
-modelsRouter.patch('/:id', requireAuth, async (req, res) => {
-  res.json({ message: `TODO [Member 3]: Update model ${req.params.id}` });
+// PATCH /api/models/:id (Update metadata: title, description, priceCents, license)
+modelsRouter.patch('/:id', requireAuth, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const userId = req.user!.id;
+    const userRole = req.user!.role;
+
+    const userCheck = await db.query(`SELECT suspended_at FROM users WHERE id = $1`, [userId]);
+    if (userCheck.rows.length > 0 && userCheck.rows[0].suspended_at !== null) {
+      throw new AppError(403, 'ACCOUNT_SUSPENDED', 'Your account has been suspended by an administrator');
+    }
+
+    const existing = await db.query(
+      `SELECT id, owner_id, title, description, price_cents, license, deleted_at
+       FROM models WHERE id = $1`,
+      [id],
+    );
+    if (existing.rowCount === 0 || existing.rows[0].deleted_at !== null) {
+      throw new AppError(404, 'MODEL_NOT_FOUND', 'Model not found');
+    }
+
+    const model = existing.rows[0];
+    if (model.owner_id !== userId && userRole !== 'admin') {
+      throw new AppError(403, 'FORBIDDEN', 'You do not have permission to edit this model');
+    }
+
+    const nextTitle =
+      typeof req.body?.title === 'string' && req.body.title.trim() ? req.body.title.trim() : model.title;
+    const nextDescription =
+      typeof req.body?.description === 'string' ? req.body.description.trim() : model.description;
+    const nextPriceCents =
+      req.body?.priceCents !== undefined && req.body?.priceCents !== null
+        ? Math.max(0, Math.round(Number(req.body.priceCents)))
+        : model.price_cents;
+
+    if (!Number.isFinite(nextPriceCents)) {
+      throw new AppError(400, 'BAD_REQUEST', 'Invalid priceCents');
+    }
+
+    const VALID_LICENSES = ['CC0', 'CC-BY', 'CC-BY-NC', 'COMMERCIAL'];
+    const rawLicense =
+      typeof req.body?.license === 'string' ? req.body.license.trim().toUpperCase() : model.license;
+    if (!VALID_LICENSES.includes(rawLicense)) {
+      throw new AppError(400, 'INVALID_LICENSE', `Invalid license. Allowed: ${VALID_LICENSES.join(', ')}`);
+    }
+
+    const updated = await db.query(
+      `UPDATE models
+       SET title = $1, description = $2, price_cents = $3, license = $4
+       WHERE id = $5
+       RETURNING id, title, description, price_cents, license`,
+      [nextTitle, nextDescription, nextPriceCents, rawLicense, id],
+    );
+
+    const r = updated.rows[0];
+    res.json({
+      model: {
+        id: r.id,
+        title: r.title,
+        description: r.description,
+        priceCents: r.price_cents,
+        license: r.license,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
 });
 
 // [Ham] DELETE /api/models/:id (Soft delete: only owner or admin can delete)

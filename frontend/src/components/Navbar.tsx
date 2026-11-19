@@ -7,6 +7,7 @@ import { FormEvent, MouseEvent, useEffect, useState, useTransition } from 'react
 import { Loader2, Search, X } from 'lucide-react';
 import { startNavigationLoading } from '@/components/ui/NavigationProgress';
 import { hidesPublicChrome } from '@/lib/auth-paths';
+import { creatorHandle } from '@/lib/creators';
 import { readSession } from '@/lib/session';
 import { useT } from '@/lib/i18n/client';
 import type { MessageKey } from '@/lib/i18n/messages';
@@ -28,18 +29,24 @@ export default function Navbar() {
   const [mobileSearch, setMobileSearch] = useState(false);
   const [pendingHref, setPendingHref] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-  const [isCreator, setIsCreator] = useState(false);
+  const [creatorDashboardHref, setCreatorDashboardHref] = useState<string | null>(null);
 
   useEffect(() => {
     setPendingHref(null);
   }, [pathname]);
 
-  // A signed-in creator goes straight to the dashboard from the Creator link; everyone else sees the landing page.
+  // A signed-in creator goes straight to their Creator Profile Seller Dashboard; everyone else sees the landing page.
   // Read again on every page change so logging in or out in this tab is picked up (the storage event only fires in other tabs).
   useEffect(() => {
     const update = () => {
       const user = readSession()?.user;
-      setIsCreator(Boolean(user && user.role !== 'admin' && (user.is_seller || user.role === 'creator')));
+      const canSell = Boolean(user && user.role !== 'admin' && (user.is_seller || user.role === 'creator'));
+      if (canSell && user) {
+        const handle = creatorHandle(user.display_name?.trim() || user.email);
+        setCreatorDashboardHref(handle ? `/creators/${handle}?tab=dashboard` : '/seller');
+      } else {
+        setCreatorDashboardHref(null);
+      }
     };
     update();
     window.addEventListener('storage', update);
@@ -108,14 +115,15 @@ export default function Navbar() {
 
         <ul className={`flex items-center gap-3 text-sm sm:gap-5 sm:text-[15px] ${pendingHref !== null ? 'pointer-events-none' : ''}`}>
           {LINKS.map(({ href: baseHref, label, desktopOnly }) => {
-            const href = baseHref === '/creator' && isCreator ? '/seller' : baseHref;
-            const active = pathname === href || pathname.startsWith(`${href}/`);
+            const href = baseHref === '/creator' && creatorDashboardHref ? creatorDashboardHref : baseHref;
+            const hrefPath = href.split('?')[0];
+            const active = pathname === hrefPath || pathname.startsWith(`${hrefPath}/`);
             const loading = pendingHref === href;
             return (
               <li key={href} className={desktopOnly ? 'hidden sm:block' : undefined}>
                 <Link
                   href={href}
-                  onClick={handleNavClick(href)}
+                  onClick={handleNavClick(hrefPath)}
                   aria-current={active ? 'page' : undefined}
                   aria-busy={loading}
                   className={`inline-flex items-center gap-1.5 whitespace-nowrap ${

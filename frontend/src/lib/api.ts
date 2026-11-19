@@ -250,6 +250,42 @@ export async function deleteModel(modelId: string, token: string): Promise<void>
   });
 }
 
+/** Update model metadata (`PATCH /api/models/:id`). */
+export async function updateSellerModel(
+  modelId: string,
+  token: string,
+  payload: { title: string; description: string; priceCents: number; license: string },
+): Promise<{ model: { id: string; title: string; description: string; priceCents: number; license: string } }> {
+  return coreApiFetch(`/api/models/${encodeURIComponent(modelId)}`, token, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+/** Replace model .glb, preview .glb, and/or poster image (`PATCH /api/models/:id/assets` on CDN Service). */
+export async function replaceModelAssets(
+  modelId: string,
+  token: string,
+  files: { file?: File | null; preview?: File | null; poster?: File | null },
+): Promise<{ model: { id: string; posterHash?: string | null } }> {
+  const formData = new FormData();
+  if (files.file) formData.append('file', files.file);
+  if (files.preview) formData.append('preview', files.preview);
+  if (files.poster) formData.append('poster', files.poster);
+
+  const res = await fetch(`${CDN_SERVICE_URL}/api/models/${encodeURIComponent(modelId)}/assets`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.error?.message || `Asset update failed (${res.status})`);
+  }
+  return res.json();
+}
+
 export interface NoticeItem {
   id: string;
   kind: string;

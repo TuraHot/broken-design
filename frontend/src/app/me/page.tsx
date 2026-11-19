@@ -266,18 +266,11 @@ export default function MePage() {
           {user?.is_seller ? (
             <>
               <Link
-                href="/seller"
+                href={`/creators/${handle}`}
                 className="flex h-9 items-center gap-2 rounded-lg border border-hud/30 bg-hud/10 px-3.5 text-xs font-mono uppercase tracking-wider text-hud transition-colors hover:bg-hud/20"
               >
-                <Store className="h-4 w-4" />
-                Seller Dashboard
-              </Link>
-              <Link
-                href={`/creators/${handle}`}
-                className="flex h-9 items-center gap-2 rounded-lg border border-white/20 bg-white/5 px-3.5 text-xs font-mono uppercase tracking-wider text-white/80 transition-colors hover:bg-white/10"
-              >
                 <UserIcon className="h-4 w-4" />
-                Public Profile
+                Creator Profile
               </Link>
               <Link
                 href="/upload"

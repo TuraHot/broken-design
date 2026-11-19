@@ -77,8 +77,8 @@ sellerRouter.get('/models', requireAuth, requireSeller, async (req, res) => {
   const userId = req.user!.id;
 
   const result = await db.query(
-    `SELECT id, title, price_cents, currency, view_count, download_count,
-            hidden_at, deleted_at, created_at
+    `SELECT id, title, description, license, price_cents, currency, view_count, download_count,
+            poster_hash, hidden_at, deleted_at, created_at
      FROM models
      WHERE owner_id = $1
      ORDER BY created_at DESC`,
@@ -89,10 +89,13 @@ sellerRouter.get('/models', requireAuth, requireSeller, async (req, res) => {
     models: result.rows.map((r) => ({
       id: r.id,
       title: r.title,
+      description: r.description ?? '',
+      license: r.license ?? 'CC0',
       priceCents: r.price_cents,
       currency: r.currency,
       viewCount: r.view_count,
       downloadCount: r.download_count,
+      posterUrl: r.poster_hash ? `${env.cdnServiceUrl}/cdn/models/${r.id}/poster.webp` : null,
       isHidden: r.hidden_at !== null,
       isDeleted: r.deleted_at !== null,
       createdAt: r.created_at,

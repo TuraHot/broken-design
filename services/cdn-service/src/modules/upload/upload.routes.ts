@@ -303,3 +303,146 @@ uploadRouter.post(
     }
   }
 );
+
+// PATCH /api/models/:id/assets (Replace main GLB, preview GLB, and/or poster image)
+uploadRouter.patch(
+  '/models/:id/assets',
+  requireAuth,
+  requireSeller,
+  uploadFields,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
+    const uploadedKeys: string[] = [];
+    let storage: ReturnType<typeof getStorage> | null = null;
+
+    try {
+      const modelId = req.params.id;
+      const userId = req.user!.id;
+      const userRole = req.user!.role;
+
+      const userCheck = await db.query(
+        `SELECT id, role, is_seller, suspended_at FROM users WHERE id = $1`,
+        [userId]
+      );
+      if (userCheck.rows.length > 0) {
+        const dbUser = userCheck.rows[0];
+        if (dbUser.suspended_at !== null) {
+          throw new AppError(403, 'ACCOUNT_SUSPENDED', 'Your account has been suspended by an administrator.');
+        }
+      }
+
+      const existingRes = await db.query(
+        `SELECT id, owner_id, license, file_hash, file_size, preview_hash, poster_hash, deleted_at
+         FROM models WHERE id = $1`,
+        [modelId]
+      );
+      if (existingRes.rowCount === 0 || existingRes.rows[0].deleted_at !== null) {
+        throw new AppError(404, 'MODEL_NOT_FOUND', 'Model not found');
+      }
+      const existing = existingRes.rows[0];
+      if (existing.owner_id !== userId && userRole !== 'admin') {
+        throw new AppError(403, 'FORBIDDEN', 'You do not have permission to edit this model');
+      }
+
+      const modelFile = files?.['file']?.[0];
+      const previewFile = files?.['preview']?.[0];
+      const posterFile = files?.['poster']?.[0];
+
+      if (!modelFile && !previewFile && !posterFile) {
+        throw new AppError(400, 'BAD_REQUEST', 'At least one asset file (file, preview, or poster) is required');
+      }
+
+      storage = getStorage();
+      let nextFileHash: string = existing.file_hash;
+      let nextFileSize: number = Number(existing.file_size);
+      let nextPreviewHash: string | null = existing.preview_hash;
+      let nextPosterHash: string | null = existing.poster_hash;
+
+      if (modelFile) {
+        if (modelFile.size > env.maxModelSizeBytes) {
+          throw new AppError(413, 'FILE_TOO_LARGE', `Model file exceeds limit of ${env.maxModelSizeBytes} bytes`);
+        }
+        const validation = await validateGlbFile(modelFile.path);
+        if (!validation.valid) {
+          throw new AppError(400, 'INVALID_GLB', validation.reason || 'File is not a valid Binary glTF (GLB v2)');
+        }
+        const rawGlbBuffer = await fsp.readFile(modelFile.path);
+        const { buffer: watermarkedBuffer } = await embedLicenseAndWatermark(rawGlbBuffer, {
+          modelId,
+          ownerId: existing.owner_id,
+          license: existing.license,
+          purchaseId: 'original',
+        });
+        await fsp.writeFile(modelFile.path, watermarkedBuffer);
+        nextFileSize = watermarkedBuffer.length;
+        nextFileHash = await computeFileSha256(modelFile.path);
+        const mainKey = assetKey(modelId, 'main', nextFileHash);
+        await storage.put(mainKey, modelFile.path);
+        uploadedKeys.push(mainKey);
+      }
+
+      if (previewFile) {
+        if (previewFile.size > env.maxPreviewSizeBytes) {
+          throw new AppError(413, 'FILE_TOO_LARGE', `Preview file exceeds limit of ${env.maxPreviewSizeBytes} bytes`);
+        }
+        const previewValidation = await validateGlbFile(previewFile.path);
+        if (!previewValidation.valid) {
+          throw new AppError(400, 'INVALID_GLB', 'Preview file is not a valid GLB (glTF v2)');
+        }
+        nextPreviewHash = await computeFileSha256(previewFile.path);
+        const previewKey = assetKey(modelId, 'preview', nextPreviewHash);
+        await storage.put(previewKey, previewFile.path);
+        uploadedKeys.push(previewKey);
+      }
+
+      if (posterFile) {
+        if (posterFile.size > env.maxPosterSizeBytes) {
+          throw new AppError(413, 'FILE_TOO_LARGE', `Poster file exceeds limit of ${env.maxPosterSizeBytes} bytes`);
+        }
+        nextPosterHash = await computeFileSha256(posterFile.path);
+        const posterKey = assetKey(modelId, 'poster', nextPosterHash);
+        await storage.put(posterKey, posterFile.path);
+        uploadedKeys.push(posterKey);
+      }
+
+      try {
+        await db.query(
+          `UPDATE models
+           SET file_hash = $1, file_size = $2, preview_hash = $3, poster_hash = $4
+           WHERE id = $5`,
+          [nextFileHash, nextFileSize, nextPreviewHash, nextPosterHash, modelId]
+        );
+      } catch (dbErr) {
+        if (!supabase) throw dbErr;
+        const { error } = await supabase
+          .from('models')
+          .update({
+            file_hash: nextFileHash,
+            file_size: nextFileSize,
+            preview_hash: nextPreviewHash,
+            poster_hash: nextPosterHash,
+          })
+          .eq('id', modelId);
+        if (error) throw dbErr;
+      }
+
+      await cleanupFiles(files);
+      res.json({
+        message: 'Model assets updated successfully',
+        model: {
+          id: modelId,
+          fileHash: nextFileHash,
+          fileSize: nextFileSize,
+          previewHash: nextPreviewHash,
+          posterHash: nextPosterHash,
+        },
+      });
+    } catch (err) {
+      await cleanupFiles(files);
+      if (storage && uploadedKeys.length > 0) {
+        await Promise.all(uploadedKeys.map((key) => storage!.delete(key).catch(() => undefined)));
+      }
+      next(err);
+    }
+  }
+);

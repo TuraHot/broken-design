@@ -1,4 +1,5 @@
 // Log in / sign up — one email-first form at `/login`. UI only until core-api auth exists.
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import AuthForm from "@/components/auth/AuthForm";
 
@@ -11,7 +12,9 @@ export default function LoginPage() {
         aria-hidden
         className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_50%_25%,rgba(143,211,255,0.12),transparent_60%),radial-gradient(ellipse_at_75%_75%,rgba(184,146,255,0.10),transparent_55%)]"
       />
-      <AuthForm />
+      <Suspense>
+        <AuthForm />
+      </Suspense>
     </main>
   );
 }

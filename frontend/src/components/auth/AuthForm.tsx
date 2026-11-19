@@ -5,7 +5,7 @@
 // Connected to Core API (/api/auth/check-email, /api/auth/login, /api/auth/register).
 import Link from 'next/link';
 import { FormEvent, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Eye, EyeOff } from 'lucide-react';
 import { checkEmail, login, register } from '@/lib/auth';
 import { SESSION_UPDATED_EVENT } from '@/lib/session';
@@ -62,6 +62,7 @@ export default function AuthForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [checking, setChecking] = useState(false);
+  const [notice, setNotice] = useState(useSearchParams().get('registered') ? 'Account created. Please log in.' : '');
 
   const copy = COPY[step];
 
@@ -103,10 +104,16 @@ export default function AuthForm() {
     if (step === 'login' || step === 'signup') {
       try {
         setChecking(true);
-        const result =
-          step === 'login'
-            ? await login(values.email, values.password)
-            : await register(values.email, values.password, values.name);
+        if (step === 'signup') {
+          // Do not sign in yet: back to the email step so the new user logs in first.
+          await register(values.email, values.password, values.name);
+          goTo('email');
+          setValues({ email: '', name: '', password: '' });
+          setNotice('Account created. Please log in.');
+          return;
+        }
+
+        const result = await login(values.email, values.password);
 
         // Store tokens for authentication across the app
         localStorage.setItem('token', result.token);
@@ -169,6 +176,12 @@ export default function AuthForm() {
         {copy.title}
       </h1>
       <p className="mt-3 text-[15px] leading-relaxed text-white/65">{copy.lead}</p>
+
+      {notice && (
+        <p role="status" className="mt-6 rounded-lg border border-hud/40 bg-hud/10 px-3 py-2 text-sm text-hud">
+          {notice}
+        </p>
+      )}
 
       <div className="mt-8 rounded-lg border border-white/10 bg-white/5 p-5 sm:p-6">
         {step !== 'email' && (

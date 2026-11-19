@@ -69,6 +69,7 @@ export default async function ModelDetailPage({ params }: Props) {
 
             <ModelActions
               modelId={model.id}
+              ownerId={model.ownerId}
               title={model.title}
               free={free}
               priceLabel={formatPrice(model.priceCents)}

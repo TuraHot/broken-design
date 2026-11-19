@@ -13,11 +13,13 @@ const UUID_RE =
 
 export default function ModelActions({
   modelId,
+  ownerId,
   title = "model",
   free,
   priceLabel,
 }: {
   modelId?: string;
+  ownerId?: string;
   title?: string;
   free: boolean;
   priceLabel: string;
@@ -27,19 +29,23 @@ export default function ModelActions({
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
   const busyRef = useRef(false);
 
   useEffect(() => {
     const syncSession = () => {
-      setSignedIn(readSession() !== null);
+      const session = readSession();
+      setSignedIn(session !== null);
+      setIsOwner(Boolean(session?.user?.id && ownerId && session.user.id === ownerId));
       setReady(true);
     };
     syncSession();
     window.addEventListener("storage", syncSession);
     return () => window.removeEventListener("storage", syncSession);
-  }, []);
+  }, [ownerId]);
 
   const isRealModel = Boolean(modelId && UUID_RE.test(modelId));
+  const canDirectDownload = free || isOwner;
 
   const performDownload = async (id: string, token: string) => {
     const res = await fetch(
@@ -129,7 +135,10 @@ export default function ModelActions({
       );
       const checkoutData = await checkoutRes.json().catch(() => null);
 
-      if (checkoutData?.error?.code === "ALREADY_PURCHASED") {
+      if (
+        checkoutData?.error?.code === "ALREADY_PURCHASED" ||
+        checkoutData?.error?.code === "OWN_MODEL"
+      ) {
         setStatusMsg("You already own this model — starting download…");
         await performDownload(modelId, session.token);
         return;
@@ -163,18 +172,18 @@ export default function ModelActions({
       <button
         type="button"
         disabled={!ready || !signedIn || busy}
-        onClick={free ? handleDownload : handleBuy}
+        onClick={canDirectDownload ? handleDownload : handleBuy}
         className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-white px-3.5 text-[15px] font-medium text-black transition-colors hover:bg-white/85 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {busy && <Loader2 aria-hidden className="h-4 w-4 animate-spin motion-reduce:animate-none" />}
         {busy
           ? "Processing…"
-          : free
+          : canDirectDownload
             ? "Get this model (.glb)"
             : `Buy for ${priceLabel}`}
       </button>
 
-      {!free && isRealModel && (
+      {!canDirectDownload && isRealModel && (
         <button
           type="button"
           disabled={!ready || !signedIn || busy}

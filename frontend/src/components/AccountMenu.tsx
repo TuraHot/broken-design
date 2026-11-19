@@ -97,19 +97,25 @@ export default function AccountMenu() {
     router.push('/');
   };
 
-  // Same size as the Log in button, hidden until we know whether someone is signed in (no flicker or shift).
-  const loginButton = (
-    <Link
-      href="/login"
-      className={`whitespace-nowrap rounded-lg bg-white px-3 py-1.5 font-medium text-black transition-colors hover:bg-white/85 sm:px-3.5 ${
-        ready ? '' : 'invisible'
-      }`}
-    >
-      {t('nav.login')}
-    </Link>
+  // Shown when signed out, hidden until we know whether someone is signed in (no flicker or shift).
+  const authButtons = (
+    <div className={`flex items-center gap-1.5 sm:gap-2 ${ready ? '' : 'invisible'}`}>
+      <Link
+        href="/login"
+        className="inline-flex h-9 items-center whitespace-nowrap rounded-lg px-2.5 text-[14px] font-medium text-white/75 transition-colors hover:bg-white/10 hover:text-white sm:px-3 sm:text-[15px]"
+      >
+        {t('nav.login')}
+      </Link>
+      <Link
+        href="/register"
+        className="inline-flex h-9 items-center whitespace-nowrap rounded-lg bg-white px-3 text-[14px] font-medium text-black transition-colors hover:bg-white/85 sm:px-3.5 sm:text-[15px]"
+      >
+        {t('nav.register')}
+      </Link>
+    </div>
   );
 
-  if (!session) return loginButton;
+  if (!session) return authButtons;
 
   const { user } = session;
   const name = user.display_name?.trim() || user.email;
@@ -131,9 +137,12 @@ export default function AccountMenu() {
 
       {open && (
         <div className="absolute right-0 top-full z-20 mt-2 w-56 rounded-lg border border-white/15 bg-black/95 p-1 backdrop-blur">
-          <div className="border-b border-white/10 px-3 py-2">
-            <p className="truncate text-sm text-white">{name}</p>
-            {name !== user.email && <p className="truncate text-xs text-white/65">{user.email}</p>}
+          <div className="flex items-center gap-2.5 border-b border-white/10 px-3 py-2.5">
+            <UserAvatar name={name} avatarUrl={user.avatar_url} size="sm" className="!h-8 !w-8 text-xs" />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium text-white">{name}</p>
+              {name !== user.email && <p className="truncate text-xs text-white/65">{user.email}</p>}
+            </div>
           </div>
           <ul className="pt-1">
             {isAdmin ? (

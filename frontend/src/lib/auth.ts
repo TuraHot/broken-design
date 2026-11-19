@@ -64,6 +64,8 @@ async function authRequest<T>(
     const message = data?.error?.message;
     throw message ? new AuthError('API', message) : new AuthError('GENERIC');
   }
+  // A success answer that is not JSON is as unusable as a failure.
+  if (data === null) throw new AuthError('GENERIC');
 
   return data as T;
 }

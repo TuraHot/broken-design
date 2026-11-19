@@ -33,7 +33,7 @@ Both backends read the same PostgreSQL database and verify the same JWT (`JWT_SE
 ### `frontend/` — Next.js 15 (App Router), React 19, Tailwind 3 — port `3000`
 | Path | Architectural Role |
 | :--- | :--- |
-| `src/app/layout.tsx` | Root layout (`Chakra Petch`, `Michroma`, `Share Tech Mono`), wraps `<Navbar />`, `<Footer />` (hidden on auth & `/admin/*` via `lib/auth-paths.ts`), and `<ReportProvider />` |
+| `src/app/layout.tsx` | Root layout (`Chakra Petch`, `Michroma`, `Share Tech Mono`), wraps `<LocaleProvider />` (language read from the `lang` cookie with `cookies()`, so every page renders per request), `<Navbar />`, `<Footer />` (hidden on auth & `/admin/*` via `lib/auth-paths.ts`), and `<ReportProvider />`; sets `<html lang>` |
 | `src/app/page.tsx` | Landing page: scroll-shattering 3D lily scene (`LilyViewer`/`LilyScene`), hero, Popular carousel, Categories, New arrivals, join banner |
 | `src/app/creator/page.tsx`, `src/components/creator/*` | Creator landing with Three.js butterfly (`ButterflyScene`/`CreatorViewer`; `SHOW_CALLOUTS` off) |
 | `src/components/Navbar.tsx`, `AccountMenu.tsx`, `AdminOnlyRedirect.tsx`, `lib/session.ts` | Global nav, search redirect (`/gallery?q=`), `localStorage` session reader (convenience only — backend re-checks roles), and admin redirect |
@@ -48,7 +48,10 @@ Both backends read the same PostgreSQL database and verify the same JWT (`JWT_SE
 | `src/app/admin/*`, `components/admin/*`, `lib/admin-api.ts`, `lib/admin-view.ts` | Dedicated admin layout (`AdminShell`, `AdminList`) covering Overview, Models, Users, Purchases, and Complaints |
 | `src/lib/api.ts`, `pagination.ts`, `mock-models.ts`, `types.ts` | Shared API client (`INTERNAL_CORE_API_URL` on SSR, `CORE_API_URL` in browser; merges mock catalogue unless `NEXT_PUBLIC_USE_MOCK=false`) |
 | `src/app/me/page.tsx`, `src/app/seller/page.tsx` | Buyer dashboard (`/me`: purchases, `embed_key` copy/regenerate, watermarked `.glb` download, seller toggle) and Seller dashboard (`/seller`: revenue/sales summary, uploaded models table, soft delete) |
-| `src/app/pay/mock/[id]`, `docs`, `components/playground/` | Pending pages tracked in [`docs/TASKS.md`](TASKS.md) |
+| `src/app/docs`, `licenses`, `terms`, `privacy`, `seller-terms`, `refunds`, `dmca`, `components/content/*`, `lib/legal.ts` | Static text pages (server components, no API calls). `components/content/prose.tsx` (`PageHeader`, `Section`, `P`, `UL`, `OL`, `C`, `Callout`, `DataTable`), `DocLayout` (table of contents + sections), `CodeBlock` (copy button) and `LegalPage` (draft notice, sections, links to the other documents). `/licenses` reads `lib/licenses.ts` |
+| `src/lib/i18n/*` (`messages.ts`, `server.ts`, `client.tsx`, `admin-error.ts`), `components/LanguageSwitch.tsx` | English / Thai. The choice lives in the `lang` cookie (1 year, set in the browser, no URL change). `messages.ts` holds every UI text key in `en` and `th` (TypeScript requires both). Client components call `useT()`, server components `getT()` from `lib/i18n/server`. The language button is in the Navbar and in the admin layout. Long text pages (`/docs`, `/licenses`, the five legal pages) keep the English page in `page.tsx` and the Thai page in `th.tsx` next to it; **a text change must be made in both files**. Translated so far: Navbar, Footer, account menu, report popup, `/contact`, `/settings`, `/docs`, `/licenses`, legal pages and `/admin/*`; other pages are still English. Messages that come from an API stay as the server wrote them |
+| `src/app/settings/page.tsx`, `src/app/contact/page.tsx` | `/settings`: profile read from the saved session and Log out (password change, name/email change and account deletion are shown as "not available yet": no API). `/contact`: report popup button and links to DMCA, Docs, Licenses and Refunds; the support email is `[TO DECIDE]` |
+| `src/app/pay/mock/[id]`, `components/playground/` | Pending pages tracked in [`docs/TASKS.md`](TASKS.md) |
 
 `next.config.ts` sets CSP: `frame-ancestors *` for `/embed/*` and `frame-ancestors 'self'` for all other routes.
 
@@ -63,7 +66,7 @@ Business logic and metadata (`middlewares/auth.middleware.ts`, `middlewares/erro
 - **`scripts/seedAdmin.ts`:** Seeds default admin and creator accounts (`schema.sql` holds schema + seed rows).
 
 ### `services/cdn-service/` — Express 5, TypeScript — port `4001`
-High-I/O upload, multi-layer `.glb` watermarking, and streaming (`upload/upload.routes.ts`, `cdn/cdn.routes.ts`, `cdn/cdn.service.ts`, `cdn/range.ts`, `utils/glbValidator.ts`, `utils/glbWatermark.ts`, `storage/*`).
+High-I/O upload, multi-layer `.glb` watermarking, and streaming (`upload/upload.routes.ts`, `upload/limitedDiskStorage.ts` (per-field size limits enforced while the file arrives: main 50 MB, preview 5 MB, poster 1 MB; an oversize field answers `413 FILE_TOO_LARGE` and leaves no temp file), `cdn/cdn.routes.ts`, `cdn/cdn.service.ts`, `cdn/range.ts`, `utils/glbValidator.ts`, `utils/glbWatermark.ts`, `storage/*`).
 - Validates `.glb` magic bytes & sizes, embeds dual-layer HMAC metadata + 64-vertex X-coordinate steganography (`original` on upload, buyer `purchaseId` on paid download), stores by `sha256` behind `StorageAdapter` (`LocalDiskStorage` / `SupabaseStorage`), and streams with HTTP Range (`206`/`416`), `ETag`/`304`, `express-rate-limit`, constant-time `embed_key` checks, and `POST /cdn/verify-watermark`. Full endpoint & header spec: [`AGENT.md` §4.1 & §5](../AGENT.md#41-cdn-service-servicescdn-service--พอร์ต-4001).
 
 ## 3. Key end-to-end flows

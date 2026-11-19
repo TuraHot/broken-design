@@ -9,14 +9,17 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { startViewingSite } from '@/lib/admin-view';
 import { Box, Flag, Globe, LayoutDashboard, LogOut, Receipt, Users, type LucideIcon } from 'lucide-react';
+import LanguageSwitch from '@/components/LanguageSwitch';
+import { useT } from '@/lib/i18n/client';
+import type { MessageKey } from '@/lib/i18n/messages';
 import { clearSession, readSession, type Session } from '@/lib/session';
 
-const TABS: { href: string; label: string; icon: LucideIcon }[] = [
-  { href: '/admin', label: 'Overview', icon: LayoutDashboard },
-  { href: '/admin/models', label: 'Models', icon: Box },
-  { href: '/admin/users', label: 'Users', icon: Users },
-  { href: '/admin/purchases', label: 'Purchases', icon: Receipt },
-  { href: '/admin/complaints', label: 'Complaints', icon: Flag },
+const TABS: { href: string; label: MessageKey; icon: LucideIcon }[] = [
+  { href: '/admin', label: 'admin.nav.overview', icon: LayoutDashboard },
+  { href: '/admin/models', label: 'admin.nav.models', icon: Box },
+  { href: '/admin/users', label: 'admin.nav.users', icon: Users },
+  { href: '/admin/purchases', label: 'admin.nav.purchases', icon: Receipt },
+  { href: '/admin/complaints', label: 'admin.nav.complaints', icon: Flag },
 ];
 
 const PRIMARY = 'inline-flex h-9 items-center rounded-lg bg-white px-3.5 text-[15px] font-medium text-black transition-colors hover:bg-white/85';
@@ -37,6 +40,7 @@ function Notice({ code, text, action }: { code: string; text: string; action: Re
 export default function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const t = useT();
   const [ready, setReady] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
 
@@ -53,15 +57,15 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   if (!ready) {
     return (
       <main className="grid min-h-dvh place-items-center px-4">
-        <p role="status" className="text-sm text-white/65">Loading…</p>
+        <p role="status" className="text-sm text-white/65">{t('admin.loading')}</p>
       </main>
     );
   }
   if (!session) {
-    return <Notice code="401" text="Log in with an admin account to continue." action={<Link href="/login" className={PRIMARY}>Log in</Link>} />;
+    return <Notice code="401" text={t('admin.e401')} action={<Link href="/login" className={PRIMARY}>{t('admin.login')}</Link>} />;
   }
   if (session.user.role !== 'admin') {
-    return <Notice code="403" text="This area is for administrators only." action={<Link href="/" className={PRIMARY}>Back to home</Link>} />;
+    return <Notice code="403" text={t('admin.e403')} action={<Link href="/" className={PRIMARY}>{t('admin.backHome')}</Link>} />;
   }
 
   const name = session.user.display_name?.trim() || session.user.email;
@@ -82,7 +86,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
     TABS.map(({ href, label, icon: Icon }) => (
       <Link key={href} href={href} aria-current={isActive(href) ? 'page' : undefined} className={cls(isActive(href))}>
         {withIcon && <Icon aria-hidden className="h-4 w-4 shrink-0" />}
-        {label}
+        {t(label)}
       </Link>
     ));
 
@@ -92,10 +96,10 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-60 flex-col border-r border-white/10 bg-black p-4 md:flex">
         <div className="px-3 pb-6 pt-2">
           <p className="text-base font-semibold tracking-wide text-white">Lixyte</p>
-          <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.16em] text-hud">[ Admin ]</p>
+          <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.16em] text-hud">[ {t('admin.label')} ]</p>
         </div>
 
-        <nav aria-label="Admin" className="grid gap-1">
+        <nav aria-label={t('admin.navLabel')} className="grid gap-1">
           {tabLinks(
             (active) => `${SIDE_LINK} ${active ? 'bg-white/10 text-white' : 'text-white/65 hover:bg-white/5 hover:text-white'}`,
             true,
@@ -107,13 +111,16 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
             <p className="truncate text-sm text-white">{name}</p>
             {name !== session.user.email && <p className="truncate text-xs text-white/65">{session.user.email}</p>}
           </div>
+          <div className="px-3 pb-2">
+            <LanguageSwitch />
+          </div>
           <button type="button" onClick={viewWebsite} className={`${SIDE_LINK} text-white/65 hover:bg-white/5 hover:text-white`}>
             <Globe aria-hidden className="h-4 w-4 shrink-0" />
-            View Website
+            {t('admin.viewSite')}
           </button>
           <button type="button" onClick={logOut} className={`${SIDE_LINK} text-white/65 hover:bg-white/5 hover:text-white`}>
             <LogOut aria-hidden className="h-4 w-4 shrink-0" />
-            Log out
+            {t('admin.logout')}
           </button>
         </div>
       </aside>
@@ -122,17 +129,18 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
       <header className="fixed inset-x-0 top-0 z-40 border-b border-white/10 bg-black/90 backdrop-blur md:hidden">
         <div className="flex h-14 items-center gap-3 px-4">
           <p className="text-[15px] font-semibold tracking-wide text-white">Lixyte</p>
-          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud">[ Admin ]</p>
+          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud">[ {t('admin.label')} ]</p>
           <div className="ml-auto flex items-center gap-1">
-            <button type="button" onClick={viewWebsite} aria-label="View Website" className="grid h-9 w-9 place-items-center rounded-lg text-white/80 hover:text-white">
+            <LanguageSwitch />
+            <button type="button" onClick={viewWebsite} aria-label={t('admin.viewSite')} className="grid h-9 w-9 place-items-center rounded-lg text-white/80 hover:text-white">
               <Globe aria-hidden className="h-5 w-5" />
             </button>
-            <button type="button" onClick={logOut} aria-label="Log out" className="grid h-9 w-9 place-items-center rounded-lg text-white/80 hover:text-white">
+            <button type="button" onClick={logOut} aria-label={t('admin.logout')} className="grid h-9 w-9 place-items-center rounded-lg text-white/80 hover:text-white">
               <LogOut aria-hidden className="h-5 w-5" />
             </button>
           </div>
         </div>
-        <nav aria-label="Admin" className="flex gap-1 overflow-x-auto border-t border-white/10 px-2">
+        <nav aria-label={t('admin.navLabel')} className="flex gap-1 overflow-x-auto border-t border-white/10 px-2">
           {tabLinks(
             (active) =>
               `-mb-px whitespace-nowrap border-b-2 px-3 py-2 text-[15px] transition-colors ${

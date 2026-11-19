@@ -15,6 +15,6 @@ export const env = {
   supabaseKey: process.env.SUPABASE_KEY || '',
   supabaseStorageBucket: process.env.SUPABASE_STORAGE_BUCKET || 'models',
   maxModelSizeBytes: Number(process.env.MAX_MODEL_SIZE_BYTES) || 52428800,
-  maxPreviewSizeBytes: Number(process.env.MAX_PREVIEW_SIZE_BYTES) || 52428800,
+  maxPreviewSizeBytes: Number(process.env.MAX_PREVIEW_SIZE_BYTES) || 5242880,
   maxPosterSizeBytes: Number(process.env.MAX_POSTER_SIZE_BYTES) || 1048576,
 };

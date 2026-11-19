@@ -5,8 +5,10 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { AlertCircle, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { Badge } from '@/components/admin/ui';
-import { AdminApiError, adminFetch, type AdminOverview } from '@/lib/admin-api';
+import { adminFetch, type AdminOverview } from '@/lib/admin-api';
 import { formatCount, formatDate, formatMoney } from '@/lib/format';
+import { adminErrorText } from '@/lib/i18n/admin-error';
+import { useT } from '@/lib/i18n/client';
 
 const LABEL = 'font-mono text-[11px] uppercase tracking-[0.16em] text-white/65';
 
@@ -61,6 +63,7 @@ function Empty({ children }: { children: React.ReactNode }) {
 }
 
 export default function AdminOverviewPage() {
+  const t = useT();
   const [data, setData] = useState<AdminOverview | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -70,24 +73,26 @@ export default function AdminOverviewPage() {
       .then(setData)
       .catch((err) => {
         if (ctrl.signal.aborted) return;
-        setError(err instanceof AdminApiError ? err.message : 'Something went wrong. Please try again.');
+        setError(adminErrorText(err, t));
       });
     return () => ctrl.abort();
+    // The error text is made once, in the language of the moment the request fails.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const attention = data
     ? [
-        { n: data.openComplaints, text: data.openComplaints === 1 ? 'new complaint' : 'new complaints', href: '/admin/complaints' },
-        { n: data.suspendedUsers, text: data.suspendedUsers === 1 ? 'suspended account' : 'suspended accounts', href: '/admin/users' },
-        { n: data.hiddenModels, text: data.hiddenModels === 1 ? 'hidden model' : 'hidden models', href: '/admin/models' },
-        { n: data.pendingPurchases, text: data.pendingPurchases === 1 ? 'unpaid order' : 'unpaid orders', href: '/admin/purchases' },
+        { n: data.openComplaints, text: t(data.openComplaints === 1 ? 'admin.ov.complaint.one' : 'admin.ov.complaint.many'), href: '/admin/complaints' },
+        { n: data.suspendedUsers, text: t(data.suspendedUsers === 1 ? 'admin.ov.suspended.one' : 'admin.ov.suspended.many'), href: '/admin/users' },
+        { n: data.hiddenModels, text: t(data.hiddenModels === 1 ? 'admin.ov.hidden.one' : 'admin.ov.hidden.many'), href: '/admin/models' },
+        { n: data.pendingPurchases, text: t(data.pendingPurchases === 1 ? 'admin.ov.unpaid.one' : 'admin.ov.unpaid.many'), href: '/admin/purchases' },
       ].filter((a) => a.n > 0)
     : [];
 
   return (
     <div>
-      <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud">[ Admin ]</p>
-      <h1 className="mt-3 font-display text-[clamp(28px,4vw,48px)] uppercase leading-[1.02]">Overview</h1>
+      <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud">[ {t('admin.label')} ]</p>
+      <h1 className="mt-3 font-display text-[clamp(28px,4vw,48px)] uppercase leading-[1.02]">{t('admin.nav.overview')}</h1>
 
       {error && (
         <p role="status" className="mt-8 flex items-center gap-2 text-red-300">
@@ -95,20 +100,20 @@ export default function AdminOverviewPage() {
           {error}
         </p>
       )}
-      {!data && !error && <p role="status" className="mt-8 text-sm text-white/65">Loading…</p>}
+      {!data && !error && <p role="status" className="mt-8 text-sm text-white/65">{t('admin.loading')}</p>}
 
       {data && (
         <div className="mt-8 grid grid-cols-[minmax(0,1fr)] gap-6">
-          <Panel title="Needs attention">
+          <Panel title={t('admin.ov.needs')}>
             {attention.length === 0 ? (
               <p className="flex items-center gap-2 text-sm text-white/65">
                 <CheckCircle2 aria-hidden className="h-4 w-4 shrink-0" />
-                Nothing needs attention right now.
+                {t('admin.ov.nothing')}
               </p>
             ) : (
               <ul className="flex flex-wrap gap-3">
                 {attention.map((a) => (
-                  <li key={a.text}>
+                  <li key={a.href}>
                     <Link href={a.href} className="inline-flex items-center gap-2 rounded-lg border border-amber/50 px-3 py-2 text-sm text-amber transition-colors hover:bg-white/5">
                       <AlertCircle aria-hidden className="h-4 w-4 shrink-0" />
                       <span><strong className="font-medium">{formatCount(a.n)}</strong> {a.text}</span>
@@ -121,37 +126,41 @@ export default function AdminOverviewPage() {
           </Panel>
 
           <div>
-            <h2 className={`${LABEL} mb-3`}>Totals</h2>
+            <h2 className={`${LABEL} mb-3`}>{t('admin.ov.totals')}</h2>
             <div className="grid grid-cols-[minmax(0,1fr)] gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              <Stat label="Users" value={formatCount(data.totalUsers)} note={`${formatCount(data.suspendedUsers)} suspended`} href="/admin/users" />
-              <Stat label="Models" value={formatCount(data.totalModels)} note={`${formatCount(data.hiddenModels)} hidden`} href="/admin/models" />
-              <Stat label="Paid purchases" value={formatCount(data.paidPurchases)} note={`${formatCount(data.pendingPurchases)} unpaid`} href="/admin/purchases" />
+              <Stat label={t('admin.ov.users')} value={formatCount(data.totalUsers)} note={t('admin.ov.nSuspended', { n: formatCount(data.suspendedUsers) })} href="/admin/users" />
+              <Stat label={t('admin.ov.models')} value={formatCount(data.totalModels)} note={t('admin.ov.nHidden', { n: formatCount(data.hiddenModels) })} href="/admin/models" />
+              <Stat label={t('admin.ov.paidPurchases')} value={formatCount(data.paidPurchases)} note={t('admin.ov.nUnpaid', { n: formatCount(data.pendingPurchases) })} href="/admin/purchases" />
               <Stat
-                label="Revenue"
+                label={t('admin.ov.revenue')}
                 value={formatMoney(data.totalRevenueCents)}
-                note={data.paidPurchases > 0 ? `${formatMoney(Math.round(data.totalRevenueCents / data.paidPurchases))} per order` : 'No sales yet'}
+                note={
+                  data.paidPurchases > 0
+                    ? t('admin.ov.perOrder', { amount: formatMoney(Math.round(data.totalRevenueCents / data.paidPurchases)) })
+                    : t('admin.ov.noSales')
+                }
               />
             </div>
           </div>
 
           <div>
-            <h2 className={`${LABEL} mb-3`}>Last 7 days</h2>
+            <h2 className={`${LABEL} mb-3`}>{t('admin.ov.last7')}</h2>
             <div className="grid grid-cols-[minmax(0,1fr)] gap-4 sm:grid-cols-3">
-              <Stat label="New users" value={formatCount(data.newUsers7d)} />
-              <Stat label="New models" value={formatCount(data.newModels7d)} />
-              <Stat label="Revenue" value={formatMoney(data.revenue7dCents)} />
+              <Stat label={t('admin.ov.newUsers')} value={formatCount(data.newUsers7d)} />
+              <Stat label={t('admin.ov.newModels')} value={formatCount(data.newModels7d)} />
+              <Stat label={t('admin.ov.revenue')} value={formatMoney(data.revenue7dCents)} />
             </div>
           </div>
 
           <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-2">
-            <Panel title="Catalogue" action={{ href: '/admin/models', label: 'Manage models' }}>
+            <Panel title={t('admin.ov.catalogue')} action={{ href: '/admin/models', label: t('admin.ov.manageModels') }}>
               <ul className="grid gap-4">
-                <Bar label="Free models" value={data.freeModels} total={data.totalModels} />
-                <Bar label="Paid models" value={data.totalModels - data.freeModels} total={data.totalModels} />
+                <Bar label={t('admin.ov.freeModels')} value={data.freeModels} total={data.totalModels} />
+                <Bar label={t('admin.ov.paidModels')} value={data.totalModels - data.freeModels} total={data.totalModels} />
               </ul>
-              <p className={`${LABEL} mb-3 mt-6`}>By license</p>
+              <p className={`${LABEL} mb-3 mt-6`}>{t('admin.ov.byLicense')}</p>
               {data.licenseBreakdown.length === 0 ? (
-                <Empty>No models yet.</Empty>
+                <Empty>{t('admin.ov.noModels')}</Empty>
               ) : (
                 <ul className="grid gap-4">
                   {data.licenseBreakdown.map((l) => (
@@ -160,19 +169,19 @@ export default function AdminOverviewPage() {
                 </ul>
               )}
               <p className="mt-6 text-sm text-white/65">
-                {formatCount(data.totalDownloads)} downloads · {formatCount(data.totalViews)} views in total
+                {t('admin.ov.totalsLine', { downloads: formatCount(data.totalDownloads), views: formatCount(data.totalViews) })}
               </p>
             </Panel>
 
-            <Panel title="People" action={{ href: '/admin/users', label: 'Manage users' }}>
+            <Panel title={t('admin.ov.people')} action={{ href: '/admin/users', label: t('admin.ov.manageUsers') }}>
               <ul className="grid gap-4">
-                <Bar label="Sellers" value={data.sellerUsers} total={data.totalUsers} />
-                <Bar label="Admins" value={data.adminUsers} total={data.totalUsers} />
-                <Bar label="Other members" value={Math.max(0, data.totalUsers - data.sellerUsers - data.adminUsers)} total={data.totalUsers} />
+                <Bar label={t('admin.ov.sellers')} value={data.sellerUsers} total={data.totalUsers} />
+                <Bar label={t('admin.ov.admins')} value={data.adminUsers} total={data.totalUsers} />
+                <Bar label={t('admin.ov.otherMembers')} value={Math.max(0, data.totalUsers - data.sellerUsers - data.adminUsers)} total={data.totalUsers} />
               </ul>
-              <p className={`${LABEL} mb-3 mt-6`}>Newest members</p>
+              <p className={`${LABEL} mb-3 mt-6`}>{t('admin.ov.newest')}</p>
               {data.recentUsers.length === 0 ? (
-                <Empty>No members yet.</Empty>
+                <Empty>{t('admin.ov.noMembers')}</Empty>
               ) : (
                 <ul className="divide-y divide-white/10">
                   {data.recentUsers.map((u) => (
@@ -191,9 +200,9 @@ export default function AdminOverviewPage() {
               )}
             </Panel>
 
-            <Panel title="Top models" action={{ href: '/admin/models', label: 'All models' }}>
+            <Panel title={t('admin.ov.topModels')} action={{ href: '/admin/models', label: t('admin.ov.allModels') }}>
               {data.topModels.length === 0 ? (
-                <Empty>No models yet.</Empty>
+                <Empty>{t('admin.ov.noModels')}</Empty>
               ) : (
                 <ol className="divide-y divide-white/10">
                   {data.topModels.map((m, i) => (
@@ -201,10 +210,10 @@ export default function AdminOverviewPage() {
                       <span className="w-5 shrink-0 font-mono text-[13px] text-white/65">{i + 1}</span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-white">{m.title}</span>
-                        <span className="block truncate text-white/65">by {m.ownerName}</span>
+                        <span className="block truncate text-white/65">{t('admin.by', { name: m.ownerName })}</span>
                       </span>
                       <span className="shrink-0 text-right font-mono text-[13px] text-white/65">
-                        {formatCount(m.downloadCount)} downloads
+                        {t('admin.ov.nDownloads', { n: formatCount(m.downloadCount) })}
                       </span>
                     </li>
                   ))}
@@ -212,9 +221,9 @@ export default function AdminOverviewPage() {
               )}
             </Panel>
 
-            <Panel title="Recent purchases" action={{ href: '/admin/purchases', label: 'All purchases' }}>
+            <Panel title={t('admin.ov.recent')} action={{ href: '/admin/purchases', label: t('admin.ov.allPurchases') }}>
               {data.recentPurchases.length === 0 ? (
-                <Empty>No paid purchases yet.</Empty>
+                <Empty>{t('admin.ov.noPurchases')}</Empty>
               ) : (
                 <ul className="divide-y divide-white/10">
                   {data.recentPurchases.map((p) => (

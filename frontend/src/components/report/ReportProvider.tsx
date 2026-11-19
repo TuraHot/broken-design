@@ -5,6 +5,7 @@
 import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import Modal from '@/components/ui/Modal';
 import { extractModelId } from '@/lib/complaints';
+import { useT } from '@/lib/i18n/client';
 import ReportForm from './ReportForm';
 
 const ReportContext = createContext<{ openReport: () => void }>({ openReport: () => {} });
@@ -12,6 +13,7 @@ const ReportContext = createContext<{ openReport: () => void }>({ openReport: ()
 export const useReport = () => useContext(ReportContext);
 
 export default function ReportProvider({ children }: { children: React.ReactNode }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [prefill, setPrefill] = useState('');
 
@@ -28,7 +30,7 @@ export default function ReportProvider({ children }: { children: React.ReactNode
     <ReportContext.Provider value={value}>
       {children}
       {open && (
-        <Modal title="Report a problem" onClose={close}>
+        <Modal title={t('report.title')} onClose={close}>
           <ReportForm initialModelRef={prefill} onClose={close} />
         </Modal>
       )}

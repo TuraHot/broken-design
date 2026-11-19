@@ -38,10 +38,13 @@ Model editing in the browser, formats other than `.glb`, real-time collaboration
 - **Model Detail & Cross-Origin Embed:** Model showcase (`/models/[id]`) with 3D preview, license breakdown, copyable `<vm-model>` and `<iframe>` snippets (`/embed/[id]`), and automatic graceful fallback to `preview.glb` when an embed key is missing/invalid/rotated.
 - **Single-Item Purchase & Downloads:** Checkout locking price, currency, and license type at purchase time, mock payment confirmation (`/pay/mock/[id]`), buyer library (`/me`) with `embed_key` viewing/regeneration, and authenticated downloads.
 - **CDN & Multi-Layer GLB Watermarking:** Range/ETag/CORS-enabled CDN streaming plus two-layer GLB watermarking (metadata HMAC signature + 64-vertex X-coordinate steganography) on upload and paid downloads, backed by `/cdn/verify-watermark`.
+- **Docs, Licenses & Legal Pages:** `/docs` (embed guide: `<vm-model>` attributes, iframe, embed keys, downloading, selling, CDN addresses, troubleshooting), `/licenses` (the four licenses compared in plain words) and five **draft** legal pages (`/terms`, `/privacy`, `/seller-terms`, `/refunds`, `/dmca`) linked from the footer. The legal text describes how the platform works today and marks every undecided point as `[TO DECIDE]`; it must be reviewed by a qualified person before real payments.
+- **Languages (English / Thai):** a language button in the Navbar and the admin layout; the choice is kept in a cookie. Translated: Navbar, Footer, account menu, report popup, `/contact`, `/settings`, `/docs`, `/licenses`, the legal pages and `/admin/*`. The other pages are still English until their owners move their text into `lib/i18n/messages.ts`.
+- **Contact & Settings:** `/contact` (report popup button, DMCA / Docs / Licenses / Refunds links) and `/settings` (profile, Log out). Changing the password or profile and deleting the account are not available yet (no API).
 - **Moderation, Complaints & System Error Pages:** User report modal (`openReport`) for flagging models/accounts/purchases, Admin dashboards (`/admin/*`) for overview, model hide/restore, user suspend/restore, purchases, and complaint resolution, plus global `403` / `404` / `500` error pages.
 
 ### Later (Post-v1)
-Docs site (`/docs`), licenses comparison page (`/licenses`), legal pages (Terms, Privacy, Refunds, DMCA), "Report" trigger button directly on `/models/[id]`, forgot-password email flow, creator profile accounts/avatars/donations, embed playground (`/models/[id]/embed`), watermark inspector UI (`/verify`), creator usage stats, key domain locking, real Stripe checkout, likes/comments moderation, and automatic 3D compression (Draco / Meshopt).
+"Report" trigger button directly on `/models/[id]`, forgot-password email flow, creator profile accounts/avatars/donations, embed playground (`/models/[id]/embed`), watermark inspector UI (`/verify`), creator usage stats, key domain locking, real Stripe checkout, likes/comments moderation, and automatic 3D compression (Draco / Meshopt).
 
 ## 7. Key user flows
 1. **Discover → embed:** Landing → Gallery (search / filter) → Model detail → copy embed code → paste on own site.
@@ -66,5 +69,7 @@ Docs site (`/docs`), licenses comparison page (`/licenses`), legal pages (Terms,
 - Payment provider for launch: mock only, or Stripe at launch?
 - Platform fee / creator payout model.
 - Moderation for uploaded files and comments (admin tools cover models, accounts and user complaints; comments have no moderation yet).
-- Legal text (terms, privacy, refunds, DMCA) needs review by someone qualified before real payments.
+- Legal text (terms, privacy, refunds, DMCA) needs review by someone qualified before real payments, in **both** English and Thai.
+- Which pages must be translated into Thai before launch (today: the pages in the Languages item above), and whether more languages are wanted.
+- Public support email address for `/contact` and the copyright contact.
 - Landing copy: the headline is "3D models, one line of code"; confirm it with the team and the site name (Lixyte) before launch.

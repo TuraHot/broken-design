@@ -12,28 +12,25 @@ import { validateGlbFile, computeFileSha256 } from '../../utils/glbValidator';
 import { embedLicenseAndWatermark } from '../../utils/glbWatermark';
 import { requireAuth, requireSeller } from '../../middlewares/auth.middleware';
 import { AppError } from '../../middlewares/error.middleware';
+import { limitedDiskStorage } from './limitedDiskStorage';
 
 export const uploadRouter = Router();
 
 // Ensure temporary upload directory exists
 fs.mkdirSync(path.resolve(env.tmpUploadDir), { recursive: true });
 
-const storageEngine = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    cb(null, path.resolve(env.tmpUploadDir));
+// Each field has its own size limit, enforced while the file is still arriving (see limitedDiskStorage.ts).
+const storageEngine = limitedDiskStorage(
+  env.tmpUploadDir,
+  {
+    file: { bytes: env.maxModelSizeBytes, label: 'Model file' },
+    preview: { bytes: env.maxPreviewSizeBytes, label: 'Preview file' },
+    poster: { bytes: env.maxPosterSizeBytes, label: 'Poster file' },
   },
-  filename: (_req, file, cb) => {
-    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    cb(null, `${uniqueSuffix}-${file.originalname}`);
-  },
-});
+  { bytes: env.maxModelSizeBytes, label: 'File' },
+);
 
-const upload = multer({
-  storage: storageEngine,
-  limits: {
-    fileSize: env.maxModelSizeBytes, // 50MB maximum
-  },
-});
+const upload = multer({ storage: storageEngine });
 
 const uploadFields = upload.fields([
   { name: 'file', maxCount: 1 },
@@ -122,7 +119,7 @@ uploadRouter.post(
         throw new AppError(
           400,
           'PREVIEW_REQUIRED',
-          'Paid models require a preview GLB file (under 50 MB) for public rotation'
+          'Paid models require a preview GLB file (under 5 MB) for public rotation'
         );
       }
 
@@ -139,6 +136,30 @@ uploadRouter.post(
       const validation = await validateGlbFile(modelFile.path);
       if (!validation.valid) {
         throw new AppError(400, 'INVALID_GLB', validation.reason || 'File is not a valid Binary glTF (GLB v2)');
+      }
+
+      // 2b. Check the preview and poster BEFORE anything is stored, so a bad one cannot leave the main file
+      // behind in permanent storage (storage is content-addressed and shared, so it is never deleted on error).
+      if (previewFile) {
+        if (previewFile.size > env.maxPreviewSizeBytes) {
+          throw new AppError(413, 'FILE_TOO_LARGE', `Preview file exceeds limit of ${env.maxPreviewSizeBytes} bytes`);
+        }
+        const previewValidation = await validateGlbFile(previewFile.path);
+        if (!previewValidation.valid) {
+          throw new AppError(400, 'INVALID_GLB', 'Preview file is not a valid GLB (glTF v2)');
+        }
+      }
+
+      const posterFile = files?.['poster']?.[0];
+      if (posterFile) {
+        if (posterFile.size > env.maxPosterSizeBytes) {
+          throw new AppError(413, 'FILE_TOO_LARGE', `Poster file exceeds limit of ${env.maxPosterSizeBytes} bytes`);
+        }
+        const allowedMime = ['image/webp', 'image/png', 'image/jpeg'];
+        const ext = path.extname(posterFile.originalname).toLowerCase();
+        if (!allowedMime.includes(posterFile.mimetype) && !['.webp', '.png', '.jpg', '.jpeg'].includes(ext)) {
+          throw new AppError(400, 'INVALID_POSTER', 'Poster must be a valid image file (.webp, .png, or .jpg)');
+        }
       }
 
       const modelId = crypto.randomUUID();
@@ -167,32 +188,16 @@ uploadRouter.post(
       const fileHash = await computeFileSha256(modelFile.path);
       await storage.put(`${fileHash}.glb`, modelFile.path);
 
-      // 3. Process preview file (if provided or required for paid model)
+      // 3. Store the preview file (already checked above)
       let previewHash: string | null = null;
       if (previewFile) {
-        if (previewFile.size > env.maxPreviewSizeBytes) {
-          throw new AppError(413, 'FILE_TOO_LARGE', `Preview file exceeds limit of ${env.maxPreviewSizeBytes} bytes`);
-        }
-        const previewValidation = await validateGlbFile(previewFile.path);
-        if (!previewValidation.valid) {
-          throw new AppError(400, 'INVALID_GLB', 'Preview file is not a valid GLB (glTF v2)');
-        }
         previewHash = await computeFileSha256(previewFile.path);
         await storage.put(`${previewHash}.glb`, previewFile.path);
       }
 
-      // 4. Process poster image (optional)
+      // 4. Store the poster image (already checked above)
       let posterHash: string | null = null;
-      const posterFile = files?.['poster']?.[0];
       if (posterFile) {
-        if (posterFile.size > env.maxPosterSizeBytes) {
-          throw new AppError(413, 'FILE_TOO_LARGE', `Poster file exceeds limit of ${env.maxPosterSizeBytes} bytes`);
-        }
-        const allowedMime = ['image/webp', 'image/png', 'image/jpeg'];
-        const ext = path.extname(posterFile.originalname).toLowerCase();
-        if (!allowedMime.includes(posterFile.mimetype) && !['.webp', '.png', '.jpg', '.jpeg'].includes(ext)) {
-          throw new AppError(400, 'INVALID_POSTER', 'Poster must be a valid image file (.webp, .png, or .jpg)');
-        }
         posterHash = await computeFileSha256(posterFile.path);
         await storage.put(`${posterHash}.webp`, posterFile.path);
       }

@@ -2,6 +2,7 @@
 
 // Small building blocks shared by the admin pages
 import { useState } from 'react';
+import { useT } from '@/lib/i18n/client';
 
 type Tone = 'neutral' | 'warn' | 'danger';
 
@@ -37,6 +38,7 @@ export function ConfirmAction({
   onConfirm: () => Promise<void>;
   disabled?: boolean;
 }) {
+  const t = useT();
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -55,8 +57,8 @@ export function ConfirmAction({
   }
 
   return (
-    <span role="group" aria-label={`Confirm: ${ariaLabel}`} className="inline-flex items-center gap-2">
-      <span className="text-sm text-white/65">Sure?</span>
+    <span role="group" aria-label={t('admin.confirmGroup', { label: ariaLabel })} className="inline-flex items-center gap-2">
+      <span className="text-sm text-white/65">{t('admin.sure')}</span>
       <button
         type="button"
         disabled={busy}
@@ -71,7 +73,7 @@ export function ConfirmAction({
         }}
         className={`${BTN} border-red-400/60 text-red-300 hover:bg-red-400/10`}
       >
-        {busy ? 'Working…' : 'Yes'}
+        {busy ? t('admin.working') : t('admin.yes')}
       </button>
       <button
         type="button"
@@ -80,7 +82,7 @@ export function ConfirmAction({
         onClick={() => setAsking(false)}
         className={`${BTN} border-white/15 text-white/80 hover:border-white/40 hover:text-white`}
       >
-        Cancel
+        {t('admin.cancel')}
       </button>
     </span>
   );

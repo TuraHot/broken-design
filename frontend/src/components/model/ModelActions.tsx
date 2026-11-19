@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { CDN_SERVICE_URL, CORE_API_URL } from "@/lib/api";
-import { readSession } from "@/lib/session";
+import { readSession, type Session, SESSION_UPDATED_EVENT } from "@/lib/session";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -16,30 +16,51 @@ export default function ModelActions({
   title = "model",
   free,
   priceLabel,
+  ownerId,
+  creator,
 }: {
   modelId?: string;
   title?: string;
   free: boolean;
   priceLabel: string;
+  ownerId?: string;
+  creator?: string;
 }) {
   const router = useRouter();
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
+  const [session, setSession] = useState<Session | null>(null);
   const busyRef = useRef(false);
 
   useEffect(() => {
     const syncSession = () => {
-      setSignedIn(readSession() !== null);
+      const s = readSession();
+      setSession(s);
+      setSignedIn(s !== null);
       setReady(true);
     };
     syncSession();
     window.addEventListener("storage", syncSession);
-    return () => window.removeEventListener("storage", syncSession);
+    window.addEventListener(SESSION_UPDATED_EVENT, syncSession);
+    return () => {
+      window.removeEventListener("storage", syncSession);
+      window.removeEventListener(SESSION_UPDATED_EVENT, syncSession);
+    };
   }, []);
 
   const isRealModel = Boolean(modelId && UUID_RE.test(modelId));
+
+  const isOwner = Boolean(
+    session?.user && (
+      (ownerId && session.user.id === ownerId) ||
+      (creator && (
+        session.user.display_name?.trim().toLowerCase() === creator.trim().toLowerCase() ||
+        (session.user as any).handle?.trim().toLowerCase() === creator.trim().toLowerCase()
+      ))
+    )
+  );
 
   const performDownload = async (id: string, token: string) => {
     const res = await fetch(
@@ -73,6 +94,10 @@ export default function ModelActions({
 
   const handleDownload = async () => {
     if (busyRef.current) return;
+    if (isOwner) {
+      setStatusMsg("คุณเป็นเจ้าของผลงานนี้ — ครีเอเตอร์ไม่สามารถซื้อหรือดาวน์โหลดผลงานของตนเองได้");
+      return;
+    }
     if (!isRealModel || !modelId) {
       setStatusMsg(
         "This is a sample catalogue item — upload or open a real model to download its .glb file.",
@@ -102,6 +127,10 @@ export default function ModelActions({
 
   const handleBuy = async () => {
     if (busyRef.current) return;
+    if (isOwner) {
+      setStatusMsg("คุณเป็นเจ้าของผลงานนี้ — ครีเอเตอร์ไม่สามารถซื้อหรือดาวน์โหลดผลงานของตนเองได้");
+      return;
+    }
     if (!isRealModel || !modelId) {
       setStatusMsg("Checkout is available for uploaded models.");
       return;
@@ -160,21 +189,36 @@ export default function ModelActions({
 
   return (
     <div className="space-y-2">
+      {isOwner && (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-300">
+          <p className="font-semibold">ผลงานของคุณ (Your Model)</p>
+          <p className="mt-0.5 text-amber-200/80">
+            ครีเอเตอร์ไม่สามารถซื้อหรือดาวน์โหลดผลงานของตนเองได้
+          </p>
+        </div>
+      )}
+
       <button
         type="button"
-        disabled={!ready || !signedIn || busy}
+        disabled={!ready || !signedIn || busy || isOwner}
         onClick={free ? handleDownload : handleBuy}
-        className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-white px-3.5 text-[15px] font-medium text-black transition-colors hover:bg-white/85 disabled:cursor-not-allowed disabled:opacity-50"
+        className={`inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg px-3.5 text-[15px] font-medium transition-colors ${
+          isOwner
+            ? "border border-white/15 bg-white/5 text-white/40 cursor-not-allowed"
+            : "bg-white text-black hover:bg-white/85 disabled:cursor-not-allowed disabled:opacity-50"
+        }`}
       >
         {busy && <Loader2 aria-hidden className="h-4 w-4 animate-spin motion-reduce:animate-none" />}
         {busy
           ? "Processing…"
-          : free
-            ? "Get this model (.glb)"
-            : `Buy for ${priceLabel}`}
+          : isOwner
+            ? "Your Model (Cannot Buy/Download)"
+            : free
+              ? "Get this model (.glb)"
+              : `Buy for ${priceLabel}`}
       </button>
 
-      {!free && isRealModel && (
+      {!free && isRealModel && !isOwner && (
         <button
           type="button"
           disabled={!ready || !signedIn || busy}

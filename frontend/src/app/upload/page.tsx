@@ -17,9 +17,15 @@ import {
   FileCode,
   ArrowRight,
   RefreshCw,
+  Check,
+  ChevronDown,
+  Plus,
+  X,
 } from 'lucide-react';
-import { CDN_SERVICE_URL } from '@/lib/api';
+import { CDN_SERVICE_URL, CORE_API_URL } from '@/lib/api';
+import { GALLERY_TAGS } from '@/lib/types';
 import { readToken } from '@/lib/session';
+import CropPosterModal from '@/components/upload/CropPosterModal';
 
 // Supported licenses
 const LICENSES = [
@@ -59,6 +65,9 @@ export default function UploadPage() {
   const [description, setDescription] = useState('');
   const [tagsInput, setTagsInput] = useState('');
   const [tags, setTags] = useState<string[]>([]);
+  const [availableTags, setAvailableTags] = useState<string[]>([...GALLERY_TAGS]);
+  const [isTagDropdownOpen, setIsTagDropdownOpen] = useState(false);
+  const tagDropdownRef = useRef<HTMLDivElement>(null);
   const [license, setLicense] = useState<string>('CC0');
   const [isPaid, setIsPaid] = useState(false);
   const [priceUsd, setPriceUsd] = useState('5.00');
@@ -71,14 +80,60 @@ export default function UploadPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState<{ id: string; file_hash: string } | null>(null);
   const [capturingPoster, setCapturingPoster] = useState(false);
+  const [cropSnapshotUrl, setCropSnapshotUrl] = useState<string | null>(null);
+  const [isCropModalOpen, setIsCropModalOpen] = useState(false);
 
   // Clean up object URLs on change
   useEffect(() => {
     return () => {
       if (fileUrl) URL.revokeObjectURL(fileUrl);
       if (posterPreviewUrl) URL.revokeObjectURL(posterPreviewUrl);
+      if (cropSnapshotUrl) URL.revokeObjectURL(cropSnapshotUrl);
     };
-  }, [fileUrl, posterPreviewUrl]);
+  }, [fileUrl, posterPreviewUrl, cropSnapshotUrl]);
+
+  // Load available tags dynamically from Core API + default tags
+  useEffect(() => {
+    async function loadTags() {
+      try {
+        const res = await fetch(`${CORE_API_URL}/api/models/tags`);
+        if (res.ok) {
+          const data = (await res.json()) as { tags?: string[] };
+          if (Array.isArray(data.tags)) {
+            setAvailableTags((prev) => {
+              const set = new Set([
+                ...prev,
+                ...data.tags!.map((t: string) => t.trim().toLowerCase()).filter(Boolean),
+              ]);
+              return Array.from(set);
+            });
+          }
+        }
+      } catch {
+        // Core API offline / error fallback
+      }
+    }
+    loadTags();
+  }, []);
+
+  // Close tag dropdown on outside click or Escape
+  useEffect(() => {
+    if (!isTagDropdownOpen) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (!tagDropdownRef.current?.contains(e.target as Node)) {
+        setIsTagDropdownOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsTagDropdownOpen(false);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [isTagDropdownOpen]);
 
   // Client-side GLB magic bytes validator
   const validateGlbHeaderClient = async (f: File): Promise<boolean> => {
@@ -131,23 +186,35 @@ export default function UploadPage() {
     }
   };
 
-  // Add tag
-  const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' || e.key === ',') {
-      e.preventDefault();
-      const val = tagsInput.trim().toLowerCase();
-      if (val && !tags.includes(val)) {
-        setTags([...tags, val]);
-        setTagsInput('');
-      }
+  // Toggle tag selection from dropdown
+  const toggleTag = (tagOption: string) => {
+    const norm = tagOption.trim().toLowerCase();
+    if (!norm) return;
+    if (tags.includes(norm)) {
+      setTags(tags.filter((t) => t !== norm));
+    } else {
+      setTags([...tags, norm]);
     }
+  };
+
+  // Add tag (from custom input or key press)
+  const handleAddNewTag = (customVal?: string) => {
+    const val = (customVal ?? tagsInput).trim().toLowerCase();
+    if (!val) return;
+    if (!tags.includes(val)) {
+      setTags([...tags, val]);
+    }
+    if (!availableTags.includes(val)) {
+      setAvailableTags((prev) => [...prev, val]);
+    }
+    setTagsInput('');
   };
 
   const removeTag = (tagToRemove: string) => {
     setTags(tags.filter((t) => t !== tagToRemove));
   };
 
-  // Capture poster snapshot automatically via <model-viewer>.toBlob()
+  // Capture poster snapshot automatically via <model-viewer>.toBlob() and open crop modal
   const handleCapturePoster = async () => {
     if (!viewerRef.current || typeof viewerRef.current.toBlob !== 'function') {
       setValidationError('3D Viewer is not ready to capture poster yet.');
@@ -157,21 +224,40 @@ export default function UploadPage() {
     try {
       setCapturingPoster(true);
       const blob: Blob | null = await viewerRef.current.toBlob({
-        mimeType: 'image/webp',
-        qualityArgument: 0.85,
+        mimeType: 'image/png',
         idealAspect: true,
       });
       if (!blob) throw new Error('Could not capture frame from 3D viewer');
 
-      const posterBlobFile = new File([blob], `${title || 'model'}-poster.webp`, { type: 'image/webp' });
-      setPosterFile(posterBlobFile);
-      if (posterPreviewUrl) URL.revokeObjectURL(posterPreviewUrl);
-      setPosterPreviewUrl(URL.createObjectURL(posterBlobFile));
+      if (cropSnapshotUrl) URL.revokeObjectURL(cropSnapshotUrl);
+      const tempUrl = URL.createObjectURL(blob);
+      setCropSnapshotUrl(tempUrl);
+      setIsCropModalOpen(true);
     } catch (err: any) {
       setValidationError(`Failed to capture poster: ${err.message}`);
     } finally {
       setCapturingPoster(false);
     }
+  };
+
+  const handleApplyCroppedPoster = (croppedBlob: Blob) => {
+    const posterBlobFile = new File([croppedBlob], `${title || 'model'}-poster.webp`, { type: 'image/webp' });
+    setPosterFile(posterBlobFile);
+    if (posterPreviewUrl) URL.revokeObjectURL(posterPreviewUrl);
+    setPosterPreviewUrl(URL.createObjectURL(posterBlobFile));
+    if (cropSnapshotUrl) {
+      URL.revokeObjectURL(cropSnapshotUrl);
+      setCropSnapshotUrl(null);
+    }
+    setIsCropModalOpen(false);
+  };
+
+  const handleCloseCropModal = () => {
+    if (cropSnapshotUrl) {
+      URL.revokeObjectURL(cropSnapshotUrl);
+      setCropSnapshotUrl(null);
+    }
+    setIsCropModalOpen(false);
   };
 
   // Handle Form Submit
@@ -239,6 +325,9 @@ export default function UploadPage() {
     setPreviewFile(null);
     setPosterFile(null);
     setPosterPreviewUrl(null);
+    if (cropSnapshotUrl) URL.revokeObjectURL(cropSnapshotUrl);
+    setCropSnapshotUrl(null);
+    setIsCropModalOpen(false);
     setTitle('');
     setDescription('');
     setTags([]);
@@ -528,38 +617,120 @@ export default function UploadPage() {
                 />
               </div>
 
-              {/* Tags Input */}
+              {/* Tags Dropdown & Selection */}
               <div>
-                <label className="block text-xs font-mono uppercase tracking-wider text-white/60 mb-1.5">
-                  Tags (Press Enter or comma to add)
-                </label>
-                <div className="rounded-lg border border-white/15 bg-white/5 p-2">
-                  <div className="flex flex-wrap gap-1.5 mb-1.5">
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-mono uppercase tracking-wider text-white/60">
+                    Tags
+                  </label>
+                  <span className="text-[11px] text-white/40">Select tag or type new tag</span>
+                </div>
+
+                {/* Selected Tag Badges */}
+                {tags.length > 0 && (
+                  <div className="mb-2 flex flex-wrap gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] p-2">
                     {tags.map((t) => (
                       <span
                         key={t}
-                        className="inline-flex items-center gap-1 rounded bg-white/10 px-2.5 py-0.5 text-xs text-white"
+                        className="inline-flex items-center gap-1.5 rounded-md border border-white/20 bg-white/10 px-2.5 py-1 text-xs text-white"
                       >
-                        <Tag className="h-3 w-3 text-blue-400" />
-                        {t}
+                        <Tag className="h-3 w-3 text-hud" />
+                        <span className="capitalize">{t}</span>
                         <button
                           type="button"
                           onClick={() => removeTag(t)}
-                          className="ml-1 text-white/50 hover:text-white"
+                          className="ml-0.5 text-white/50 hover:text-white transition-colors"
+                          title="Remove tag"
                         >
-                          ✕
+                          <X className="h-3 w-3" />
                         </button>
                       </span>
                     ))}
                   </div>
-                  <input
-                    type="text"
-                    placeholder={tags.length === 0 ? "e.g. character, weapon, vehicle, pbr" : "Add more tags..."}
-                    value={tagsInput}
-                    onChange={(e) => setTagsInput(e.target.value)}
-                    onKeyDown={handleTagKeyDown}
-                    className="w-full bg-transparent px-1.5 py-1 text-xs text-white placeholder:text-white/30 focus:outline-none"
-                  />
+                )}
+
+                {/* Dropdown & Input Controls */}
+                <div className="grid gap-2 sm:grid-cols-[1fr,auto]">
+                  {/* Dropdown Selector */}
+                  <div ref={tagDropdownRef} className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setIsTagDropdownOpen((prev) => !prev)}
+                      aria-expanded={isTagDropdownOpen}
+                      aria-haspopup="listbox"
+                      className="flex h-10 w-full items-center justify-between rounded-lg border border-white/15 bg-white/5 px-3.5 text-sm text-white hover:border-white/30 focus:border-white/50 focus:outline-none transition-colors"
+                    >
+                      <span className="flex items-center gap-2 truncate">
+                        <Tag className="h-4 w-4 text-white/40 shrink-0" />
+                        <span className={tags.length === 0 ? 'text-white/40' : 'text-white'}>
+                          {tags.length === 0
+                            ? 'Choose tags from list...'
+                            : `${tags.length} tag${tags.length > 1 ? 's' : ''} selected`}
+                        </span>
+                      </span>
+                      <ChevronDown
+                        className={`h-4 w-4 text-white/60 transition-transform ${isTagDropdownOpen ? 'rotate-180' : ''}`}
+                      />
+                    </button>
+
+                    {isTagDropdownOpen && (
+                      <ul
+                        role="listbox"
+                        className="absolute left-0 top-full z-30 mt-1.5 max-h-64 w-full overflow-y-auto rounded-lg border border-white/15 bg-black/95 p-1.5 shadow-2xl backdrop-blur"
+                      >
+                        <li className="px-2 py-1 text-[11px] font-mono uppercase tracking-wider text-hud/70 border-b border-white/10 mb-1">
+                          Available Tags ({availableTags.length})
+                        </li>
+                        {availableTags.map((opt) => {
+                          const isSelected = tags.includes(opt);
+                          return (
+                            <li key={opt}>
+                              <button
+                                type="button"
+                                role="option"
+                                aria-selected={isSelected}
+                                onClick={() => toggleTag(opt)}
+                                className={`flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-left text-sm transition-colors ${
+                                  isSelected
+                                    ? 'bg-white/15 text-white font-medium'
+                                    : 'text-white/70 hover:bg-white/10 hover:text-white'
+                                }`}
+                              >
+                                <span className="capitalize">{opt}</span>
+                                {isSelected && <Check className="h-4 w-4 text-emerald-400" />}
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
+
+                  {/* Custom Tag Add Input */}
+                  <div className="flex gap-1.5">
+                    <input
+                      type="text"
+                      placeholder="New tag name..."
+                      value={tagsInput}
+                      onChange={(e) => setTagsInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ',') {
+                          e.preventDefault();
+                          handleAddNewTag();
+                        }
+                      }}
+                      className="h-10 w-full sm:w-44 rounded-lg border border-white/15 bg-white/5 px-3 text-xs text-white placeholder:text-white/30 focus:border-white/50 focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleAddNewTag()}
+                      disabled={!tagsInput.trim()}
+                      className="inline-flex h-10 items-center gap-1 rounded-lg border border-white/20 bg-white/10 px-3 text-xs font-medium text-white hover:bg-white/20 disabled:opacity-40 disabled:hover:bg-white/10 transition-colors"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Add
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -654,6 +825,16 @@ export default function UploadPage() {
           </form>
         )}
       </div>
+
+      {/* Crop Poster Selection Modal */}
+      {isCropModalOpen && cropSnapshotUrl && (
+        <CropPosterModal
+          imageUrl={cropSnapshotUrl}
+          onConfirm={handleApplyCroppedPoster}
+          onClose={handleCloseCropModal}
+          modelTitle={title}
+        />
+      )}
     </main>
   );
 }

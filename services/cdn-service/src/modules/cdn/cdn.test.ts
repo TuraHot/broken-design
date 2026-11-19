@@ -443,6 +443,14 @@ test("download paid model: login + purchase (or owner) required", async () => {
   assert.equal(downloadIncrements.length, 2);
 });
 
+test("download: creator role downloading own model is blocked with 403 OWN_MODEL", async () => {
+  const res = await get(`/models/${PAID_ID}/download`, {
+    Authorization: `Bearer ${token(OWNER, "creator")}`,
+  });
+  assert.equal(res.status, 403);
+  assert.equal(await errCode(res), "OWN_MODEL");
+});
+
 test("download: suspended downloader is blocked", async () => {
   users[BUYER].suspended_at = new Date();
   const res = await get(`/models/${PAID_ID}/download`, {

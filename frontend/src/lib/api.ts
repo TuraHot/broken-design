@@ -1,17 +1,18 @@
 import { cache } from 'react';
 import { buildProfile, creatorHandle, type CreatorProfile } from './creators';
 import { isPublicModel, PAGE_SIZE, queryModels } from './pagination';
-import type {
-  Model,
-  ModelsPage,
-  ModelsParams,
-  PurchaseDetail,
-  PurchaseItem,
-  QrPaymentResponse,
-  SellerModelItem,
-  SellerSalesSummary,
-  SellerWalletResponse,
-  SellerWithdrawal,
+import {
+  GALLERY_TAGS,
+  type Model,
+  type ModelsPage,
+  type ModelsParams,
+  type PurchaseDetail,
+  type PurchaseItem,
+  type QrPaymentResponse,
+  type SellerModelItem,
+  type SellerSalesSummary,
+  type SellerWalletResponse,
+  type SellerWithdrawal,
 } from './types';
 
 export const CORE_API_URL = process.env.NEXT_PUBLIC_CORE_API_URL || 'http://localhost:4000';
@@ -97,6 +98,26 @@ export async function fetchModels(params: ModelsParams): Promise<ModelsPage> {
   }
 
   return queryModels([], params);
+}
+
+/** Get list of all distinct tags across models, merged with default GALLERY_TAGS */
+export async function fetchAvailableTags(): Promise<string[]> {
+  try {
+    const res = await fetch(`${getServerCoreApiUrl()}/api/models/tags`, { cache: 'no-store' });
+    if (res.ok) {
+      const data = (await res.json()) as { tags?: string[] };
+      if (Array.isArray(data.tags)) {
+        const set = new Set([
+          ...GALLERY_TAGS,
+          ...data.tags.map((t: string) => t.trim().toLowerCase()).filter(Boolean),
+        ]);
+        return Array.from(set);
+      }
+    }
+  } catch {
+    // Core API offline
+  }
+  return [...GALLERY_TAGS];
 }
 
 /** One model for its detail page, or `null` when it does not exist. */

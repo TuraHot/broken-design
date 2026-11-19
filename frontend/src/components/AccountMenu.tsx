@@ -70,19 +70,25 @@ export default function AccountMenu() {
     router.push('/');
   };
 
-  // Same size as the Log in button, hidden until we know whether someone is signed in (no flicker or shift).
-  const loginButton = (
-    <Link
-      href="/login"
-      className={`whitespace-nowrap rounded-lg bg-white px-3 py-1.5 font-medium text-black transition-colors hover:bg-white/85 sm:px-3.5 ${
-        ready ? '' : 'invisible'
-      }`}
-    >
-      {t('nav.login')}
-    </Link>
+  // Shown when signed out, hidden until we know whether someone is signed in (no flicker or shift).
+  const authButtons = (
+    <div className={`flex items-center gap-1.5 sm:gap-2 ${ready ? '' : 'invisible'}`}>
+      <Link
+        href="/login"
+        className="inline-flex h-9 items-center whitespace-nowrap rounded-lg px-2.5 text-[14px] font-medium text-white/75 transition-colors hover:bg-white/10 hover:text-white sm:px-3 sm:text-[15px]"
+      >
+        {t('nav.login')}
+      </Link>
+      <Link
+        href="/register"
+        className="inline-flex h-9 items-center whitespace-nowrap rounded-lg bg-white px-3 text-[14px] font-medium text-black transition-colors hover:bg-white/85 sm:px-3.5 sm:text-[15px]"
+      >
+        {t('nav.register')}
+      </Link>
+    </div>
   );
 
-  if (!session) return loginButton;
+  if (!session) return authButtons;
 
   const { user } = session;
   const name = user.display_name?.trim() || user.email;

@@ -15,6 +15,7 @@ const en = {
   'nav.openSearch': 'Open search',
   'nav.closeSearch': 'Close search',
   'nav.login': 'Log in',
+  'nav.register': 'Register',
   'lang.switchTo': 'Switch language to Thai',
 
   // Account menu
@@ -280,6 +281,7 @@ const th: Record<MessageKey, string> = {
   'nav.openSearch': 'เปิดช่องค้นหา',
   'nav.closeSearch': 'ปิดช่องค้นหา',
   'nav.login': 'ล็อกอิน',
+  'nav.register': 'สมัครสมาชิก',
   'lang.switchTo': 'Switch language to English',
 
   'menu.account': 'เมนูบัญชีของ {name}',

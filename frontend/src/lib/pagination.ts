@@ -1,7 +1,58 @@
-// Gallery helpers: search/filter/page params <-> URL, popularity sort and slicing.
+// Gallery helpers: search/filter/page params <-> URL, visibility guard, popularity sort and slicing.
 import type { License, Model, ModelsPage, ModelsParams } from './types';
 
 export const PAGE_SIZE = 48;
+
+type ModelVisibilityFields = {
+  isHidden?: boolean;
+  hidden?: boolean;
+  hiddenAt?: string | null;
+  hidden_at?: string | null;
+  isBanned?: boolean;
+  banned?: boolean;
+  bannedAt?: string | null;
+  banned_at?: string | null;
+  isDeleted?: boolean;
+  deleted?: boolean;
+  deletedAt?: string | null;
+  deleted_at?: string | null;
+  ownerSuspendedAt?: string | null;
+  owner_suspended_at?: string | null;
+  status?: string;
+  owner?: { isSuspended?: boolean; suspendedAt?: string | null; suspended_at?: string | null };
+};
+
+/** True only for models that are not hidden/banned, not soft-deleted, and not owned by a suspended user. */
+export function isPublicModel(model: Model & ModelVisibilityFields): boolean {
+  if (
+    model.isHidden ||
+    model.hidden ||
+    model.hiddenAt != null ||
+    model.hidden_at != null ||
+    model.isBanned ||
+    model.banned ||
+    model.bannedAt != null ||
+    model.banned_at != null
+  ) {
+    return false;
+  }
+  if (model.isDeleted || model.deleted || model.deletedAt != null || model.deleted_at != null) {
+    return false;
+  }
+  if (
+    model.owner?.isSuspended ||
+    model.owner?.suspendedAt != null ||
+    model.owner?.suspended_at != null ||
+    model.ownerSuspendedAt != null ||
+    model.owner_suspended_at != null
+  ) {
+    return false;
+  }
+  if (typeof model.status === 'string' && ['hidden', 'banned', 'deleted', 'suspended'].includes(model.status.toLowerCase())) {
+    return false;
+  }
+  return true;
+}
 
 const VALID_TAGS: readonly string[] = ['character', 'vehicle', 'architecture', 'nature', 'sci-fi', 'props', 'abstract', 'animal'];
 const VALID_LICENSES: readonly string[] = ['CC0', 'CC-BY', 'CC-BY-NC', 'COMMERCIAL'];
@@ -56,6 +107,7 @@ export function buildHref(params: ModelsParams): string {
 export function queryModels(models: Model[], params: ModelsParams, pageSize = PAGE_SIZE): ModelsPage {
   const q = params.q?.trim().toLowerCase();
   const filtered = models.filter((m) => {
+    if (!isPublicModel(m)) return false;
     if (q) {
       const inTitle = m.title.toLowerCase().includes(q);
       const inDesc = (m.description ?? '').toLowerCase().includes(q);

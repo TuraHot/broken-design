@@ -212,7 +212,7 @@ broken-design/
 │   │   ├── lib/
 │   │   │   ├── api.ts, auth.ts, auth-paths.ts, session.ts
 │   │   │   ├── admin-api.ts, admin-view.ts, complaints.ts
-│   │   │   ├── creators.ts, format.ts, licenses.ts, mock-models.ts, types.ts
+│   │   │   ├── creators.ts, format.ts, licenses.ts, types.ts
 │   │   │   └── pagination.ts & pagination.test.mjs (4 test cases)
 │   │   └── types/model-viewer.d.ts
 │   ├── next.config.ts, tailwind.config.ts, postcss.config.mjs, tsconfig.json

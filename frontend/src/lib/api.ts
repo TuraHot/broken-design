@@ -1,7 +1,6 @@
 import { cache } from 'react';
 import { buildProfile, creatorHandle, type CreatorProfile } from './creators';
 import { PAGE_SIZE, queryModels } from './pagination';
-import { MOCK_MODELS } from './mock-models';
 import type {
   Model,
   ModelsPage,
@@ -23,8 +22,6 @@ function getServerCoreApiUrl(): string {
   return CORE_API_URL;
 }
 
-// Mock data is merged with real database models (via Core API) unless NEXT_PUBLIC_USE_MOCK=false.
-const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK !== 'false';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function buildModelSearchParams(params: ModelsParams, pageSize?: number): URLSearchParams {
@@ -72,14 +69,8 @@ const fetchCoreApiModelById = cache(async (id: string): Promise<Model | null> =>
   }
 });
 
-/** List models for the gallery (paged, real database models from Core API + optional mock catalogue). */
+/** List models for the gallery (paged, real database models from Core API). */
 export async function fetchModels(params: ModelsParams): Promise<ModelsPage> {
-  if (USE_MOCK) {
-    const apiModels = await fetchCoreApiModels();
-    const combined = [...apiModels, ...MOCK_MODELS];
-    return queryModels(combined, params);
-  }
-
   try {
     const sp = buildModelSearchParams(params);
     const res = await fetch(`${getServerCoreApiUrl()}/api/models?${sp}`, { cache: 'no-store' });
@@ -108,16 +99,14 @@ export async function fetchModel(id: string): Promise<Model | null> {
     if (fromApi) return fromApi;
   }
 
-  if (USE_MOCK) return MOCK_MODELS.find((m) => m.id === id) ?? null;
   return null;
 }
 
 /** Other models by the same creator (most popular first), for the "More from" row. */
 export async function fetchMoreFromCreator(model: Model, limit = 4): Promise<Model[]> {
   const apiModels = await fetchCoreApiModels();
-  const pool = USE_MOCK ? [...apiModels, ...MOCK_MODELS] : apiModels;
   return queryModels(
-    pool.filter((m) => m.creator === model.creator && m.id !== model.id),
+    apiModels.filter((m) => m.creator === model.creator && m.id !== model.id),
     {},
     limit,
   ).items;
@@ -126,17 +115,14 @@ export async function fetchMoreFromCreator(model: Model, limit = 4): Promise<Mod
 /** A creator profile by handle (see `creatorHandle`), or `null` when nobody has that handle. */
 export async function fetchCreator(handle: string): Promise<CreatorProfile | null> {
   const apiModels = await fetchCoreApiModels();
-  const pool = USE_MOCK ? [...apiModels, ...MOCK_MODELS] : apiModels;
-  const mine = pool.filter((m) => creatorHandle(m.creator) === handle);
+  const mine = apiModels.filter((m) => creatorHandle(m.creator) === handle);
   if (mine.length > 0) return buildProfile(mine[0].creator, mine);
 
-  if (!USE_MOCK) {
-    try {
-      const res = await fetch(`${getServerCoreApiUrl()}/api/creators/${encodeURIComponent(handle)}`, { cache: 'no-store' });
-      if (res.ok) return (await res.json()) as CreatorProfile;
-    } catch {
-      return null;
-    }
+  try {
+    const res = await fetch(`${getServerCoreApiUrl()}/api/creators/${encodeURIComponent(handle)}`, { cache: 'no-store' });
+    if (res.ok) return (await res.json()) as CreatorProfile;
+  } catch {
+    // Core API offline
   }
   return null;
 }

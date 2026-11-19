@@ -7,6 +7,7 @@ import { FormEvent, MouseEvent, useEffect, useState, useTransition } from 'react
 import { Loader2, Search, X } from 'lucide-react';
 import { startNavigationLoading } from '@/components/ui/NavigationProgress';
 import { hidesPublicChrome } from '@/lib/auth-paths';
+import { readSession } from '@/lib/session';
 import { useT } from '@/lib/i18n/client';
 import type { MessageKey } from '@/lib/i18n/messages';
 import AccountMenu from './AccountMenu';
@@ -27,9 +28,22 @@ export default function Navbar() {
   const [mobileSearch, setMobileSearch] = useState(false);
   const [pendingHref, setPendingHref] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [isCreator, setIsCreator] = useState(false);
 
   useEffect(() => {
     setPendingHref(null);
+  }, [pathname]);
+
+  // A signed-in creator goes straight to the dashboard from the Creator link; everyone else sees the landing page.
+  // Read again on every page change so logging in or out in this tab is picked up (the storage event only fires in other tabs).
+  useEffect(() => {
+    const update = () => {
+      const user = readSession()?.user;
+      setIsCreator(Boolean(user && user.role !== 'admin' && (user.is_seller || user.role === 'creator')));
+    };
+    update();
+    window.addEventListener('storage', update);
+    return () => window.removeEventListener('storage', update);
   }, [pathname]);
 
   const handleNavClick = (href: string) => (e: MouseEvent<HTMLAnchorElement>) => {
@@ -93,7 +107,8 @@ export default function Navbar() {
         </Link>
 
         <ul className={`flex items-center gap-3 text-sm sm:gap-5 sm:text-[15px] ${pendingHref !== null ? 'pointer-events-none' : ''}`}>
-          {LINKS.map(({ href, label, desktopOnly }) => {
+          {LINKS.map(({ href: baseHref, label, desktopOnly }) => {
+            const href = baseHref === '/creator' && isCreator ? '/seller' : baseHref;
             const active = pathname === href || pathname.startsWith(`${href}/`);
             const loading = pendingHref === href;
             return (

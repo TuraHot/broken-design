@@ -30,14 +30,24 @@ sellerRouter.post('/enable', requireAuth, async (req, res) => {
   const userId = req.user!.id;
 
   const result = await db.query(
-    `UPDATE users SET is_seller = TRUE WHERE id = $1 AND is_seller = FALSE RETURNING id`,
+    `UPDATE users SET is_seller = TRUE
+     WHERE id = $1 AND is_seller = FALSE AND role <> 'admin' AND suspended_at IS NULL
+     RETURNING id`,
     [userId],
   );
 
   if (result.rowCount === 0) {
-    // อาจเป็นคนขายอยู่แล้ว
-    const check = await db.query(`SELECT is_seller FROM users WHERE id = $1`, [userId]);
-    if (check.rowCount! > 0 && check.rows[0].is_seller) {
+    // ไม่ได้อัปเดต: หาสาเหตุจาก DB (ไม่เชื่อ role ใน JWT)
+    const check = await db.query(`SELECT is_seller, role, suspended_at FROM users WHERE id = $1`, [userId]);
+    if (check.rowCount === 0) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
+    const row = check.rows[0];
+    if (row.role === 'admin') {
+      throw new AppError(403, 'ADMIN_CANNOT_SELL', 'Admin accounts cannot become sellers');
+    }
+    if (row.suspended_at !== null) {
+      throw new AppError(403, 'ACCOUNT_SUSPENDED', 'Your account has been suspended by an administrator');
+    }
+    if (row.is_seller) {
       res.json({ message: 'Seller mode is already enabled' });
       return;
     }

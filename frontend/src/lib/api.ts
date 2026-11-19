@@ -131,6 +131,19 @@ export async function fetchCreator(handle: string): Promise<CreatorProfile | nul
   return null;
 }
 
+/**
+ * A failed API call. `fromServer` is true when `message` is text the API wrote (shown as written); false when it is
+ * our own fallback ("Request failed (500)"), which pages replace with a translated text.
+ */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public fromServer: boolean,
+  ) {
+    super(message);
+  }
+}
+
 /** Shared authenticated JSON fetch helper for buyer and seller actions. */
 async function coreApiFetch<T>(path: string, token: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(`${CORE_API_URL}${path}`, {
@@ -142,7 +155,8 @@ async function coreApiFetch<T>(path: string, token: string, init: RequestInit = 
   });
   if (!res.ok) {
     const err = await res.json().catch(() => null);
-    throw new Error(err?.error?.message || `Request failed (${res.status})`);
+    const message = err?.error?.message;
+    throw message ? new ApiError(message, true) : new ApiError(`Request failed (${res.status})`, false);
   }
   return res.json() as Promise<T>;
 }

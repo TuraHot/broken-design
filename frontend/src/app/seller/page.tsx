@@ -32,17 +32,13 @@ import {
 import { creatorHandle } from '@/lib/creators';
 import { formatMoney, formatPrice } from '@/lib/format';
 import { useLocale, useT } from '@/lib/i18n/client';
-import type { MessageKey } from '@/lib/i18n/messages';
+import { fromErr, type Msg } from '@/lib/i18n/msg';
 import type {
   AuthUser,
   SellerModelItem,
   SellerSalesSummary,
   SellerWalletResponse,
 } from '@/lib/types';
-
-// A status line is either a translated key (follows the language switch) or text the server wrote.
-type Msg = { key: MessageKey; vars?: Record<string, string | number> } | { text: string };
-const fromErr = (err: any, key: MessageKey): Msg => (err?.message ? { text: err.message } : { key });
 
 const CARD = 'rounded-lg border border-white/10 bg-white/5 p-5 sm:p-6';
 const LABEL = 'font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70';

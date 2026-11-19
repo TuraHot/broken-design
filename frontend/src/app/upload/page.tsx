@@ -21,9 +21,7 @@ import {
 import { CDN_SERVICE_URL } from '@/lib/api';
 import { useT } from '@/lib/i18n/client';
 import type { MessageKey } from '@/lib/i18n/messages';
-
-// An error line is either a translated key (follows the language switch) or text the server wrote.
-type Msg = { key: MessageKey; vars?: Record<string, string | number> } | { text: string };
+import { msgText as renderMsg, type Msg } from '@/lib/i18n/msg';
 
 // Supported licenses
 const LICENSES = [
@@ -43,7 +41,7 @@ const DEV_CREATOR_TOKEN =
 
 export default function UploadPage() {
   const t = useT();
-  const msgText = (m: Msg) => ('key' in m ? t(m.key, m.vars) : m.text);
+  const msgText = (m: Msg) => renderMsg(m, t);
   // Model-viewer dynamic import for client-side WebGL
   const [modelViewerLoaded, setModelViewerLoaded] = useState(false);
   const viewerRef = useRef<any>(null);

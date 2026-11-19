@@ -18,7 +18,7 @@ import { CDN_SERVICE_URL, fetchMyPurchases } from '@/lib/api';
 import { formatDate, formatMoney } from '@/lib/format';
 import { readSession } from '@/lib/session';
 import { useT } from '@/lib/i18n/client';
-import { fromErr, msgText, type Msg } from '@/lib/i18n/msg';
+import { fromErr, msgText, serverError, type Msg } from '@/lib/i18n/msg';
 import type { PurchaseItem } from '@/lib/types';
 
 const CARD = 'rounded-lg border border-white/10 bg-white/5 p-5 sm:p-6';
@@ -90,7 +90,7 @@ function CheckoutSuccessContent() {
       );
       if (!res.ok) {
         const body = await res.json().catch(() => null);
-        throw new Error(body?.error?.message || t('pay.errDownloadStatus', { status: res.status }));
+        throw body?.error?.message ? serverError(body.error.message) : new Error('download failed');
       }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);

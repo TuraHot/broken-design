@@ -3,6 +3,7 @@
 export const accountEn = {
   // ── shared ──
   'acct.close': '[Close]',
+  'common.errNetwork': 'Cannot reach the server. Please try again.',
   'acct.view': 'View',
   'acct.free': 'Free',
   'acct.errLoadPurchases': 'Could not load your purchases.',
@@ -45,7 +46,6 @@ export const accountEn = {
   'me.snippet': 'Web Component Snippet:',
   'me.snippetCopied': '✓ Copied Code',
   'me.snippetCopy': 'Copy <vm-model>',
-  'me.dlFailedStatus': 'Download failed ({status})',
   'me.dlFailed': 'Download failed.',
   'me.dlStarted': 'Downloading {title}.glb (watermarked for your account)',
 
@@ -198,6 +198,7 @@ export const accountEn = {
 
 export const accountTh: Record<keyof typeof accountEn, string> = {
   'acct.close': '[ปิด]',
+  'common.errNetwork': 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาลองอีกครั้ง',
   'acct.view': 'ดู',
   'acct.free': 'ฟรี',
   'acct.errLoadPurchases': 'โหลดรายการที่ซื้อไม่สำเร็จ',
@@ -239,7 +240,6 @@ export const accountTh: Record<keyof typeof accountEn, string> = {
   'me.snippet': 'โค้ด Web Component:',
   'me.snippetCopied': '✓ คัดลอกโค้ดแล้ว',
   'me.snippetCopy': 'คัดลอก <vm-model>',
-  'me.dlFailedStatus': 'ดาวน์โหลดไม่สำเร็จ ({status})',
   'me.dlFailed': 'ดาวน์โหลดไม่สำเร็จ',
   'me.dlStarted': 'กำลังดาวน์โหลด {title}.glb (ฝังลายน้ำของบัญชีคุณ)',
 

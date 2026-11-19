@@ -309,3 +309,156 @@ sellerRouter.post('/withdraw', requireAuth, requireSeller, async (req, res) => {
     },
   });
 });
+
+// ─── 7. GET /api/seller/application ─────────────────────────────────────────
+// ดูสถานะคำขอเป็น Creator ล่าสุดของผู้ใช้ปัจจุบัน
+sellerRouter.get('/application', requireAuth, async (req, res) => {
+  const userId = req.user!.id;
+  const result = await db.query(
+    `SELECT id, note, status, admin_note, created_at, reviewed_at
+     FROM creator_applications
+     WHERE user_id = $1
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    [userId],
+  );
+  if (result.rowCount === 0) {
+    res.json({ application: null });
+    return;
+  }
+  const r = result.rows[0];
+  res.json({
+    application: {
+      id: r.id,
+      note: r.note ?? '',
+      status: r.status,
+      adminNote: r.admin_note ?? null,
+      createdAt: r.created_at,
+      reviewedAt: r.reviewed_at ?? null,
+    },
+  });
+});
+
+// ─── 8. POST /api/seller/apply ──────────────────────────────────────────────
+// ส่งคำขอเป็น Creator (หลังยอมรับกฎ) — ถ้ามี Creator Invite Code ที่ถูกต้องจะเป็น Creator ทันที ถ้าไม่มีจะส่งให้แอดมินอนุมัติ
+sellerRouter.post('/apply', requireAuth, async (req, res) => {
+  const userId = req.user!.id;
+  const note = typeof req.body?.note === 'string' ? req.body.note.trim().slice(0, 1000) : '';
+  const rawInviteCode = typeof req.body?.inviteCode === 'string' ? req.body.inviteCode.trim() : '';
+
+  const userRes = await db.query(
+    `SELECT is_seller, role, suspended_at FROM users WHERE id = $1`,
+    [userId],
+  );
+  if (userRes.rowCount === 0) {
+    throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
+  }
+  const u = userRes.rows[0];
+  if (u.role === 'admin') {
+    throw new AppError(403, 'ADMIN_CANNOT_SELL', 'Admin accounts cannot become creators');
+  }
+  if (u.suspended_at !== null) {
+    throw new AppError(403, 'ACCOUNT_SUSPENDED', 'Your account has been suspended by an administrator');
+  }
+  if (u.is_seller || u.role === 'creator') {
+    res.json({
+      approved: true,
+      application: { id: null, status: 'approved', note: '', adminNote: null },
+      message: 'Your account is already approved as a creator',
+    });
+    return;
+  }
+
+  // กรณีมี Creator Invite Code → ตรวจสอบและอนุมัติทันที
+  if (rawInviteCode) {
+    const codeUpper = rawInviteCode.toUpperCase();
+    const codeRes = await db.query(
+      `UPDATE creator_invite_codes
+       SET used_count = used_count + 1
+       WHERE UPPER(code) = $1
+         AND used_count < max_uses
+         AND (expires_at IS NULL OR expires_at > NOW())
+       RETURNING id, code`,
+      [codeUpper],
+    );
+
+    if (codeRes.rowCount === 0) {
+      throw new AppError(400, 'INVALID_INVITE_CODE', 'Invalid, expired, or fully used Creator Invite Code');
+    }
+
+    await db.query(
+      `UPDATE users
+       SET is_seller = TRUE,
+           role = CASE WHEN role = 'user' THEN 'creator' ELSE role END
+       WHERE id = $1`,
+      [userId],
+    );
+
+    const insertedApproved = await db.query(
+      `INSERT INTO creator_applications (user_id, note, status, admin_note, reviewed_at)
+       VALUES ($1, $2, 'approved', $3, NOW())
+       RETURNING id, note, status, admin_note, created_at, reviewed_at`,
+      [userId, note, `Approved via invite code: ${codeRes.rows[0].code}`],
+    );
+
+    const r = insertedApproved.rows[0];
+    res.status(201).json({
+      approved: true,
+      application: {
+        id: r.id,
+        note: r.note ?? '',
+        status: r.status,
+        adminNote: r.admin_note ?? null,
+        createdAt: r.created_at,
+        reviewedAt: r.reviewed_at ?? null,
+      },
+      message: 'Invite code accepted! You are now a creator.',
+    });
+    return;
+  }
+
+  const pendingRes = await db.query(
+    `SELECT id, note, status, admin_note, created_at, reviewed_at
+     FROM creator_applications
+     WHERE user_id = $1 AND status = 'pending'
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    [userId],
+  );
+  if (pendingRes.rowCount! > 0) {
+    const p = pendingRes.rows[0];
+    res.json({
+      approved: false,
+      application: {
+        id: p.id,
+        note: p.note ?? '',
+        status: p.status,
+        adminNote: p.admin_note ?? null,
+        createdAt: p.created_at,
+        reviewedAt: p.reviewed_at ?? null,
+      },
+      message: 'Your creator application is already pending admin review',
+    });
+    return;
+  }
+
+  const inserted = await db.query(
+    `INSERT INTO creator_applications (user_id, note, status)
+     VALUES ($1, $2, 'pending')
+     RETURNING id, note, status, admin_note, created_at, reviewed_at`,
+    [userId, note],
+  );
+  const r = inserted.rows[0];
+  res.status(201).json({
+    approved: false,
+    application: {
+      id: r.id,
+      note: r.note ?? '',
+      status: r.status,
+      adminNote: r.admin_note ?? null,
+      createdAt: r.created_at,
+      reviewedAt: r.reviewed_at ?? null,
+    },
+    message: 'Application submitted for admin approval',
+  });
+});

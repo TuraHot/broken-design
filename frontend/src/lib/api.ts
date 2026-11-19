@@ -205,6 +205,35 @@ export async function enableSellerMode(token: string): Promise<void> {
   await coreApiFetch('/api/seller/enable', token, { method: 'POST' });
 }
 
+export interface CreatorApplication {
+  id: string | null;
+  note: string;
+  status: 'pending' | 'approved' | 'rejected';
+  adminNote: string | null;
+  createdAt?: string;
+  reviewedAt?: string | null;
+}
+
+/** Fetch current user's latest creator application (`GET /api/seller/application`). */
+export async function fetchMyCreatorApplication(token: string): Promise<CreatorApplication | null> {
+  const data = await coreApiFetch<{ application: CreatorApplication | null }>('/api/seller/application', token, {
+    cache: 'no-store',
+  });
+  return data.application ?? null;
+}
+
+/** Submit a creator application (with optional invite code for instant approval) (`POST /api/seller/apply`). */
+export async function applyAsCreator(
+  token: string,
+  payload: { note?: string; inviteCode?: string } = {},
+): Promise<{ approved?: boolean; application: CreatorApplication; message?: string }> {
+  return coreApiFetch('/api/seller/apply', token, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
 /** Fetch seller status (`GET /api/seller/status`). */
 export async function fetchSellerStatus(token: string): Promise<boolean> {
   const res = await fetch(`${CORE_API_URL}/api/seller/status`, {

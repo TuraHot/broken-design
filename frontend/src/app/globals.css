@@ -2,12 +2,39 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Colour tokens as space-separated RGB, so Tailwind opacity modifiers work (text-ink/65, bg-canvas/80).
+   Dark is today's look and the default; the light values apply when <html data-theme="light"> (see lib/theme.ts). */
+:root {
+  --c-canvas: 0 0 0;
+  --c-ink: 255 255 255;
+  --c-ink-soft: 166 166 166;
+  --c-line: 26 26 26;
+  --c-card: 11 16 24;
+  --c-accent: 143 211 255;
+  --c-highlight: 184 146 255;
+}
+
+html[data-theme='light'] {
+  --c-canvas: 246 246 244;
+  --c-ink: 13 13 13;
+  --c-ink-soft: 59 59 59;
+  --c-line: 207 207 207;
+  --c-card: 255 255 255;
+  --c-accent: 123 79 224;
+  --c-highlight: 201 242 61;
+}
+
 html,
 body {
   min-height: 100%;
   margin: 0;
-  background: #000;
+  background: rgb(var(--c-canvas));
   color-scheme: dark;
+}
+
+html[data-theme='light'],
+html[data-theme='light'] body {
+  color-scheme: light;
 }
 
 /* Native dropdown lists: a translucent select background made the list white with white text. */
@@ -15,7 +42,16 @@ select {
   color-scheme: dark;
 }
 
+html[data-theme='light'] select {
+  color-scheme: light;
+}
+
 select option {
   background-color: #0b0b0b;
   color: #fff;
+}
+
+html[data-theme='light'] select option {
+  background-color: rgb(var(--c-card));
+  color: rgb(var(--c-ink));
 }

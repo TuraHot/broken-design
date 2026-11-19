@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { db } from '../../config/db';
 import { env } from '../../config/env';
 import { AppError } from '../../middlewares/error.middleware';
+import { requireAuth } from '../../middlewares/auth.middleware';
 
 export const authRouter = Router();
 
@@ -79,7 +80,7 @@ authRouter.post('/register', async (req, res) => {
     const result = await db.query(
       `INSERT INTO users (email, password_hash, display_name)
        VALUES ($1, $2, $3)
-       RETURNING id, email, display_name, role, is_seller`,
+       RETURNING id, email, display_name, role, is_seller, avatar_url`,
       [normalizedEmail, passwordHash, displayName],
     );
 
@@ -98,7 +99,14 @@ authRouter.post('/register', async (req, res) => {
     res.status(201).json({
       message: 'Registration successful',
       token,
-      user,
+      user: {
+        id: user.id,
+        email: user.email,
+        display_name: user.display_name,
+        role: user.role,
+        is_seller: user.is_seller,
+        avatar_url: user.avatar_url || null,
+      },
     });
   } catch (error) {
     if (
@@ -125,7 +133,7 @@ authRouter.post('/login', async (req, res) => {
   const { email, password } = parsed.data;
 
   const result = await db.query(
-    `SELECT id, email, password_hash, display_name, role, is_seller, suspended_at
+    `SELECT id, email, password_hash, display_name, role, is_seller, avatar_url, suspended_at
      FROM users
      WHERE email = $1`,
     [email.toLowerCase()],
@@ -167,6 +175,77 @@ authRouter.post('/login', async (req, res) => {
       display_name: user.display_name,
       role: user.role,
       is_seller: user.is_seller,
+      avatar_url: user.avatar_url || null,
     },
+  });
+});
+
+// GET /api/auth/me
+// ดึงข้อมูลโปรไฟล์ผู้ใช้ปัจจุบัน
+authRouter.get('/me', requireAuth, async (req, res) => {
+  const result = await db.query(
+    `SELECT id, email, display_name, role, is_seller, avatar_url, created_at
+     FROM users
+     WHERE id = $1`,
+    [req.user!.id],
+  );
+
+  const user = result.rows[0];
+  if (!user) {
+    throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
+  }
+
+  res.json({ user });
+});
+
+// PATCH /api/auth/profile
+// อัปเดตรูปโปรไฟล์ (avatarUrl) หรือชื่อผู้ใช้ (displayName)
+const updateProfileSchema = z.object({
+  displayName: z.string().trim().min(1).max(100).optional(),
+  avatarUrl: z.string().max(1000000).nullable().optional(), // รองรับ Data URL หรือ Image URL
+});
+
+authRouter.patch('/profile', requireAuth, async (req, res) => {
+  const parsed = updateProfileSchema.safeParse(req.body);
+
+  if (!parsed.success) {
+    throw new AppError(400, 'INVALID_INPUT', 'Invalid profile update data');
+  }
+
+  const { displayName, avatarUrl } = parsed.data;
+  const updates: string[] = [];
+  const values: any[] = [];
+  let idx = 1;
+
+  if (displayName !== undefined) {
+    updates.push(`display_name = $${idx++}`);
+    values.push(displayName);
+  }
+  if (avatarUrl !== undefined) {
+    updates.push(`avatar_url = $${idx++}`);
+    values.push(avatarUrl);
+  }
+
+  if (updates.length === 0) {
+    throw new AppError(400, 'NO_UPDATES', 'No update fields provided');
+  }
+
+  values.push(req.user!.id);
+  const result = await db.query(
+    `UPDATE users
+     SET ${updates.join(', ')}
+     WHERE id = $${idx}
+     RETURNING id, email, display_name, role, is_seller, avatar_url`,
+    values,
+  );
+
+  const updatedUser = result.rows[0];
+  if (!updatedUser) {
+    throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
+  }
+
+  res.json({
+    message: 'Profile updated successfully',
+    user: updatedUser,
   });
 });

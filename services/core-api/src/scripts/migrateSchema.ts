@@ -1,9 +1,19 @@
+import bcrypt from "bcrypt";
 import { db } from "../config/db";
 
 async function runMigration() {
   console.log("--- Running database migration for Lixyte PostgreSQL schema ---");
   try {
-    // 1. Alter purchases table to ensure all required columns exist
+    // 1. Add avatar_url to users table
+    console.log("Adding avatar_url to users table...");
+    await db.query(`
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS is_seller BOOLEAN NOT NULL DEFAULT FALSE;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended_at TIMESTAMPTZ;
+    `);
+    console.log("✅ users.avatar_url column verified!");
+
+    // 2. Ensure purchases table
     console.log("Migrating purchases table...");
     await db.query(`
       ALTER TABLE purchases ADD COLUMN IF NOT EXISTS amount_cents INTEGER NOT NULL DEFAULT 0;
@@ -15,7 +25,7 @@ async function runMigration() {
     `);
     console.log("✅ Purchases table columns & index verified!");
 
-    // 2. Complaints table
+    // 3. Complaints table
     console.log("Migrating complaints table...");
     await db.query(`
       CREATE TABLE IF NOT EXISTS complaints (
@@ -36,17 +46,41 @@ async function runMigration() {
     `);
     console.log("✅ Complaints table & indexes verified!");
 
-    // 3. Verify users & models
-    console.log("Migrating users & models tables...");
-    await db.query(`
-      ALTER TABLE users ADD COLUMN IF NOT EXISTS is_seller BOOLEAN NOT NULL DEFAULT FALSE;
-      ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended_at TIMESTAMPTZ;
-      ALTER TABLE models ADD COLUMN IF NOT EXISTS hidden_at TIMESTAMPTZ;
-      ALTER TABLE models ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
-    `);
-    console.log("✅ Users & models columns verified!");
+    // 4. Seed/Ensure standard demo accounts for all 3 roles:
+    // Password for all demo accounts: Admin@BrokenDesign2026!
+    const defaultPassword = "Admin@BrokenDesign2026!";
+    const defaultHash = await bcrypt.hash(defaultPassword, 10);
 
-    console.log("🎉 All migrations completed successfully!");
+    // Admin Account
+    await db.query(
+      `INSERT INTO users (email, password_hash, display_name, role, is_seller)
+       VALUES ('admin@brokendesign.com', $1, 'Platform Admin', 'admin', false)
+       ON CONFLICT (email) DO UPDATE
+       SET password_hash = $1, role = 'admin', suspended_at = NULL;`,
+      [defaultHash],
+    );
+
+    // Creator Account
+    await db.query(
+      `INSERT INTO users (email, password_hash, display_name, role, is_seller)
+       VALUES ('creator@brokendesign.com', $1, 'Demo Creator', 'creator', true)
+       ON CONFLICT (email) DO UPDATE
+       SET password_hash = $1, role = 'creator', is_seller = true, suspended_at = NULL;`,
+      [defaultHash],
+    );
+
+    // Regular User Account
+    await db.query(
+      `INSERT INTO users (email, password_hash, display_name, role, is_seller)
+       VALUES ('user@brokendesign.com', $1, 'Demo Buyer', 'user', false)
+       ON CONFLICT (email) DO UPDATE
+       SET password_hash = $1, role = 'user', suspended_at = NULL;`,
+      [defaultHash],
+    );
+
+    console.log("✅ Seeded demo accounts for all 3 roles (admin, creator, user) with password: Admin@BrokenDesign2026!");
+
+    console.log("🎉 All migrations and seed accounts completed successfully!");
     process.exit(0);
   } catch (err) {
     console.error("❌ Migration failed:", err);

@@ -8,6 +8,7 @@ export interface AuthUser {
   display_name: string;
   role: string;
   is_seller: boolean;
+  avatar_url?: string | null;
 }
 
 // ผลลัพธ์เมื่อ Login หรือ Register สำเร็จ
@@ -80,4 +81,26 @@ export async function register(
     password,
     displayName: displayName.trim(),
   });
+}
+
+// อัปเดตโปรไฟล์ (ชื่อผู้ใช้ / รูปโปรไฟล์ avatarUrl)
+export async function updateProfile(
+  data: { displayName?: string; avatarUrl?: string | null },
+  token: string,
+): Promise<AuthUser> {
+  const response = await fetch(`${CORE_API_URL}/api/auth/profile`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+
+  const resData = await response.json();
+  if (!response.ok) {
+    throw new Error(resData?.error?.message || 'Failed to update profile');
+  }
+
+  return resData.user as AuthUser;
 }

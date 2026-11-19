@@ -103,16 +103,29 @@ export default function AccountMenu() {
         aria-expanded={open}
         aria-haspopup="true"
         aria-label={t('menu.account', { name })}
-        className="grid h-9 w-9 place-items-center rounded-full border border-hud/50 bg-white/5 text-[13px] font-medium text-white transition-colors hover:border-hud hover:bg-white/10"
+        className="grid h-9 w-9 overflow-hidden place-items-center rounded-full border border-hud/50 bg-white/5 text-[13px] font-medium text-white transition-colors hover:border-hud hover:bg-white/10"
       >
-        {initialsOf(name)}
+        {user.avatar_url ? (
+          <img src={user.avatar_url} alt={name} className="h-full w-full object-cover" />
+        ) : (
+          initialsOf(name)
+        )}
       </button>
 
       {open && (
         <div className="absolute right-0 top-full z-20 mt-2 w-56 rounded-lg border border-white/15 bg-black/95 p-1 backdrop-blur">
-          <div className="border-b border-white/10 px-3 py-2">
-            <p className="truncate text-sm text-white">{name}</p>
-            {name !== user.email && <p className="truncate text-xs text-white/65">{user.email}</p>}
+          <div className="flex items-center gap-2.5 border-b border-white/10 px-3 py-2.5">
+            <div className="grid h-8 w-8 shrink-0 overflow-hidden place-items-center rounded-full border border-hud/40 bg-white/5 text-xs text-white">
+              {user.avatar_url ? (
+                <img src={user.avatar_url} alt={name} className="h-full w-full object-cover" />
+              ) : (
+                initialsOf(name)
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium text-white">{name}</p>
+              {name !== user.email && <p className="truncate text-xs text-white/65">{user.email}</p>}
+            </div>
           </div>
           <ul className="pt-1">
             {isAdmin ? (

@@ -6,7 +6,7 @@
 import Link from 'next/link';
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Palette, Shield, User } from 'lucide-react';
 import { checkEmail, login, register } from '@/lib/auth';
 import { EMAIL_RE, FIELD, Field } from './Field';
 
@@ -125,6 +125,26 @@ export default function AuthForm() {
       } finally {
         setChecking(false);
       }
+    }
+  };
+
+  const handleQuickLogin = async (email: string, targetPath: string) => {
+    if (checking) return;
+    try {
+      setChecking(true);
+      setErrors({});
+      const result = await login(email, 'Admin@BrokenDesign2026!');
+      localStorage.setItem('token', result.token);
+      localStorage.setItem('accessToken', result.token);
+      if (result.user) {
+        localStorage.setItem('user', JSON.stringify(result.user));
+      }
+      window.dispatchEvent(new Event('storage'));
+      router.push(targetPath);
+    } catch (err: any) {
+      setErrors({ email: err?.message || 'Quick login failed' });
+    } finally {
+      setChecking(false);
     }
   };
 
@@ -248,6 +268,45 @@ export default function AuthForm() {
               Create an account
             </Link>
           </p>
+        </div>
+
+        {/* Quick Role Login Buttons */}
+        <div className="mt-5 border-t border-white/10 pt-4">
+          <p className="text-center font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70">
+            [ Quick Role Login / เข้าสู่ระบบด่วน ]
+          </p>
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            <button
+              type="button"
+              disabled={checking}
+              onClick={() => handleQuickLogin('admin@brokendesign.com', '/admin')}
+              className="flex flex-col items-center justify-center gap-1 rounded-lg border border-red-500/30 bg-red-500/10 p-2.5 text-center transition-colors hover:border-red-400 hover:bg-red-500/20 disabled:opacity-50"
+            >
+              <Shield className="h-4 w-4 text-red-400" />
+              <span className="font-mono text-xs font-semibold text-white">Admin</span>
+              <span className="text-[10px] text-white/50">ผู้ดูแลระบบ</span>
+            </button>
+            <button
+              type="button"
+              disabled={checking}
+              onClick={() => handleQuickLogin('creator@brokendesign.com', '/gallery')}
+              className="flex flex-col items-center justify-center gap-1 rounded-lg border border-purple-500/30 bg-purple-500/10 p-2.5 text-center transition-colors hover:border-purple-400 hover:bg-purple-500/20 disabled:opacity-50"
+            >
+              <Palette className="h-4 w-4 text-purple-400" />
+              <span className="font-mono text-xs font-semibold text-white">Creator</span>
+              <span className="text-[10px] text-white/50">ครีเอเตอร์</span>
+            </button>
+            <button
+              type="button"
+              disabled={checking}
+              onClick={() => handleQuickLogin('user@brokendesign.com', '/gallery')}
+              className="flex flex-col items-center justify-center gap-1 rounded-lg border border-hud/30 bg-hud/10 p-2.5 text-center transition-colors hover:border-hud hover:bg-hud/20 disabled:opacity-50"
+            >
+              <User className="h-4 w-4 text-hud" />
+              <span className="font-mono text-xs font-semibold text-white">User</span>
+              <span className="text-[10px] text-white/50">ผู้ซื้อทั่วไป</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

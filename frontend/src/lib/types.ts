@@ -7,6 +7,7 @@ export const GALLERY_TAGS = ['character', 'vehicle', 'architecture', 'nature', '
 
 export interface Model {
   id: string;
+  ownerId?: string;
   title: string;
   creator: string;
   creatorAvatarUrl?: string;

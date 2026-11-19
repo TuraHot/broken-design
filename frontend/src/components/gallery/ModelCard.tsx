@@ -1,25 +1,101 @@
 'use client';
 
-// Gallery card — lazy poster, title, creator, Free/price badge, likes
+// Gallery card — lazy poster, title, creator, Free/price badge, likes, and interactive 3D rotation on hover
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { MouseEvent, useEffect, useState } from 'react';
-import { Heart, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
+import { Heart, Image as ImageIcon, Loader2, Rotate3D } from 'lucide-react';
 import UserAvatar from '@/components/ui/UserAvatar';
+import { CDN_SERVICE_URL } from '@/lib/api';
 import { formatPrice as price } from '@/lib/format';
 import type { Model } from '@/lib/types';
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Global dynamic loader for @google/model-viewer to load only once
+let modelViewerPromise: Promise<any> | null = null;
+function ensureModelViewer() {
+  if (typeof window === 'undefined') return Promise.resolve();
+  if (!modelViewerPromise) {
+    modelViewerPromise = import('@google/model-viewer').catch((err) => {
+      console.warn('Failed to load @google/model-viewer:', err);
+    });
+  }
+  return modelViewerPromise;
+}
+
 export default function ModelCard({ model }: { model: Model }) {
+  const router = useRouter();
   const free = model.priceCents === 0;
   const pathname = usePathname();
   const [opening, setOpening] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  const [viewerReady, setViewerReady] = useState(false);
+  const [show3D, setShow3D] = useState(false);
+
+  const hoverTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const downCoordsRef = useRef<{ x: number; y: number } | null>(null);
+
   const targetHref = `/models/${model.id}`;
+  const isRealModel = Boolean(model.id && UUID_RE.test(model.id));
+  const preview3dUrl = isRealModel
+    ? `${CDN_SERVICE_URL}/cdn/models/${encodeURIComponent(model.id)}/preview.glb`
+    : null;
 
   useEffect(() => {
     setOpening(false);
   }, [pathname]);
 
-  const onClick = (e: MouseEvent<HTMLAnchorElement>) => {
+  // Clean up timer on unmount
+  useEffect(() => {
+    return () => {
+      if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+    };
+  }, []);
+
+  const handleMouseEnter = () => {
+    setIsHovered(true);
+    if (!isRealModel) return;
+
+    // 180ms debounce so cursor quickly sweeping past cards doesn't spin up WebGL
+    hoverTimerRef.current = setTimeout(() => {
+      ensureModelViewer().then(() => {
+        setViewerReady(true);
+        setShow3D(true);
+      });
+    }, 180);
+  };
+
+  const handleMouseLeave = () => {
+    setIsHovered(false);
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+    setShow3D(false);
+    downCoordsRef.current = null;
+  };
+
+  // Click vs Drag on 3D viewport:
+  // If user dragged to orbit (> 5px), don't navigate; if user clicked (< 5px), open model
+  const onViewerPointerDown = (e: React.PointerEvent) => {
+    downCoordsRef.current = { x: e.clientX, y: e.clientY };
+  };
+
+  const onViewerPointerUp = (e: React.PointerEvent) => {
+    if (downCoordsRef.current) {
+      const dist = Math.hypot(e.clientX - downCoordsRef.current.x, e.clientY - downCoordsRef.current.y);
+      if (dist < 5) {
+        if (!opening && pathname !== targetHref) {
+          setOpening(true);
+          router.push(targetHref);
+        }
+      }
+    }
+    downCoordsRef.current = null;
+  };
+
+  const onLinkClick = (e: React.MouseEvent) => {
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
     if (opening || pathname === targetHref) {
       e.preventDefault();
@@ -29,28 +105,75 @@ export default function ModelCard({ model }: { model: Model }) {
   };
 
   return (
-    <Link
-      href={targetHref}
-      onClick={onClick}
-      aria-busy={opening}
+    <div
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
       className={`group block overflow-hidden rounded-lg border bg-white/5 transition-colors ${
         opening ? 'border-hud/50 cursor-wait' : 'border-white/10 hover:border-white/30'
       }`}
     >
-      <div className="relative">
-        {model.posterUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={model.posterUrl} alt="" loading="lazy" className="aspect-[4/3] w-full object-cover" />
-        ) : (
-          // Stand-in until real poster images exist.
+      {/* Media / 3D Canvas Viewport */}
+      <div
+        className="relative aspect-[4/3] w-full overflow-hidden bg-black/60 select-none"
+        onDragStart={(e) => e.preventDefault()}
+      >
+        {/* Interactive 3D Model Viewer on Hover */}
+        {show3D && viewerReady && preview3dUrl ? (
           <div
-            aria-hidden
-            className="flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 bg-white/[0.06] text-white/40"
+            className="h-full w-full cursor-grab active:cursor-grabbing"
+            onPointerDown={onViewerPointerDown}
+            onPointerUp={onViewerPointerUp}
           >
-            <ImageIcon className="h-7 w-7" />
-            <span className="text-sm">Image</span>
+            <model-viewer
+              src={preview3dUrl}
+              poster={model.posterUrl}
+              alt={model.title}
+              camera-controls
+              auto-rotate
+              shadow-intensity="1"
+              style={{ width: '100%', height: '100%', backgroundColor: '#050505' }}
+              onError={() => setShow3D(false)}
+            />
+            {/* 3D Orbit Badge */}
+            <div className="pointer-events-none absolute bottom-2 right-2 flex items-center gap-1 rounded bg-black/75 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-hud border border-white/10 backdrop-blur">
+              <Rotate3D className="h-3 w-3 animate-pulse" />
+              <span>Drag to rotate</span>
+            </div>
+          </div>
+        ) : (
+          <Link
+            href={targetHref}
+            onClick={onLinkClick}
+            className="block h-full w-full"
+          >
+            {model.posterUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={model.posterUrl}
+                alt=""
+                loading="lazy"
+                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+              />
+            ) : (
+              <div
+                aria-hidden
+                className="flex h-full w-full flex-col items-center justify-center gap-2 bg-white/[0.06] text-white/40"
+              >
+                <ImageIcon className="h-7 w-7" />
+                <span className="text-sm">Image</span>
+              </div>
+            )}
+          </Link>
+        )}
+
+        {/* 3D Available Badge (shown on hover before 3D loads) */}
+        {!show3D && isRealModel && isHovered && (
+          <div className="pointer-events-none absolute bottom-2 right-2 flex items-center gap-1 rounded bg-black/80 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-white/80 border border-white/10 backdrop-blur">
+            <Rotate3D className="h-3 w-3 text-hud" />
+            <span>3D Model</span>
           </div>
         )}
+
         {opening && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-[rgba(4,8,18,0.78)] backdrop-blur-[2px]">
             <Loader2 aria-hidden className="h-6 w-6 animate-spin text-hud motion-reduce:animate-none" />
@@ -58,8 +181,12 @@ export default function ModelCard({ model }: { model: Model }) {
           </div>
         )}
       </div>
-      <div className="p-3">
-        <h3 className="truncate text-sm font-medium text-white">{model.title}</h3>
+
+      {/* Model Metadata Section (Clickable Link) */}
+      <Link href={targetHref} onClick={onLinkClick} className="block p-3 cursor-pointer">
+        <h3 className="truncate text-sm font-medium text-white group-hover:text-hud transition-colors">
+          {model.title}
+        </h3>
         <div className="mt-1.5 flex items-center gap-1.5">
           <UserAvatar name={model.creator} avatarUrl={model.creatorAvatarUrl} size="xs" />
           <p className="min-w-0 truncate text-sm text-white/65">{model.creator}</p>
@@ -80,7 +207,7 @@ export default function ModelCard({ model }: { model: Model }) {
             {model.likeCount}
           </span>
         </div>
-      </div>
-    </Link>
+      </Link>
+    </div>
   );
 }

@@ -31,6 +31,7 @@ import {
 } from '@/lib/api';
 import { creatorHandle } from '@/lib/creators';
 import { formatMoney, formatPrice } from '@/lib/format';
+import { readSession, updateSessionUser } from '@/lib/session';
 import type {
   AuthUser,
   SellerModelItem,
@@ -58,16 +59,10 @@ export default function SellerPage() {
   // 1. Load user & token
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const storedToken = localStorage.getItem('token');
-    const storedUser = localStorage.getItem('user');
-
-    if (storedToken) {
-      setToken(storedToken);
-      if (storedUser) {
-        try {
-          setUser(JSON.parse(storedUser));
-        } catch {}
-      }
+    const session = readSession();
+    if (session) {
+      setToken(session.token);
+      setUser(session.user as AuthUser);
     }
   }, []);
 
@@ -117,7 +112,7 @@ export default function SellerPage() {
       setIsSeller(true);
       setUser((prev) => {
         const next = prev ? { ...prev, is_seller: true } : prev;
-        if (next) localStorage.setItem('user', JSON.stringify(next));
+        if (next) updateSessionUser({ is_seller: true });
         return next;
       });
       setStatusMsg('Seller mode enabled! You can now manage your assets.');

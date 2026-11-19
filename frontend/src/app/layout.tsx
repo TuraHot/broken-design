@@ -6,6 +6,7 @@ import Footer from '@/components/Footer';
 import Navbar from '@/components/Navbar';
 import ReportProvider from '@/components/report/ReportProvider';
 import NavigationProgress from '@/components/ui/NavigationProgress';
+import RealtimeNotificationToast from '@/components/notifications/RealtimeNotificationToast';
 import { LocaleProvider } from '@/lib/i18n/client';
 import { getLocale } from '@/lib/i18n/server';
 import './globals.css';
@@ -25,6 +26,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body className={`${chakra.className} ${michroma.variable} ${shareTechMono.variable}`}>
         <LocaleProvider locale={locale}>
           <NavigationProgress />
+          <RealtimeNotificationToast />
           <ReportProvider>
             <AdminOnlyRedirect />
             <Navbar />

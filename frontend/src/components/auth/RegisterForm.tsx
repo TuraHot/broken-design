@@ -6,7 +6,7 @@ import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { register } from '@/lib/auth';
-import { SESSION_UPDATED_EVENT } from '@/lib/session';
+import { saveSession, SESSION_UPDATED_EVENT } from '@/lib/session';
 import { EMAIL_RE, FIELD, Field } from './Field';
 
 const PRIMARY =
@@ -65,12 +65,8 @@ export default function RegisterForm() {
     try {
       const result = await register(values.email, values.password, values.username.trim());
 
-      // Save user session
-      localStorage.setItem('token', result.token);
-      if (result.user) {
-        localStorage.setItem('user', JSON.stringify(result.user));
-      }
-      window.dispatchEvent(new CustomEvent(SESSION_UPDATED_EVENT));
+      // Save user session (per-tab session isolation)
+      saveSession({ token: result.token, user: result.user });
 
       router.push('/gallery');
     } catch (err: any) {

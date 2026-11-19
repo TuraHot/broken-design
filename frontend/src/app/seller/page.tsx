@@ -111,8 +111,10 @@ export default function SellerPage() {
       await enableSellerMode(token);
       setIsSeller(true);
       setUser((prev) => {
-        const next = prev ? { ...prev, is_seller: true } : prev;
-        if (next) updateSessionUser({ is_seller: true });
+        if (!prev) return prev;
+        const nextRole: typeof prev.role = prev.role === 'user' ? 'creator' : prev.role;
+        const next = { ...prev, is_seller: true, role: nextRole };
+        updateSessionUser({ is_seller: true, role: nextRole });
         return next;
       });
       setStatusMsg('Seller mode enabled! You can now manage your assets.');

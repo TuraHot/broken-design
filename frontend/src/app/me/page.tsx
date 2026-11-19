@@ -91,8 +91,10 @@ export default function MePage() {
       setStatusMsg(null);
       await enableSellerMode(token);
       setUser((prev) => {
-        const updated = prev ? { ...prev, is_seller: true } : prev;
-        if (updated) updateSessionUser({ is_seller: true });
+        if (!prev) return prev;
+        const nextRole: AuthUser['role'] = prev.role === 'user' ? 'creator' : prev.role;
+        const updated = { ...prev, is_seller: true, role: nextRole };
+        updateSessionUser({ is_seller: true, role: nextRole });
         return updated;
       });
       setStatusMsg('Seller mode activated! You can now upload models and view your sales.');

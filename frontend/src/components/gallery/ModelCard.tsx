@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { MouseEvent, useEffect, useState } from 'react';
 import { Heart, Image as ImageIcon, Loader2 } from 'lucide-react';
+import UserAvatar from '@/components/ui/UserAvatar';
 import { formatPrice as price } from '@/lib/format';
 import type { Model } from '@/lib/types';
 
@@ -59,7 +60,10 @@ export default function ModelCard({ model }: { model: Model }) {
       </div>
       <div className="p-3">
         <h3 className="truncate text-sm font-medium text-white">{model.title}</h3>
-        <p className="mt-0.5 truncate text-sm text-white/65">{model.creator}</p>
+        <div className="mt-1.5 flex items-center gap-1.5">
+          <UserAvatar name={model.creator} avatarUrl={model.creatorAvatarUrl} size="xs" />
+          <p className="min-w-0 truncate text-sm text-white/65">{model.creator}</p>
+        </div>
         <div className="mt-3 flex items-center justify-between">
           <span
             className={

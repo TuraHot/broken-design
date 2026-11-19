@@ -6,7 +6,6 @@ import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { register } from '@/lib/auth';
-import { SESSION_UPDATED_EVENT } from '@/lib/session';
 import { EMAIL_RE, FIELD, Field } from './Field';
 
 const PRIMARY =
@@ -63,16 +62,10 @@ export default function RegisterForm() {
     setErrors({});
 
     try {
-      const result = await register(values.email, values.password, values.username.trim());
+      await register(values.email, values.password, values.username.trim());
 
-      // Save user session
-      localStorage.setItem('token', result.token);
-      if (result.user) {
-        localStorage.setItem('user', JSON.stringify(result.user));
-      }
-      window.dispatchEvent(new CustomEvent(SESSION_UPDATED_EVENT));
-
-      router.push('/gallery');
+      // Do not sign in yet: send the new user to the log in page first.
+      router.push('/login?registered=1');
     } catch (err: any) {
       setErrors({
         api: err instanceof Error ? err.message : 'Registration failed. Please try again.',

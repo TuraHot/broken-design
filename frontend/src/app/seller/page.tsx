@@ -116,7 +116,7 @@ export default function SellerPage() {
       await enableSellerMode(token);
       setIsSeller(true);
       setUser((prev) => {
-        const next = prev ? { ...prev, is_seller: true } : prev;
+        const next = prev ? { ...prev, is_seller: true, role: prev.role === 'user' ? 'creator' : prev.role } : prev;
         if (next) localStorage.setItem('user', JSON.stringify(next));
         return next;
       });

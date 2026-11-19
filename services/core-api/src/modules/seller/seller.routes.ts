@@ -39,13 +39,14 @@ function requireSeller(
 }
 
 // ─── 1. POST /api/seller/enable ─────────────────────────────────────────────
-// เปิดโหมดคนขาย (is_seller = true)
+// เปิดโหมดคนขาย (is_seller = true และเปลี่ยน role user -> creator)
 sellerRouter.post('/enable', requireAuth, async (req, res) => {
   const userId = req.user!.id;
 
   const result = await db.query(
-    `UPDATE users SET is_seller = TRUE
-     WHERE id = $1 AND is_seller = FALSE AND role <> 'admin' AND suspended_at IS NULL
+    `UPDATE users SET is_seller = TRUE,
+                      role = CASE WHEN role = 'user' THEN 'creator'::user_role ELSE role END
+     WHERE id = $1 AND (is_seller = FALSE OR role = 'user') AND role <> 'admin' AND suspended_at IS NULL
      RETURNING id`,
     [userId],
   );

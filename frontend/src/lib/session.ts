@@ -1,7 +1,6 @@
 // Read-only view of the sign-in that `components/auth/AuthForm.tsx` saves in localStorage.
 // Used by the Navbar to show who is signed in. It is a convenience for the UI only:
 // every page and API must still check the role on the server.
-import { stopViewingSite } from './admin-view';
 import type { AuthUser } from './auth';
 
 export interface Session {
@@ -64,7 +63,6 @@ export function updateSessionUser(patch: Partial<AuthUser>): Session | null {
 
 /** Forget the saved sign-in (log out on this device). */
 export function clearSession(): void {
-  stopViewingSite();
   try {
     STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
   } catch {

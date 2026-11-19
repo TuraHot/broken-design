@@ -1,14 +1,13 @@
 'use client';
 
 // Layout for every /admin page. It replaces the public navbar and footer (see `lib/auth-paths.ts`):
-// a sidebar on desktop, a top bar with tabs on phones, "View Website" and Log out. Admins stay in this
-// area (`components/AdminOnlyRedirect.tsx` sends them back); "View Website" is the one way out.
+// a sidebar on desktop, a top bar with tabs on phones, and Log out. Admins never use the public site: they stay in
+// this area and `components/AdminOnlyRedirect.tsx` sends them back from every other page (there is no way out).
 // The gate only decides what to show; the API re-checks the admin role in the database on every call.
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { startViewingSite } from '@/lib/admin-view';
-import { Box, Flag, Globe, LayoutDashboard, LogOut, Receipt, Users, type LucideIcon } from 'lucide-react';
+import { Box, Flag, LayoutDashboard, LogOut, Receipt, Users, type LucideIcon } from 'lucide-react';
 import LanguageSwitch from '@/components/LanguageSwitch';
 import { useT } from '@/lib/i18n/client';
 import type { MessageKey } from '@/lib/i18n/messages';
@@ -75,12 +74,6 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
     router.push('/');
   };
 
-  // Opens the public site in this tab; AdminOnlyRedirect leaves it alone until the admin comes back to /admin.
-  const viewWebsite = () => {
-    startViewingSite();
-    router.push('/');
-  };
-
   const isActive = (href: string) => (href === '/admin' ? pathname === '/admin' : pathname.startsWith(href));
   const tabLinks = (cls: (active: boolean) => string, withIcon: boolean) =>
     TABS.map(({ href, label, icon: Icon }) => (
@@ -114,10 +107,6 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
           <div className="px-3 pb-2">
             <LanguageSwitch />
           </div>
-          <button type="button" onClick={viewWebsite} className={`${SIDE_LINK} text-white/65 hover:bg-white/5 hover:text-white`}>
-            <Globe aria-hidden className="h-4 w-4 shrink-0" />
-            {t('admin.viewSite')}
-          </button>
           <button type="button" onClick={logOut} className={`${SIDE_LINK} text-white/65 hover:bg-white/5 hover:text-white`}>
             <LogOut aria-hidden className="h-4 w-4 shrink-0" />
             {t('admin.logout')}
@@ -132,9 +121,6 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
           <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud">[ {t('admin.label')} ]</p>
           <div className="ml-auto flex items-center gap-1">
             <LanguageSwitch />
-            <button type="button" onClick={viewWebsite} aria-label={t('admin.viewSite')} className="grid h-9 w-9 place-items-center rounded-lg text-white/80 hover:text-white">
-              <Globe aria-hidden className="h-5 w-5" />
-            </button>
             <button type="button" onClick={logOut} aria-label={t('admin.logout')} className="grid h-9 w-9 place-items-center rounded-lg text-white/80 hover:text-white">
               <LogOut aria-hidden className="h-5 w-5" />
             </button>

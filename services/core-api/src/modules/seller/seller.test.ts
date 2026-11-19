@@ -46,6 +46,59 @@ test('POST /api/seller/enable - enables seller mode for user', async () => {
   }
 });
 
+test('POST /api/seller/enable - refuses admin accounts (role read from the database)', async () => {
+  const originalQuery = db.query.bind(db);
+  (db as any).query = async (sql: string) => {
+    if (sql.includes('UPDATE users SET is_seller = TRUE')) return { rowCount: 0, rows: [] };
+    if (sql.includes('SELECT is_seller, role, suspended_at')) {
+      return { rowCount: 1, rows: [{ is_seller: false, role: 'admin', suspended_at: null }] };
+    }
+    return { rowCount: 0, rows: [] };
+  };
+
+  const server = app.listen(0);
+  const port = (server.address() as any).port;
+  try {
+    // The token claims a normal user; the database says admin, and the database wins.
+    const res = await fetch(`http://localhost:${port}/api/seller/enable`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${makeToken({ id: 'u-admin', role: 'user' })}` },
+    });
+    assert.equal(res.status, 403);
+    const body = await res.json();
+    assert.equal(body.error?.code, 'ADMIN_CANNOT_SELL');
+  } finally {
+    server.close();
+    db.query = originalQuery;
+  }
+});
+
+test('POST /api/seller/enable - refuses suspended accounts', async () => {
+  const originalQuery = db.query.bind(db);
+  (db as any).query = async (sql: string) => {
+    if (sql.includes('UPDATE users SET is_seller = TRUE')) return { rowCount: 0, rows: [] };
+    if (sql.includes('SELECT is_seller, role, suspended_at')) {
+      return { rowCount: 1, rows: [{ is_seller: false, role: 'user', suspended_at: new Date() }] };
+    }
+    return { rowCount: 0, rows: [] };
+  };
+
+  const server = app.listen(0);
+  const port = (server.address() as any).port;
+  try {
+    const res = await fetch(`http://localhost:${port}/api/seller/enable`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${makeToken()}` },
+    });
+    assert.equal(res.status, 403);
+    const body = await res.json();
+    assert.equal(body.error?.code, 'ACCOUNT_SUSPENDED');
+  } finally {
+    server.close();
+    db.query = originalQuery;
+  }
+});
+
 test('GET /api/seller/status - checks seller status', async () => {
   const originalQuery = db.query.bind(db);
   (db as any).query = async (sql: string) => {

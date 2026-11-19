@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Box, KeyRound, Loader2, RotateCw } from "lucide-react";
 import { CDN_SERVICE_URL } from "@/lib/api";
+import { useT } from "@/lib/i18n/client";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -20,13 +21,15 @@ export default function ModelPreview({
   posterUrl?: string;
 }) {
   const isRealModel = UUID_RE.test(id);
+  const t = useT();
   const [viewerReady, setViewerReady] = useState(false);
   const [modelLoading, setModelLoading] = useState(isRealModel);
   const [loadFailed, setLoadFailed] = useState(!isRealModel);
   const [autoRotate, setAutoRotate] = useState(true);
   const [embedKey, setEmbedKey] = useState("");
   const [appliedKey, setAppliedKey] = useState("");
-  const [keyError, setKeyError] = useState<string | null>(null);
+  // The "invalid key" notice is a flag, not text, so it follows the language when the visitor switches it.
+  const [keyInvalid, setKeyInvalid] = useState(false);
   const viewerRef = useRef<HTMLElement | null>(null);
 
   const baseCdn = `${CDN_SERVICE_URL}/cdn/models/${encodeURIComponent(id)}`;
@@ -56,9 +59,7 @@ export default function ModelPreview({
     const onError = () => {
       setModelLoading(false);
       if (appliedKey) {
-        setKeyError(
-          "Invalid or expired embed_key — switched back to public preview.",
-        );
+        setKeyInvalid(true);
         setAppliedKey("");
       } else {
         setLoadFailed(true);
@@ -67,7 +68,7 @@ export default function ModelPreview({
 
     const onLoad = () => {
       setModelLoading(false);
-      if (appliedKey) setKeyError(null);
+      if (appliedKey) setKeyInvalid(false);
     };
 
     el.addEventListener("error", onError);
@@ -111,7 +112,7 @@ export default function ModelPreview({
                   className="h-5 w-5 animate-spin text-hud motion-reduce:animate-none"
                 />
                 <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud">
-                  [ Streaming 3D mesh… ]
+                  {t('model.streaming3d')}
                 </span>
               </div>
             )}
@@ -126,7 +127,7 @@ export default function ModelPreview({
                 }`}
               >
                 <RotateCw className="h-3.5 w-3.5" />
-                {autoRotate ? "Auto-Rotate: ON" : "Auto-Rotate: OFF"}
+                {autoRotate ? t('model.rotateOn') : t('model.rotateOff')}
               </button>
             </div>
           </>
@@ -136,7 +137,7 @@ export default function ModelPreview({
             className="flex h-full w-full flex-col items-center justify-center gap-2 text-white/40"
           >
             <Box className="h-8 w-8" />
-            <span className="text-sm">3D preview</span>
+            <span className="text-sm">{t('model.preview3d')}</span>
           </div>
         )}
       </div>
@@ -149,7 +150,7 @@ export default function ModelPreview({
               type="text"
               value={embedKey}
               onChange={(e) => setEmbedKey(e.target.value)}
-              placeholder="Have an embed_key? Paste to stream full model…"
+              placeholder={t('model.keyPlaceholder')}
               className="min-w-0 flex-1 rounded border border-white/15 bg-black/60 px-2.5 py-1 font-mono text-xs text-white placeholder:text-white/40 focus:border-hud/60 focus:outline-none"
             />
             <button
@@ -158,7 +159,7 @@ export default function ModelPreview({
               onClick={() => {
                 if (modelLoading) return;
                 const nextKey = embedKey.trim();
-                setKeyError(null);
+                setKeyInvalid(false);
                 if (nextKey === appliedKey) return;
                 setAppliedKey(nextKey);
               }}
@@ -170,17 +171,17 @@ export default function ModelPreview({
                   className="h-3.5 w-3.5 animate-spin text-hud motion-reduce:animate-none"
                 />
               )}
-              {appliedKey ? "Update Key" : "Stream Full"}
+              {appliedKey ? t('model.keyUpdate') : t('model.keyStream')}
             </button>
           </div>
-          {keyError && (
+          {keyInvalid && (
             <p className="mt-1.5 font-mono text-xs text-amber-400">
-              {keyError}
+              {t('model.keyInvalid')}
             </p>
           )}
-          {appliedKey && !keyError && (
+          {appliedKey && !keyInvalid && (
             <p className="mt-1.5 font-mono text-xs text-hud">
-              Streaming authenticated full model via /cdn/models/{id}/file.glb
+              {t('model.keyActive', { id })}
             </p>
           )}
         </div>

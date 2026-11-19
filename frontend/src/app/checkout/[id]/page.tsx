@@ -9,11 +9,14 @@ import { confirmMockPayment, createQrPayment, fetchPurchaseById } from '@/lib/ap
 import { initials } from '@/lib/creators';
 import { formatMoney } from '@/lib/format';
 import { readSession } from '@/lib/session';
+import { useT } from '@/lib/i18n/client';
+import { fromErr, msgText, type Msg } from '@/lib/i18n/msg';
 import type { PurchaseDetail, QrPaymentResponse } from '@/lib/types';
 
 export default function CheckoutPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const t = useT();
 
   const [ready, setReady] = useState(false);
   const [token, setToken] = useState<string | null>(null);
@@ -23,7 +26,7 @@ export default function CheckoutPage() {
   const [qrInfo, setQrInfo] = useState<QrPaymentResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<Msg | null>(null);
 
   useEffect(() => {
     const session = readSession();
@@ -43,7 +46,7 @@ export default function CheckoutPage() {
         const data = await fetchPurchaseById(id, session.token);
         if (active) setPurchase(data);
       } catch (err: any) {
-        if (active) setErrorMsg(err?.message || 'Unable to load order.');
+        if (active) setErrorMsg(fromErr(err, 'pay.errLoadOrder'));
       } finally {
         if (active) setLoading(false);
       }
@@ -82,7 +85,7 @@ export default function CheckoutPage() {
       const res = await createQrPayment(purchase.id, token);
       setQrInfo(res);
     } catch (err: any) {
-      setErrorMsg(err?.message || 'Unable to generate QR payment.');
+      setErrorMsg(fromErr(err, 'pay.errQr'));
     } finally {
       setSubmitting(false);
     }
@@ -96,7 +99,7 @@ export default function CheckoutPage() {
       await confirmMockPayment(purchase.id, token);
       router.push(`/checkout/success?purchaseId=${encodeURIComponent(purchase.id)}`);
     } catch (err: any) {
-      setErrorMsg(err?.message || 'Payment confirmation failed.');
+      setErrorMsg(fromErr(err, 'pay.errConfirm'));
       setSubmitting(false);
     }
   };
@@ -106,7 +109,7 @@ export default function CheckoutPage() {
       <main className="flex min-h-[calc(100dvh-4rem)] items-center justify-center px-4 pt-20 pb-12">
         <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-6 py-5 text-white/70">
           <Loader2 className="h-5 w-5 animate-spin text-hud" />
-          <span className="font-mono text-xs uppercase tracking-wider">Loading checkout…</span>
+          <span className="font-mono text-xs uppercase tracking-wider">{t('pay.loadingCheckout')}</span>
         </div>
       </main>
     );
@@ -116,13 +119,13 @@ export default function CheckoutPage() {
     return (
       <main className="flex min-h-[calc(100dvh-4rem)] items-center justify-center px-4 pt-20 pb-12">
         <div className="w-full max-w-[460px] rounded-2xl border border-white/10 bg-[#0b0d12] p-6 text-center shadow-2xl">
-          <h1 className="font-display text-xl uppercase text-white">Sign in required</h1>
-          <p className="mt-2 text-sm text-white/65">Please sign in to continue to QR checkout.</p>
+          <h1 className="font-display text-xl uppercase text-white">{t('pay.signInTitle')}</h1>
+          <p className="mt-2 text-sm text-white/65">{t('pay.signInQr')}</p>
           <Link
             href="/login"
             className="mt-5 inline-flex h-11 w-full items-center justify-center rounded-full bg-white text-sm font-medium text-black transition-colors hover:bg-white/85"
           >
-            Log in
+            {t('pay.login')}
           </Link>
         </div>
       </main>
@@ -133,20 +136,20 @@ export default function CheckoutPage() {
     return (
       <main className="flex min-h-[calc(100dvh-4rem)] items-center justify-center px-4 pt-20 pb-12">
         <div className="w-full max-w-[460px] rounded-2xl border border-white/10 bg-[#0b0d12] p-6 text-center shadow-2xl">
-          <h1 className="font-display text-xl uppercase text-white">Order not found</h1>
-          <p className="mt-2 text-sm text-amber">{errorMsg || 'This order could not be found.'}</p>
+          <h1 className="font-display text-xl uppercase text-white">{t('pay.orderNotFound')}</h1>
+          <p className="mt-2 text-sm text-amber">{errorMsg ? msgText(errorMsg, t) : t('pay.errOrderMissing')}</p>
           <Link
             href="/gallery"
             className="mt-5 inline-flex h-10 items-center justify-center rounded-full border border-white/20 px-5 text-sm text-white/80 hover:bg-white/10"
           >
-            Back to Gallery
+            {t('pay.backGallery')}
           </Link>
         </div>
       </main>
     );
   }
 
-  const sellerName = purchase.sellerName || 'Creator';
+  const sellerName = purchase.sellerName || t('pay.creator');
   const priceText = formatMoney(purchase.amountCents, purchase.currency || 'USD');
 
   if (purchase.status === 'paid') {
@@ -154,13 +157,13 @@ export default function CheckoutPage() {
       <main className="flex min-h-[calc(100dvh-4rem)] items-center justify-center px-4 pt-20 pb-12">
         <div className="w-full max-w-[460px] rounded-2xl border border-white/10 bg-[#0b0d12] p-6 text-center shadow-2xl">
           <CheckCircle2 className="mx-auto h-10 w-10 text-hud" />
-          <h1 className="mt-3 font-display text-xl uppercase text-white">Payment Confirmed</h1>
+          <h1 className="mt-3 font-display text-xl uppercase text-white">{t('pay.paidTitle')}</h1>
           <p className="mt-1.5 text-sm text-white/65">{purchase.title}</p>
           <Link
             href={`/checkout/success?purchaseId=${encodeURIComponent(purchase.id)}`}
             className="mt-6 inline-flex h-11 w-full items-center justify-center rounded-full bg-white text-sm font-medium text-black transition-colors hover:bg-white/85"
           >
-            View Embed Key &amp; Download
+            {t('pay.viewKey')}
           </Link>
         </div>
       </main>
@@ -176,12 +179,12 @@ export default function CheckoutPage() {
             {initials(sellerName)}
           </span>
           <p className="text-sm font-medium text-white">
-            {sellerName} <span className="font-normal text-white/50">(Seller)</span>
+            {sellerName} <span className="font-normal text-white/50">({t('pay.seller')})</span>
           </p>
         </div>
 
         <p className="mt-3 text-center text-xs text-white/55">
-          Signed in as <span className="text-white/80">{email}</span>
+          {t('pay.signedInAs', { email })}
         </p>
 
         {/* Item card */}
@@ -197,13 +200,13 @@ export default function CheckoutPage() {
 
         {/* Highlighted Total bar */}
         <div className="mt-3 flex items-center justify-between rounded-xl border border-hud/25 bg-hud/10 px-4 py-3">
-          <span className="text-sm font-medium text-white">Total</span>
+          <span className="text-sm font-medium text-white">{t('pay.total')}</span>
           <span className="font-mono text-sm font-semibold text-hud">{priceText}</span>
         </div>
 
         <div className="mt-2.5 text-right">
           <Link href={`/models/${purchase.modelId}`} className="text-xs text-hud hover:underline">
-            Continue shopping
+            {t('pay.continue')}
           </Link>
         </div>
 
@@ -211,7 +214,7 @@ export default function CheckoutPage() {
         <div className="mt-4 space-y-3">
           <div>
             <label htmlFor="checkout-email" className="block text-xs font-medium text-white/85">
-              Email address
+              {t('pay.email')}
             </label>
             <input
               id="checkout-email"
@@ -224,10 +227,10 @@ export default function CheckoutPage() {
 
           <div>
             <label htmlFor="checkout-name" className="block text-xs font-medium text-white/85">
-              Your display name
+              {t('pay.displayName')}
             </label>
             <p className="mt-0.5 text-[11px] text-white/45">
-              Enter your name as you&apos;d like it to be shown to the creator
+              {t('pay.displayNameHint')}
             </p>
             <input
               id="checkout-name"
@@ -244,15 +247,15 @@ export default function CheckoutPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-xs font-medium text-white">
               <QrCode className="h-4 w-4 text-hud" />
-              PromptPay QR Payment
+              {t('pay.method')}
             </div>
-            <span className="font-mono text-[10px] uppercase tracking-wider text-hud/80">QR Only</span>
+            <span className="font-mono text-[10px] uppercase tracking-wider text-hud/80">{t('pay.qrOnly')}</span>
           </div>
         </div>
 
         {errorMsg && (
           <p role="alert" className="mt-3 rounded-lg border border-amber/40 bg-amber/10 px-3 py-2 text-xs text-amber">
-            {errorMsg}
+            {msgText(errorMsg, t)}
           </p>
         )}
 
@@ -265,26 +268,26 @@ export default function CheckoutPage() {
             className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-white text-sm font-semibold text-black transition-colors hover:bg-white/85 disabled:opacity-60"
           >
             {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-            {submitting ? 'Generating QR…' : 'Checkout now'}
+            {submitting ? t('pay.generating') : t('pay.checkoutNow')}
           </button>
         ) : (
           <div className="mt-5 rounded-xl border border-hud/35 bg-black/70 p-4 text-center">
             {qrInfo.provider === 'stripe' && qrInfo.qrImageUrl ? (
               <>
                 <p className="font-mono text-xs uppercase tracking-wider text-hud">
-                  Scan PromptPay QR ({formatMoney(qrInfo.amountSatang, 'THB')})
+                  {t('pay.scanQr', { amount: formatMoney(qrInfo.amountSatang, 'THB') })}
                 </p>
                 <div className="mx-auto mt-3 inline-block rounded-xl bg-white p-3">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={qrInfo.qrImageUrl}
-                    alt="PromptPay QR Code"
+                    alt={t('pay.qrAlt')}
                     className="h-48 w-48 object-contain"
                   />
                 </div>
                 <p className="mt-3 flex items-center justify-center gap-2 font-mono text-[11px] text-white/60">
                   <Loader2 className="h-3.5 w-3.5 animate-spin text-hud" />
-                  Waiting for payment confirmation…
+                  {t('pay.waiting')}
                 </p>
                 {qrInfo.hostedUrl && (
                   <a
@@ -293,7 +296,7 @@ export default function CheckoutPage() {
                     rel="noreferrer"
                     className="mt-2 inline-flex items-center gap-1 text-xs text-hud hover:underline"
                   >
-                    Open Stripe QR instructions
+                    {t('pay.stripeHelp')}
                     <ExternalLink className="h-3 w-3" />
                   </a>
                 )}
@@ -301,14 +304,14 @@ export default function CheckoutPage() {
             ) : (
               <>
                 <p className="font-mono text-xs uppercase tracking-wider text-amber">
-                  Mock QR Mode ({formatMoney(qrInfo.amountSatang, 'THB')})
+                  {t('pay.mockQr', { amount: formatMoney(qrInfo.amountSatang, 'THB') })}
                 </p>
                 <div className="mx-auto mt-3 grid h-40 w-40 place-items-center rounded-xl border border-dashed border-white/25 bg-white/5">
                   <QrCode className="h-24 w-24 text-white/80" />
                 </div>
                 <p className="mt-2 text-xs text-white/55">
-                  Set <code className="text-white/80">PAYMENT_PROVIDER=stripe</code> in{' '}
-                  <code className="text-white/80">core-api/.env</code> for live PromptPay QR.
+                  {t('pay.mockHelp1')} <code className="text-white/80">PAYMENT_PROVIDER=stripe</code> {t('pay.mockHelp2')}{' '}
+                  <code className="text-white/80">core-api/.env</code> {t('pay.mockHelp3')}
                 </p>
                 <button
                   type="button"
@@ -317,7 +320,7 @@ export default function CheckoutPage() {
                   className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-full bg-white text-xs font-semibold text-black transition-colors hover:bg-white/85 disabled:opacity-60"
                 >
                   {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-                  Confirm QR Payment (Mock)
+                  {t('pay.confirmMock')}
                 </button>
               </>
             )}
@@ -325,7 +328,7 @@ export default function CheckoutPage() {
         )}
 
         <p className="mt-4 text-center text-[11px] text-white/45">
-          Questions, refunds or issues: contact {sellerName}.
+          {t('pay.contactSeller', { name: sellerName })}
         </p>
       </div>
     </main>

@@ -7,9 +7,11 @@ import { MouseEvent, useEffect, useState } from 'react';
 import { Heart, Image as ImageIcon, Loader2 } from 'lucide-react';
 import UserAvatar from '@/components/ui/UserAvatar';
 import { formatPrice as price } from '@/lib/format';
+import { useT } from '@/lib/i18n/client';
 import type { Model } from '@/lib/types';
 
 export default function ModelCard({ model }: { model: Model }) {
+  const t = useT();
   const free = model.priceCents === 0;
   const pathname = usePathname();
   const [opening, setOpening] = useState(false);
@@ -48,13 +50,13 @@ export default function ModelCard({ model }: { model: Model }) {
             className="flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 bg-white/[0.06] text-white/40"
           >
             <ImageIcon className="h-7 w-7" />
-            <span className="text-sm">Image</span>
+            <span className="text-sm">{t('card.image')}</span>
           </div>
         )}
         {opening && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-[rgba(4,8,18,0.78)] backdrop-blur-[2px]">
             <Loader2 aria-hidden className="h-6 w-6 animate-spin text-hud motion-reduce:animate-none" />
-            <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-hud">[ Opening model… ]</span>
+            <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-hud">{t('card.opening')}</span>
           </div>
         )}
       </div>
@@ -72,11 +74,11 @@ export default function ModelCard({ model }: { model: Model }) {
                 : 'rounded border border-white/25 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-white'
             }
           >
-            {free ? 'Free' : price(model.priceCents)}
+            {free ? t('gallery.free') : price(model.priceCents)}
           </span>
           <span className="inline-flex items-center gap-1 font-mono text-[11px] text-white/65">
             <Heart aria-hidden className="h-4 w-4" />
-            <span className="sr-only">Likes:</span>
+            <span className="sr-only">{t('card.likes')}</span>
             {model.likeCount}
           </span>
         </div>

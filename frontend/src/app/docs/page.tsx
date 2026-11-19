@@ -99,6 +99,9 @@ function DocsEn() {
           <P>
             For a paid model add your key to the address: <C>https://YOUR_SITE/embed/MODEL_ID?key=YOUR_EMBED_KEY</C>.
           </P>
+          <P>
+            The few messages of the viewer (loading, "preview only") are in English by default. Add <C>&amp;lang=th</C> to the address for Thai.
+          </P>
         </Section>
 
         <Section id="paid-models" title="Paid models and embed keys">

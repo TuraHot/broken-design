@@ -6,10 +6,26 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { CDN_SERVICE_URL, CORE_API_URL } from "@/lib/api";
+import { useT } from "@/lib/i18n/client";
+import type { MessageKey } from "@/lib/i18n/messages";
 import { readSession } from "@/lib/session";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// What the status line shows: a text of ours (kept as a key, so it follows the language) or a message the server sent
+// (shown as the server wrote it).
+type Status = { key: MessageKey; vars?: Record<string, string | number> } | { text: string } | null;
+
+// A failure that carries one of our own texts.
+class UiMessage extends Error {
+  constructor(
+    public key: MessageKey,
+    public vars?: Record<string, string | number>,
+  ) {
+    super(key);
+  }
+}
 
 export default function ModelActions({
   modelId,
@@ -23,7 +39,8 @@ export default function ModelActions({
   priceLabel: string;
 }) {
   const router = useRouter();
-  const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  const t = useT();
+  const [status, setStatus] = useState<Status>(null);
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
@@ -41,6 +58,12 @@ export default function ModelActions({
 
   const isRealModel = Boolean(modelId && UUID_RE.test(modelId));
 
+  const failure = (err: unknown, fallback: MessageKey): Status => {
+    if (err instanceof UiMessage) return { key: err.key, vars: err.vars };
+    if (err instanceof Error && err.message) return { text: err.message };
+    return { key: fallback };
+  };
+
   const performDownload = async (id: string, token: string) => {
     const res = await fetch(
       `${CDN_SERVICE_URL}/cdn/models/${encodeURIComponent(id)}/download`,
@@ -51,9 +74,8 @@ export default function ModelActions({
 
     if (!res.ok) {
       const body = await res.json().catch(() => null);
-      throw new Error(
-        body?.error?.message || `Download failed (${res.status})`,
-      );
+      if (body?.error?.message) throw new Error(body.error.message);
+      throw new UiMessage("model.dlFailedStatus", { status: res.status });
     }
 
     const blob = await res.blob();
@@ -61,39 +83,37 @@ export default function ModelActions({
     const a = document.createElement("a");
     a.href = url;
     const safeName =
-      title.replace(/[^\w\u0E00-\u0E7F-]+/g, "_").replace(/^_+|_+$/g, "") ||
+      title.replace(/[^\w฀-๿-]+/g, "_").replace(/^_+|_+$/g, "") ||
       "model";
     a.download = `${safeName}.glb`;
     document.body.appendChild(a);
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
-    setStatusMsg("Download started (.glb)");
+    setStatus({ key: "model.dlStarted" });
   };
 
   const handleDownload = async () => {
     if (busyRef.current) return;
     if (!isRealModel || !modelId) {
-      setStatusMsg(
-        "This is a sample catalogue item — upload or open a real model to download its .glb file.",
-      );
+      setStatus({ key: "model.dlSample" });
       return;
     }
 
     const session = readSession();
     setSignedIn(session !== null);
     if (!session) {
-      setStatusMsg("Please log in first to download this model.");
+      setStatus({ key: "model.dlLogin" });
       return;
     }
 
     try {
       busyRef.current = true;
       setBusy(true);
-      setStatusMsg(null);
+      setStatus(null);
       await performDownload(modelId, session.token);
-    } catch (err: any) {
-      setStatusMsg(err?.message || "Unable to download model from CDN.");
+    } catch (err) {
+      setStatus(failure(err, "model.dlFailed"));
     } finally {
       busyRef.current = false;
       setBusy(false);
@@ -103,23 +123,21 @@ export default function ModelActions({
   const handleBuy = async () => {
     if (busyRef.current) return;
     if (!isRealModel || !modelId) {
-      setStatusMsg("Checkout is available for uploaded models.");
+      setStatus({ key: "model.buySample" });
       return;
     }
 
     const session = readSession();
     setSignedIn(session !== null);
     if (!session) {
-      setStatusMsg(
-        "Please log in first to purchase or download this paid model.",
-      );
+      setStatus({ key: "model.buyLogin" });
       return;
     }
 
     try {
       busyRef.current = true;
       setBusy(true);
-      setStatusMsg(null);
+      setStatus(null);
       const checkoutRes = await fetch(
         `${CORE_API_URL}/api/models/${encodeURIComponent(modelId)}/checkout`,
         {
@@ -130,16 +148,14 @@ export default function ModelActions({
       const checkoutData = await checkoutRes.json().catch(() => null);
 
       if (checkoutData?.error?.code === "ALREADY_PURCHASED") {
-        setStatusMsg("You already own this model — starting download…");
+        setStatus({ key: "model.alreadyOwn" });
         await performDownload(modelId, session.token);
         return;
       }
 
       if (!checkoutRes.ok) {
-        throw new Error(
-          checkoutData?.error?.message ||
-            `Checkout failed (${checkoutRes.status})`,
-        );
+        if (checkoutData?.error?.message) throw new Error(checkoutData.error.message);
+        throw new UiMessage("model.buyFailedStatus", { status: checkoutRes.status });
       }
 
       if (checkoutData?.checkoutUrl) {
@@ -147,11 +163,10 @@ export default function ModelActions({
         return;
       }
 
-      throw new Error(
-        checkoutData?.message || "Payment checkout URL is not available.",
-      );
-    } catch (err: any) {
-      setStatusMsg(err?.message || "Checkout could not be completed.");
+      if (checkoutData?.message) throw new Error(checkoutData.message);
+      throw new UiMessage("model.buyNoUrl");
+    } catch (err) {
+      setStatus(failure(err, "model.buyFailed"));
     } finally {
       busyRef.current = false;
       setBusy(false);
@@ -168,10 +183,10 @@ export default function ModelActions({
       >
         {busy && <Loader2 aria-hidden className="h-4 w-4 animate-spin motion-reduce:animate-none" />}
         {busy
-          ? "Processing…"
+          ? t("model.processing")
           : free
-            ? "Get this model (.glb)"
-            : `Buy for ${priceLabel}`}
+            ? t("model.getFree")
+            : t("model.buy", { price: priceLabel })}
       </button>
 
       {!free && isRealModel && (
@@ -181,23 +196,23 @@ export default function ModelActions({
           onClick={handleDownload}
           className="h-9 w-full rounded-lg border border-white/20 bg-white/5 px-3 text-xs font-mono uppercase tracking-wider text-white/80 transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Already bought? Download .glb
+          {t("model.alreadyBought")}
         </button>
       )}
 
       {ready && !signedIn && (
         <p className="text-xs text-white/65">
-          Please{" "}
+          {t("model.loginPre")}{" "}
           <Link href="/login" className="font-medium text-hud underline underline-offset-2 hover:text-white">
-            log in
+            {t("model.loginLink")}
           </Link>{" "}
-          to download or purchase this model.
+          {t("model.loginPost")}
         </p>
       )}
 
-      {statusMsg && (
+      {status && (
         <p role="status" className="text-sm text-amber">
-          {statusMsg}
+          {"text" in status ? status.text : t(status.key, status.vars)}
         </p>
       )}
     </div>

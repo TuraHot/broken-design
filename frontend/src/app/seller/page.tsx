@@ -31,6 +31,8 @@ import {
 } from '@/lib/api';
 import { creatorHandle } from '@/lib/creators';
 import { formatMoney, formatPrice } from '@/lib/format';
+import { useLocale, useT } from '@/lib/i18n/client';
+import type { MessageKey } from '@/lib/i18n/messages';
 import type {
   AuthUser,
   SellerModelItem,
@@ -38,10 +40,17 @@ import type {
   SellerWalletResponse,
 } from '@/lib/types';
 
+// A status line is either a translated key (follows the language switch) or text the server wrote.
+type Msg = { key: MessageKey; vars?: Record<string, string | number> } | { text: string };
+const fromErr = (err: any, key: MessageKey): Msg => (err?.message ? { text: err.message } : { key });
+
 const CARD = 'rounded-lg border border-white/10 bg-white/5 p-5 sm:p-6';
 const LABEL = 'font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70';
 
 export default function SellerPage() {
+  const t = useT();
+  const locale = useLocale();
+  const dateFmt = (v: string) => new Date(v).toLocaleDateString(locale === 'th' ? 'th-TH' : 'en-US');
   const [user, setUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isSeller, setIsSeller] = useState<boolean | null>(null);
@@ -52,7 +61,7 @@ export default function SellerPage() {
   const [payoutMethod, setPayoutMethod] = useState<'promptpay' | 'bank'>('promptpay');
   const [payoutAccount, setPayoutAccount] = useState('');
   const [loading, setLoading] = useState(true);
-  const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  const [statusMsg, setStatusMsg] = useState<Msg | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
 
   // 1. Load user & token
@@ -94,7 +103,7 @@ export default function SellerPage() {
         }
       }
     } catch (err: any) {
-      setStatusMsg(err?.message || 'Could not load seller data.');
+      setStatusMsg(fromErr(err, 'seller.errLoad'));
     } finally {
       setLoading(false);
     }
@@ -120,10 +129,10 @@ export default function SellerPage() {
         if (next) localStorage.setItem('user', JSON.stringify(next));
         return next;
       });
-      setStatusMsg('Seller mode enabled! You can now manage your assets.');
+      setStatusMsg({ key: 'seller.enabled' });
       await loadData(token);
     } catch (err: any) {
-      setStatusMsg(err?.message || 'Failed to activate seller mode.');
+      setStatusMsg(fromErr(err, 'seller.enableFail'));
     } finally {
       setBusyAction(null);
     }
@@ -132,7 +141,7 @@ export default function SellerPage() {
   // Handle Soft Delete Model
   const handleDeleteModel = async (modelId: string, title: string) => {
     if (!token) return;
-    if (!window.confirm(`Are you sure you want to remove "${title}"? Existing paid buyers will retain access, but it will be hidden from the public gallery.`)) {
+    if (!window.confirm(t('seller.deleteConfirm', { title }))) {
       return;
     }
 
@@ -140,9 +149,9 @@ export default function SellerPage() {
       setBusyAction(`del-${modelId}`);
       await deleteModel(modelId, token);
       setModels((prev) => prev.map((m) => (m.id === modelId ? { ...m, isDeleted: true } : m)));
-      setStatusMsg(`Model "${title}" has been retired (soft deleted).`);
+      setStatusMsg({ key: 'seller.deleted', vars: { title } });
     } catch (err: any) {
-      setStatusMsg(err?.message || 'Could not delete model.');
+      setStatusMsg(fromErr(err, 'seller.deleteFail'));
     } finally {
       setBusyAction(null);
     }
@@ -151,7 +160,7 @@ export default function SellerPage() {
   if (loading) {
     return (
       <main className="mx-auto max-w-[1200px] px-4 pb-16 pt-24 md:px-6">
-        <p className="font-mono text-sm text-white/50">Loading seller dashboard…</p>
+        <p className="font-mono text-sm text-white/50">{t('seller.loading')}</p>
       </main>
     );
   }
@@ -161,16 +170,16 @@ export default function SellerPage() {
     return (
       <main className="mx-auto max-w-[800px] px-4 pb-16 pt-28 md:px-6">
         <div className={`${CARD} text-center`}>
-          <p className={LABEL}>[ Seller Access ]</p>
-          <h1 className="mt-4 font-display text-2xl uppercase tracking-wide text-white">Sign In as Creator</h1>
+          <p className={LABEL}>{t('seller.needLabel')}</p>
+          <h1 className="mt-4 font-display text-2xl uppercase tracking-wide text-white">{t('seller.needTitle')}</h1>
           <p className="mt-3 text-[15px] leading-relaxed text-white/65">
-            You must be logged in to access the seller dashboard and monitor your 3D model sales.
+            {t('seller.needBody')}
           </p>
           <Link
             href="/login"
             className="mt-6 inline-block rounded-lg bg-white px-5 py-2 text-sm font-medium text-black transition-colors hover:bg-white/85"
           >
-            Log in to continue
+            {t('seller.needLogin')}
           </Link>
         </div>
       </main>
@@ -183,12 +192,12 @@ export default function SellerPage() {
       <main className="mx-auto max-w-[800px] px-4 pb-16 pt-28 md:px-6">
         <div className={`${CARD} text-center`}>
           <Store className="mx-auto h-12 w-12 text-hud" />
-          <p className={`${LABEL} mt-4`}>[ Seller Mode Inactive ]</p>
+          <p className={`${LABEL} mt-4`}>{t('seller.offLabel')}</p>
           <h1 className="mt-2 font-display text-2xl uppercase tracking-wide text-white">
-            Activate Your Creator Store
+            {t('seller.offTitle')}
           </h1>
           <p className="mt-3 text-[15px] leading-relaxed text-white/65">
-            Your account is currently in Buyer mode. Click below to activate Creator capabilities, upload 3D models, and earn revenue.
+            {t('seller.offBody')}
           </p>
           <button
             type="button"
@@ -197,7 +206,7 @@ export default function SellerPage() {
             className="mt-6 inline-flex items-center gap-2 rounded-lg bg-hud px-6 py-2.5 font-mono text-xs uppercase tracking-wider text-black font-semibold transition-colors hover:bg-hud/85 disabled:opacity-60"
           >
             <Plus className="h-4 w-4" />
-            {busyAction === 'enable' ? 'Activating…' : 'Activate Seller Mode'}
+            {busyAction === 'enable' ? t('seller.activating') : t('seller.offButton')}
           </button>
         </div>
       </main>
@@ -213,13 +222,13 @@ export default function SellerPage() {
       {/* Toast Notification */}
       {statusMsg && (
         <div className="mb-6 flex items-center justify-between rounded-lg border border-hud/30 bg-hud/10 px-4 py-3 text-sm text-hud">
-          <span>{statusMsg}</span>
+          <span>{'key' in statusMsg ? t(statusMsg.key, statusMsg.vars) : statusMsg.text}</span>
           <button
             type="button"
             onClick={() => setStatusMsg(null)}
             className="ml-4 font-mono text-xs opacity-70 hover:opacity-100"
           >
-            [Close]
+            {t('acct.close')}
           </button>
         </div>
       )}
@@ -231,13 +240,13 @@ export default function SellerPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-white/10 pb-6">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="font-display text-2xl uppercase text-white">Creator Dashboard</h1>
+            <h1 className="font-display text-2xl uppercase text-white">{t('seller.title')}</h1>
             <span className="rounded border border-hud/40 bg-hud/15 px-2 py-0.5 font-mono text-[10px] uppercase text-hud">
-              Seller Active
+              {t('seller.active')}
             </span>
           </div>
           <p className="mt-1 font-mono text-xs text-white/50">
-            Welcome back, {displayName} · Handle: @{handle}
+            {t('seller.welcome', { name: displayName, handle })}
           </p>
         </div>
 
@@ -247,7 +256,7 @@ export default function SellerPage() {
             className="flex h-9 items-center gap-1.5 rounded-lg border border-white/20 bg-white/5 px-3.5 font-mono text-xs uppercase tracking-wider text-white transition-colors hover:bg-white/10"
           >
             <User className="h-4 w-4" />
-            Public Profile
+            {t('seller.publicProfile')}
             <ArrowUpRight className="h-3.5 w-3.5 text-white/50" />
           </Link>
           <Link
@@ -255,7 +264,7 @@ export default function SellerPage() {
             className="flex h-9 items-center gap-1.5 rounded-lg bg-white px-3.5 font-mono text-xs uppercase tracking-wider text-black transition-colors hover:bg-white/85"
           >
             <Plus className="h-4 w-4" />
-            Upload New Model
+            {t('seller.uploadNew')}
           </Link>
         </div>
       </div>
@@ -264,35 +273,35 @@ export default function SellerPage() {
       <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className={CARD}>
           <div className="flex items-center justify-between text-white/50">
-            <span className={LABEL}>[ Total Revenue ]</span>
+            <span className={LABEL}>{t('seller.revenue')}</span>
             <Coins className="h-4 w-4 text-hud" />
           </div>
           <p className="mt-3 font-display text-2xl uppercase text-white">
             {formatPrice(salesSummary?.totalRevenue || 0)}
           </p>
-          <p className="mt-1 font-mono text-[11px] text-white/40">Gross sales across all models</p>
+          <p className="mt-1 font-mono text-[11px] text-white/40">{t('seller.revenueNote')}</p>
         </div>
 
         <div className={CARD}>
           <div className="flex items-center justify-between text-white/50">
-            <span className={LABEL}>[ Total Sales ]</span>
+            <span className={LABEL}>{t('seller.sales')}</span>
             <ShoppingBag className="h-4 w-4 text-emerald-400" />
           </div>
           <p className="mt-3 font-display text-2xl uppercase text-white">
-            {salesSummary?.totalSales ?? 0} Orders
+            {t('seller.orders', { n: salesSummary?.totalSales ?? 0 })}
           </p>
-          <p className="mt-1 font-mono text-[11px] text-white/40">Completed paid downloads</p>
+          <p className="mt-1 font-mono text-[11px] text-white/40">{t('seller.salesNote')}</p>
         </div>
 
         <div className={CARD}>
           <div className="flex items-center justify-between text-white/50">
-            <span className={LABEL}>[ Active Models ]</span>
+            <span className={LABEL}>{t('seller.activeModels')}</span>
             <Layers className="h-4 w-4 text-purple-400" />
           </div>
           <p className="mt-3 font-display text-2xl uppercase text-white">
-            {activeModels.length} Models
+            {t('seller.modelsCount', { n: activeModels.length })}
           </p>
-          <p className="mt-1 font-mono text-[11px] text-white/40">Published to Lixyte CDN</p>
+          <p className="mt-1 font-mono text-[11px] text-white/40">{t('seller.activeNote')}</p>
         </div>
       </div>
 
@@ -300,17 +309,17 @@ export default function SellerPage() {
       <section className="mt-10">
         <div className="flex items-center gap-2 border-b border-white/10 pb-3">
           <Wallet className="h-4 w-4 text-hud" />
-          <h2 className="font-display text-lg uppercase text-white">Platform Wallet &amp; Withdrawal</h2>
+          <h2 className="font-display text-lg uppercase text-white">{t('seller.walletTitle')}</h2>
         </div>
 
         <div className="mt-5 grid gap-6 lg:grid-cols-[1fr_1.2fr]">
           <div className={CARD}>
-            <span className={LABEL}>[ Held on Platform ]</span>
+            <span className={LABEL}>{t('seller.held')}</span>
             <p className="mt-2 font-display text-3xl uppercase text-white">
               {formatMoney(walletData?.wallet.availableGrossCents ?? 0, 'USD')}
             </p>
             <p className="mt-1 text-xs text-white/55">
-              เงินจากการขายจะถูกเก็บไว้ในระบบเว็บก่อน และคำนวณส่วนต่างค่าธรรมเนียมแพลตฟอร์มเมื่อทำรายการถอน
+              {t('seller.heldNote')}
             </p>
 
             {(() => {
@@ -324,15 +333,15 @@ export default function SellerPage() {
               return (
                 <dl className="mt-5 space-y-2 border-t border-white/10 pt-4 font-mono text-xs">
                   <div className="flex justify-between text-white/70">
-                    <dt>ยอดขอถอน (Gross)</dt>
+                    <dt>{t('seller.gross')}</dt>
                     <dd>{formatMoney(previewGross, 'USD')}</dd>
                   </div>
                   <div className="flex justify-between text-amber">
-                    <dt>ส่วนต่างค่าธรรมเนียมเว็บ ({feeBps / 100}%)</dt>
+                    <dt>{t('seller.fee', { pct: feeBps / 100 })}</dt>
                     <dd>-{formatMoney(previewFee, 'USD')}</dd>
                   </div>
                   <div className="flex justify-between border-t border-white/10 pt-2 text-sm font-semibold text-hud">
-                    <dt>ยอดสุทธิที่จะได้รับ (Net)</dt>
+                    <dt>{t('seller.net')}</dt>
                     <dd>{formatMoney(previewNet, 'USD')}</dd>
                   </div>
                 </dl>
@@ -355,20 +364,20 @@ export default function SellerPage() {
                   payoutAccount,
                 });
                 setPayoutAccount('');
-                setStatusMsg('Withdrawal request submitted! Fee breakdown has been recorded.');
+                setStatusMsg({ key: 'seller.withdrawDone' });
                 await loadData(token);
               } catch (err: any) {
-                setStatusMsg(err?.message || 'Withdrawal request failed.');
+                setStatusMsg(fromErr(err, 'seller.withdrawFail'));
               } finally {
                 setBusyAction(null);
               }
             }}
           >
-            <span className={LABEL}>[ Request Withdrawal ]</span>
+            <span className={LABEL}>{t('seller.withdrawLabel')}</span>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <div>
                 <label htmlFor="withdraw-amount" className="block text-xs text-white/75">
-                  Amount (USD)
+                  {t('seller.amountUsd')}
                 </label>
                 <input
                   id="withdraw-amount"
@@ -383,7 +392,7 @@ export default function SellerPage() {
               </div>
               <div>
                 <label htmlFor="payout-method" className="block text-xs text-white/75">
-                  Payout Method
+                  {t('seller.payoutMethod')}
                 </label>
                 <select
                   id="payout-method"
@@ -391,15 +400,15 @@ export default function SellerPage() {
                   onChange={(e) => setPayoutMethod(e.target.value as 'promptpay' | 'bank')}
                   className="mt-1.5 h-10 w-full rounded-lg border border-white/15 bg-black/50 px-3 text-sm text-white focus:border-hud/60 focus:outline-none"
                 >
-                  <option value="promptpay">PromptPay</option>
-                  <option value="bank">Bank Transfer</option>
+                  <option value="promptpay">{t('seller.promptpay')}</option>
+                  <option value="bank">{t('seller.bank')}</option>
                 </select>
               </div>
             </div>
 
             <div className="mt-4">
               <label htmlFor="payout-account" className="block text-xs text-white/75">
-                {payoutMethod === 'promptpay' ? 'PromptPay Phone / National ID' : 'Bank Name & Account Number'}
+                {payoutMethod === 'promptpay' ? t('seller.accountPromptpay') : t('seller.accountBank')}
               </label>
               <input
                 id="payout-account"
@@ -407,7 +416,7 @@ export default function SellerPage() {
                 required
                 value={payoutAccount}
                 onChange={(e) => setPayoutAccount(e.target.value)}
-                placeholder={payoutMethod === 'promptpay' ? 'e.g. 081-234-5678' : 'e.g. KBANK 123-4-56789-0'}
+                placeholder={payoutMethod === 'promptpay' ? t('seller.phPromptpay') : t('seller.phBank')}
                 className="mt-1.5 h-10 w-full rounded-lg border border-white/15 bg-black/50 px-3 text-sm text-white focus:border-hud/60 focus:outline-none"
               />
             </div>
@@ -417,7 +426,7 @@ export default function SellerPage() {
               disabled={busyAction === 'withdraw' || (walletData?.wallet.availableGrossCents ?? 0) <= 0}
               className="mt-5 inline-flex h-10 items-center justify-center rounded-lg bg-white px-5 font-mono text-xs font-semibold uppercase tracking-wider text-black transition-colors hover:bg-white/85 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {busyAction === 'withdraw' ? 'Processing…' : 'Request Withdrawal'}
+              {busyAction === 'withdraw' ? t('seller.processing') : t('seller.withdrawButton')}
             </button>
           </form>
         </div>
@@ -427,12 +436,12 @@ export default function SellerPage() {
             <table className="w-full text-left font-mono text-xs">
               <thead className="border-b border-white/10 bg-white/5 text-[11px] uppercase tracking-wider text-white/50">
                 <tr>
-                  <th className="px-4 py-3">Gross</th>
-                  <th className="px-4 py-3">Platform Fee</th>
-                  <th className="px-4 py-3">Net Payout</th>
-                  <th className="px-4 py-3">Destination</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Date</th>
+                  <th className="px-4 py-3">{t('seller.thGross')}</th>
+                  <th className="px-4 py-3">{t('seller.thFee')}</th>
+                  <th className="px-4 py-3">{t('seller.thNet')}</th>
+                  <th className="px-4 py-3">{t('seller.thDestination')}</th>
+                  <th className="px-4 py-3">{t('seller.thStatus')}</th>
+                  <th className="px-4 py-3">{t('seller.thDate')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
@@ -445,7 +454,7 @@ export default function SellerPage() {
                       {w.payoutMethod.toUpperCase()} · {w.payoutAccount}
                     </td>
                     <td className="px-4 py-3 uppercase text-white/80">{w.status}</td>
-                    <td className="px-4 py-3 text-white/40">{new Date(w.createdAt).toLocaleDateString()}</td>
+                    <td className="px-4 py-3 text-white/40">{dateFmt(w.createdAt)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -458,7 +467,7 @@ export default function SellerPage() {
       <section className="mt-10">
         <div className="flex items-center justify-between border-b border-white/10 pb-3">
           <h2 className="font-display text-lg uppercase text-white">
-            My 3D Models
+            {t('seller.myModels')}
             <span className="ml-2 font-mono text-xs text-white/50">({models.length})</span>
           </h2>
           <button
@@ -466,22 +475,22 @@ export default function SellerPage() {
             onClick={() => token && loadData(token)}
             className="flex items-center gap-1 font-mono text-xs text-white/65 hover:text-white"
           >
-            <RefreshCw className="h-3 w-3" /> Refresh
+            <RefreshCw className="h-3 w-3" /> {t('seller.refresh')}
           </button>
         </div>
 
         {models.length === 0 ? (
           <div className={`${CARD} mt-6 text-center py-12`}>
             <Layers className="mx-auto h-8 w-8 text-white/30" />
-            <h3 className="mt-3 font-display text-base uppercase text-white">No models published yet</h3>
+            <h3 className="mt-3 font-display text-base uppercase text-white">{t('seller.noneTitle')}</h3>
             <p className="mt-1 text-sm text-white/50">
-              Upload your first .glb asset to start showcasing and selling your 3D work.
+              {t('seller.noneBody')}
             </p>
             <Link
               href="/upload"
               className="mt-5 inline-block rounded-lg bg-white px-4 py-2 text-xs font-mono uppercase tracking-wider text-black transition-colors hover:bg-white/85"
             >
-              Upload a .glb Model
+              {t('seller.noneButton')}
             </Link>
           </div>
         ) : (
@@ -489,12 +498,12 @@ export default function SellerPage() {
             <table className="w-full text-left text-sm">
               <thead className="border-b border-white/10 bg-white/5 font-mono text-[11px] uppercase tracking-wider text-white/50">
                 <tr>
-                  <th className="px-4 py-3">Title</th>
-                  <th className="px-4 py-3">Price</th>
-                  <th className="px-4 py-3">Views</th>
-                  <th className="px-4 py-3">Downloads</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
+                  <th className="px-4 py-3">{t('seller.thTitle')}</th>
+                  <th className="px-4 py-3">{t('seller.thPrice')}</th>
+                  <th className="px-4 py-3">{t('seller.thViews')}</th>
+                  <th className="px-4 py-3">{t('seller.thDownloads')}</th>
+                  <th className="px-4 py-3">{t('seller.thStatus')}</th>
+                  <th className="px-4 py-3 text-right">{t('seller.thActions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5 font-mono text-xs">
@@ -510,7 +519,7 @@ export default function SellerPage() {
                       <span className="block text-[11px] text-white/40">{m.id}</span>
                     </td>
                     <td className="px-4 py-3.5 text-white/80">
-                      {m.priceCents === 0 ? 'Free' : formatPrice(m.priceCents)}
+                      {m.priceCents === 0 ? t('acct.free') : formatPrice(m.priceCents)}
                     </td>
                     <td className="px-4 py-3.5 text-white/60">
                       <span className="flex items-center gap-1">
@@ -525,15 +534,15 @@ export default function SellerPage() {
                     <td className="px-4 py-3.5">
                       {m.isDeleted ? (
                         <span className="rounded bg-red-500/10 px-2 py-0.5 text-red-400 border border-red-500/20">
-                          Deleted
+                          {t('seller.statusDeleted')}
                         </span>
                       ) : m.isHidden ? (
                         <span className="rounded bg-amber-500/10 px-2 py-0.5 text-amber-400 border border-amber-500/20">
-                          Hidden by Admin
+                          {t('seller.statusHidden')}
                         </span>
                       ) : (
                         <span className="rounded bg-emerald-500/10 px-2 py-0.5 text-emerald-400 border border-emerald-500/20">
-                          Live
+                          {t('seller.statusLive')}
                         </span>
                       )}
                     </td>
@@ -543,7 +552,7 @@ export default function SellerPage() {
                           href={`/models/${m.id}`}
                           className="rounded border border-white/10 px-2 py-1 text-[11px] text-white/70 hover:text-white"
                         >
-                          View
+                          {t('acct.view')}
                         </Link>
                         {!m.isDeleted && (
                           <button
@@ -551,7 +560,7 @@ export default function SellerPage() {
                             disabled={busyAction === `del-${m.id}`}
                             onClick={() => handleDeleteModel(m.id, m.title)}
                             className="rounded border border-red-500/30 px-2 py-1 text-[11px] text-red-400/80 hover:bg-red-500/10 hover:text-red-300 disabled:opacity-50"
-                            title="Soft delete model"
+                            title={t('seller.softDelete')}
                           >
                             <Trash2 className="h-3 w-3 inline" />
                           </button>
@@ -570,28 +579,28 @@ export default function SellerPage() {
       {salesSummary && salesSummary.sales && salesSummary.sales.length > 0 && (
         <section className="mt-12">
           <h2 className="font-display text-lg uppercase text-white border-b border-white/10 pb-3">
-            Recent Orders & Buyers
+            {t('seller.ordersTitle')}
           </h2>
           <div className="mt-4 overflow-x-auto rounded-lg border border-white/10">
             <table className="w-full text-left text-sm font-mono text-xs">
               <thead className="border-b border-white/10 bg-white/5 text-[11px] uppercase tracking-wider text-white/50">
                 <tr>
-                  <th className="px-4 py-3">Model</th>
-                  <th className="px-4 py-3">Buyer</th>
-                  <th className="px-4 py-3">Price</th>
-                  <th className="px-4 py-3">Date</th>
+                  <th className="px-4 py-3">{t('seller.thModel')}</th>
+                  <th className="px-4 py-3">{t('seller.thBuyer')}</th>
+                  <th className="px-4 py-3">{t('seller.thPrice')}</th>
+                  <th className="px-4 py-3">{t('seller.thDate')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
                 {salesSummary.sales.map((s) => (
                   <tr key={s.purchaseId} className="hover:bg-white/[0.02]">
                     <td className="px-4 py-3 text-white">{s.title}</td>
-                    <td className="px-4 py-3 text-white/70">{s.buyerName || 'Buyer'}</td>
+                    <td className="px-4 py-3 text-white/70">{s.buyerName || t('seller.buyerFallback')}</td>
                     <td className="px-4 py-3 text-emerald-400 font-medium">
                       +{formatPrice(s.priceCents)}
                     </td>
                     <td className="px-4 py-3 text-white/40">
-                      {new Date(s.soldAt).toLocaleDateString()}
+                      {dateFmt(s.soldAt)}
                     </td>
                   </tr>
                 ))}

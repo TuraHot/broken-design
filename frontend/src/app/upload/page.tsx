@@ -19,14 +19,19 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { CDN_SERVICE_URL } from '@/lib/api';
+import { useT } from '@/lib/i18n/client';
+import type { MessageKey } from '@/lib/i18n/messages';
+
+// An error line is either a translated key (follows the language switch) or text the server wrote.
+type Msg = { key: MessageKey; vars?: Record<string, string | number> } | { text: string };
 
 // Supported licenses
 const LICENSES = [
-  { value: 'CC0', label: 'CC0 — Public Domain', desc: 'No rights reserved, free for any use' },
-  { value: 'CC-BY', label: 'CC-BY — Attribution', desc: 'Free with credit to creator' },
-  { value: 'CC-BY-NC', label: 'CC-BY-NC — Non-Commercial', desc: 'Free for non-commercial projects' },
-  { value: 'COMMERCIAL', label: 'COMMERCIAL — Paid License', desc: 'Exclusive or paid commercial rights' },
-] as const;
+  { value: 'CC0', label: 'upload.lic.cc0', desc: 'upload.lic.cc0d' },
+  { value: 'CC-BY', label: 'upload.lic.ccby', desc: 'upload.lic.ccbyd' },
+  { value: 'CC-BY-NC', label: 'upload.lic.ccbync', desc: 'upload.lic.ccbyncd' },
+  { value: 'COMMERCIAL', label: 'upload.lic.com', desc: 'upload.lic.comd' },
+] as const satisfies readonly { value: string; label: MessageKey; desc: MessageKey }[];
 
 const MAX_MODEL_SIZE = 50 * 1024 * 1024; // 50 MB
 const MAX_PREVIEW_SIZE = 5 * 1024 * 1024; // 5 MB
@@ -37,6 +42,8 @@ const DEV_CREATOR_TOKEN =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjAwMDAwMDAwLTAwMDAtMDAwMC0wMDAwLTAwMDAwMDAwMDAwMSIsImVtYWlsIjoiY3JlYXRvckBicm9rZW5kZXNpZ24uY29tIiwicm9sZSI6ImNyZWF0b3IiLCJpc19zZWxsZXIiOnRydWUsImlhdCI6MTc5NDEzNDkxMywiZXhwIjoxNzk2NzI2OTEzfQ.vNxWpDQCz6OQvjoigpuvV7FQOMxa8KgJxyI792gahS0';
 
 export default function UploadPage() {
+  const t = useT();
+  const msgText = (m: Msg) => ('key' in m ? t(m.key, m.vars) : m.text);
   // Model-viewer dynamic import for client-side WebGL
   const [modelViewerLoaded, setModelViewerLoaded] = useState(false);
   const viewerRef = useRef<any>(null);
@@ -64,10 +71,10 @@ export default function UploadPage() {
 
   // UI & Submission states
   const [isDragging, setIsDragging] = useState(false);
-  const [validationError, setValidationError] = useState<string | null>(null);
+  const [validationError, setValidationError] = useState<Msg | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const submittingRef = useRef(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<Msg | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState<{ id: string; file_hash: string } | null>(null);
   const [capturingPoster, setCapturingPoster] = useState(false);
 
@@ -96,18 +103,18 @@ export default function UploadPage() {
     setSubmitError(null);
 
     if (!selected.name.toLowerCase().endsWith('.glb')) {
-      setValidationError('Please select a valid .glb (Binary glTF) file.');
+      setValidationError({ key: 'upload.errGlb' });
       return;
     }
 
     if (selected.size > MAX_MODEL_SIZE) {
-      setValidationError(`Model file is too large (${(selected.size / (1024 * 1024)).toFixed(1)} MB). Max limit is 50 MB.`);
+      setValidationError({ key: 'upload.errModelBig', vars: { size: (selected.size / (1024 * 1024)).toFixed(1) } });
       return;
     }
 
     const isValidGlb = await validateGlbHeaderClient(selected);
     if (!isValidGlb) {
-      setValidationError('The selected file does not appear to be a valid glTF 2.0 Binary (.glb) file.');
+      setValidationError({ key: 'upload.errGlbHeader' });
       return;
     }
 
@@ -143,13 +150,13 @@ export default function UploadPage() {
   };
 
   const removeTag = (tagToRemove: string) => {
-    setTags(tags.filter((t) => t !== tagToRemove));
+    setTags(tags.filter((x) => x !== tagToRemove));
   };
 
   // Capture poster snapshot automatically via <model-viewer>.toBlob()
   const handleCapturePoster = async () => {
     if (!viewerRef.current || typeof viewerRef.current.toBlob !== 'function') {
-      setValidationError('3D Viewer is not ready to capture poster yet.');
+      setValidationError({ key: 'upload.errViewer' });
       return;
     }
 
@@ -160,14 +167,14 @@ export default function UploadPage() {
         qualityArgument: 0.85,
         idealAspect: true,
       });
-      if (!blob) throw new Error('Could not capture frame from 3D viewer');
+      if (!blob) throw new Error(t('upload.errCapture'));
 
       const posterBlobFile = new File([blob], `${title || 'model'}-poster.webp`, { type: 'image/webp' });
       setPosterFile(posterBlobFile);
       if (posterPreviewUrl) URL.revokeObjectURL(posterPreviewUrl);
       setPosterPreviewUrl(URL.createObjectURL(posterBlobFile));
     } catch (err: any) {
-      setValidationError(`Failed to capture poster: ${err.message}`);
+      setValidationError({ key: 'upload.errCaptureFailed', vars: { reason: err.message } });
     } finally {
       setCapturingPoster(false);
     }
@@ -178,11 +185,11 @@ export default function UploadPage() {
     e.preventDefault();
     if (submittingRef.current || isSubmitting) return;
     if (!file) {
-      setValidationError('Please upload a 3D model file (.glb).');
+      setValidationError({ key: 'upload.errNoFile' });
       return;
     }
     if (!title.trim()) {
-      setValidationError('Model title is required.');
+      setValidationError({ key: 'upload.errNoTitle' });
       return;
     }
 
@@ -217,7 +224,7 @@ export default function UploadPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data?.error?.message || 'Failed to upload model. Please check your inputs.');
+        throw new Error(data?.error?.message || t('upload.errUpload'));
       }
 
       setUploadSuccess({
@@ -225,7 +232,9 @@ export default function UploadPage() {
         file_hash: data.model?.file_hash || 'uploaded',
       });
     } catch (err: any) {
-      setSubmitError(err.message || 'An unexpected error occurred during upload.');
+      setSubmitError(
+        err instanceof TypeError ? { key: 'upload.errNetwork' } : err?.message ? { text: err.message } : { key: 'upload.errUnexpected' },
+      );
     } finally {
       submittingRef.current = false;
       setIsSubmitting(false);
@@ -255,11 +264,11 @@ export default function UploadPage() {
         {/* Header */}
         <div className="mb-8 border-b border-white/10 pb-6">
           <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-mono tracking-wider text-white/70 uppercase mb-3">
-            <Sparkles className="h-3.5 w-3.5 text-blue-400" /> Creator Upload Portal
+            <Sparkles className="h-3.5 w-3.5 text-blue-400" /> {t('upload.badge')}
           </div>
-          <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">Upload 3D Asset</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">{t('upload.title')}</h1>
           <p className="mt-2 text-sm text-white/60">
-            Publish your glTF 2.0 Binary (.glb) model to the global 3D CDN repository for developers to embed.
+            {t('upload.lead')}
           </p>
         </div>
 
@@ -269,9 +278,9 @@ export default function UploadPage() {
             <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-emerald-500/20 text-emerald-400">
               <CheckCircle2 className="h-8 w-8" />
             </div>
-            <h2 className="mt-4 text-2xl font-bold text-white">Model Published Successfully!</h2>
+            <h2 className="mt-4 text-2xl font-bold text-white">{t('upload.okTitle')}</h2>
             <p className="mt-2 text-sm text-white/70">
-              Your 3D model has been processed, verified, and stored with Content-Addressable SHA-256 fingerprint:
+              {t('upload.okBody')}
             </p>
             <div className="mx-auto mt-4 max-w-md rounded-lg border border-white/10 bg-black/60 p-3 font-mono text-xs text-white/80 select-all">
               {uploadSuccess.file_hash}
@@ -282,13 +291,13 @@ export default function UploadPage() {
                 onClick={resetForm}
                 className="inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/5 px-4 py-2 text-sm font-medium hover:bg-white/10 transition-colors"
               >
-                <RefreshCw className="h-4 w-4" /> Upload Another Model
+                <RefreshCw className="h-4 w-4" /> {t('upload.another')}
               </button>
               <Link
                 href={`/models/${uploadSuccess.id}`}
                 className="inline-flex items-center gap-2 rounded-lg bg-white px-5 py-2 text-sm font-semibold text-black hover:bg-white/85 transition-colors"
               >
-                View in Gallery <ArrowRight className="h-4 w-4" />
+                {t('upload.viewGallery')} <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
           </div>
@@ -318,7 +327,7 @@ export default function UploadPage() {
                       <model-viewer
                         ref={viewerRef}
                         src={fileUrl}
-                        alt="Uploaded 3D Preview"
+                        alt={t('upload.viewerAlt')}
                         auto-rotate
                         camera-controls
                         shadow-intensity="1"
@@ -326,7 +335,7 @@ export default function UploadPage() {
                       />
                     ) : (
                       <div className="grid h-full place-items-center text-sm text-white/50">
-                        Loading 3D Canvas...
+                        {t('upload.loadingCanvas')}
                       </div>
                     )}
 
@@ -343,11 +352,11 @@ export default function UploadPage() {
                           type="button"
                           onClick={handleCapturePoster}
                           disabled={capturingPoster}
-                          title="Generate poster snapshot from current 3D angle"
+                          title={t('upload.captureTip')}
                           className="inline-flex items-center gap-1 rounded bg-white/10 px-2 py-1 text-xs text-white hover:bg-white/20 transition-colors"
                         >
                           <Camera className="h-3 w-3" />
-                          {capturingPoster ? 'Capturing...' : 'Capture Poster'}
+                          {capturingPoster ? t('upload.capturing') : t('upload.capture')}
                         </button>
                         <button
                           type="button"
@@ -357,7 +366,7 @@ export default function UploadPage() {
                           }}
                           className="rounded bg-red-500/20 px-2 py-1 text-xs text-red-300 hover:bg-red-500/30 transition-colors"
                         >
-                          Change
+                          {t('upload.change')}
                         </button>
                       </div>
                     </div>
@@ -377,10 +386,10 @@ export default function UploadPage() {
                     <div className="grid h-16 w-16 place-items-center rounded-2xl border border-white/15 bg-white/5 text-white/80 group-hover:scale-105 transition-transform">
                       <Box className="h-8 w-8 text-blue-400" />
                     </div>
-                    <span className="mt-4 text-base font-medium text-white">Click or drag & drop 3D model</span>
-                    <span className="mt-1 text-xs text-white/50">Supports Binary glTF 2.0 (.glb) up to 50 MB</span>
+                    <span className="mt-4 text-base font-medium text-white">{t('upload.dropTitle')}</span>
+                    <span className="mt-1 text-xs text-white/50">{t('upload.dropHint')}</span>
                     <div className="mt-4 rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/70">
-                      Browse Files
+                      {t('upload.browse')}
                     </div>
                   </label>
                 )}
@@ -392,14 +401,14 @@ export default function UploadPage() {
                 <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
                   <div className="flex items-center justify-between text-xs font-medium text-white/80 mb-2">
                     <span className="flex items-center gap-1.5">
-                      <ImageIcon className="h-4 w-4 text-purple-400" /> Poster Cover
+                      <ImageIcon className="h-4 w-4 text-purple-400" /> {t('upload.posterCover')}
                     </span>
                     <span className="text-[11px] text-white/40">&lt; 1 MB</span>
                   </div>
 
                   {posterPreviewUrl ? (
                     <div className="relative h-28 w-full overflow-hidden rounded-lg border border-white/15 bg-black">
-                      <img src={posterPreviewUrl} alt="Poster preview" className="h-full w-full object-cover" />
+                      <img src={posterPreviewUrl} alt={t('upload.posterAlt')} className="h-full w-full object-cover" />
                       <button
                         type="button"
                         onClick={() => {
@@ -421,7 +430,7 @@ export default function UploadPage() {
                           if (e.target.files && e.target.files[0]) {
                             const p = e.target.files[0];
                             if (p.size > MAX_POSTER_SIZE) {
-                              setValidationError('Poster image exceeds 1 MB limit.');
+                              setValidationError({ key: 'upload.errPosterBig' });
                               return;
                             }
                             setPosterFile(p);
@@ -430,7 +439,7 @@ export default function UploadPage() {
                         }}
                       />
                       <Camera className="h-5 w-5 text-white/40 mb-1" />
-                      <span className="text-xs text-white/70">Upload image or click "Capture Poster"</span>
+                      <span className="text-xs text-white/70">{t('upload.posterHint')}</span>
                     </label>
                   )}
                 </div>
@@ -439,7 +448,7 @@ export default function UploadPage() {
                 <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
                   <div className="flex items-center justify-between text-xs font-medium text-white/80 mb-2">
                     <span className="flex items-center gap-1.5">
-                      <Layers className="h-4 w-4 text-emerald-400" /> Preview GLB
+                      <Layers className="h-4 w-4 text-emerald-400" /> {t('upload.previewGlb')}
                     </span>
                     <span className="text-[11px] text-white/40">&lt; 5 MB</span>
                   </div>
@@ -453,7 +462,7 @@ export default function UploadPage() {
                         onClick={() => setPreviewFile(null)}
                         className="mt-2 text-left text-xs text-red-400 hover:underline"
                       >
-                        Remove file
+                        {t('upload.removeFile')}
                       </button>
                     </div>
                   ) : (
@@ -466,7 +475,7 @@ export default function UploadPage() {
                           if (e.target.files && e.target.files[0]) {
                             const pf = e.target.files[0];
                             if (pf.size > MAX_PREVIEW_SIZE) {
-                              setValidationError('Preview file exceeds 5 MB limit.');
+                              setValidationError({ key: 'upload.errPreviewBig' });
                               return;
                             }
                             setPreviewFile(pf);
@@ -474,8 +483,8 @@ export default function UploadPage() {
                         }}
                       />
                       <Upload className="h-5 w-5 text-white/40 mb-1" />
-                      <span className="text-xs text-white/70">Optional preview GLB</span>
-                      <span className="text-[11px] text-white/40">For sample rotation</span>
+                      <span className="text-xs text-white/70">{t('upload.previewHint1')}</span>
+                      <span className="text-[11px] text-white/40">{t('upload.previewHint2')}</span>
                     </label>
                   )}
                 </div>
@@ -488,25 +497,25 @@ export default function UploadPage() {
               {validationError && (
                 <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-300">
                   <AlertCircle className="h-4 w-4 shrink-0" />
-                  <span>{validationError}</span>
+                  <span>{msgText(validationError)}</span>
                 </div>
               )}
               {submitError && (
                 <div className="flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-300">
                   <AlertCircle className="h-4 w-4 shrink-0" />
-                  <span>{submitError}</span>
+                  <span>{msgText(submitError)}</span>
                 </div>
               )}
 
               {/* Title Input */}
               <div>
                 <label className="block text-xs font-mono uppercase tracking-wider text-white/60 mb-1.5">
-                  Model Title <span className="text-red-400">*</span>
+                  {t('upload.fTitle')} <span className="text-red-400">*</span>
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Cyberpunk Drone MK-II"
+                  placeholder={t('upload.phTitle')}
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   className="w-full rounded-lg border border-white/15 bg-white/5 px-3.5 py-2.5 text-sm text-white placeholder:text-white/30 focus:border-white/50 focus:outline-none"
@@ -516,11 +525,11 @@ export default function UploadPage() {
               {/* Description Input */}
               <div>
                 <label className="block text-xs font-mono uppercase tracking-wider text-white/60 mb-1.5">
-                  Description
+                  {t('upload.fDescription')}
                 </label>
                 <textarea
                   rows={3}
-                  placeholder="Tell developers about polygon count, materials, animation rigs, etc."
+                  placeholder={t('upload.phDescription')}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   className="w-full rounded-lg border border-white/15 bg-white/5 px-3.5 py-2.5 text-sm text-white placeholder:text-white/30 focus:border-white/50 focus:outline-none"
@@ -530,20 +539,20 @@ export default function UploadPage() {
               {/* Tags Input */}
               <div>
                 <label className="block text-xs font-mono uppercase tracking-wider text-white/60 mb-1.5">
-                  Tags (Press Enter or comma to add)
+                  {t('upload.fTags')}
                 </label>
                 <div className="rounded-lg border border-white/15 bg-white/5 p-2">
                   <div className="flex flex-wrap gap-1.5 mb-1.5">
-                    {tags.map((t) => (
+                    {tags.map((tag) => (
                       <span
-                        key={t}
+                        key={tag}
                         className="inline-flex items-center gap-1 rounded bg-white/10 px-2.5 py-0.5 text-xs text-white"
                       >
                         <Tag className="h-3 w-3 text-blue-400" />
-                        {t}
+                        {tag}
                         <button
                           type="button"
-                          onClick={() => removeTag(t)}
+                          onClick={() => removeTag(tag)}
                           className="ml-1 text-white/50 hover:text-white"
                         >
                           ✕
@@ -553,7 +562,7 @@ export default function UploadPage() {
                   </div>
                   <input
                     type="text"
-                    placeholder={tags.length === 0 ? "e.g. character, weapon, vehicle, pbr" : "Add more tags..."}
+                    placeholder={tags.length === 0 ? t('upload.phTags') : t('upload.phTagsMore')}
                     value={tagsInput}
                     onChange={(e) => setTagsInput(e.target.value)}
                     onKeyDown={handleTagKeyDown}
@@ -565,7 +574,7 @@ export default function UploadPage() {
               {/* License Selection */}
               <div>
                 <label className="block text-xs font-mono uppercase tracking-wider text-white/60 mb-1.5">
-                  License & Usage
+                  {t('upload.fLicense')}
                 </label>
                 <select
                   value={license}
@@ -574,12 +583,12 @@ export default function UploadPage() {
                 >
                   {LICENSES.map((lic) => (
                     <option key={lic.value} value={lic.value}>
-                      {lic.label}
+                      {t(lic.label)}
                     </option>
                   ))}
                 </select>
                 <p className="mt-1 text-xs text-white/40">
-                  {LICENSES.find((l) => l.value === license)?.desc}
+                  {t(LICENSES.find((l) => l.value === license)?.desc ?? 'upload.lic.cc0d')}
                 </p>
               </div>
 
@@ -587,8 +596,8 @@ export default function UploadPage() {
               <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <span className="text-sm font-semibold text-white">Pricing Model</span>
-                    <p className="text-xs text-white/50">Allow free embed or sell with access key</p>
+                    <span className="text-sm font-semibold text-white">{t('upload.pricing')}</span>
+                    <p className="text-xs text-white/50">{t('upload.pricingHint')}</p>
                   </div>
                   <div className="inline-flex rounded-lg border border-white/15 bg-white/5 p-1">
                     <button
@@ -598,7 +607,7 @@ export default function UploadPage() {
                         !isPaid ? 'bg-white text-black' : 'text-white/70 hover:text-white'
                       }`}
                     >
-                      Free
+                      {t('upload.free')}
                     </button>
                     <button
                       type="button"
@@ -607,14 +616,14 @@ export default function UploadPage() {
                         isPaid ? 'bg-white text-black' : 'text-white/70 hover:text-white'
                       }`}
                     >
-                      Paid
+                      {t('upload.paid')}
                     </button>
                   </div>
                 </div>
 
                 {isPaid && (
                   <div className="mt-3 border-t border-white/10 pt-3">
-                    <label className="block text-xs text-white/60 mb-1">Price (USD)</label>
+                    <label className="block text-xs text-white/60 mb-1">{t('upload.priceUsd')}</label>
                     <div className="relative">
                       <DollarSign className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
                       <input
@@ -627,7 +636,7 @@ export default function UploadPage() {
                       />
                     </div>
                     <p className="mt-1 text-[11px] text-white/40">
-                      Buyers receive an <code className="text-white/70">embed_key</code> to stream this model on their domains.
+                      {t('upload.priceHint')}
                     </p>
                   </div>
                 )}
@@ -641,11 +650,11 @@ export default function UploadPage() {
               >
                 {isSubmitting ? (
                   <>
-                    <RefreshCw className="h-4 w-4 animate-spin" /> Verifying & Uploading to CDN...
+                    <RefreshCw className="h-4 w-4 animate-spin" /> {t('upload.submitting')}
                   </>
                 ) : (
                   <>
-                    <Upload className="h-4 w-4" /> Publish 3D Asset
+                    <Upload className="h-4 w-4" /> {t('upload.submit')}
                   </>
                 )}
               </button>

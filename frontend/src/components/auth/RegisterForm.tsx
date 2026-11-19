@@ -6,6 +6,8 @@ import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { register } from '@/lib/auth';
+import { authErrorText } from '@/lib/i18n/auth-error';
+import { useT } from '@/lib/i18n/client';
 import { SESSION_UPDATED_EVENT } from '@/lib/session';
 import { EMAIL_RE, FIELD, Field } from './Field';
 
@@ -14,6 +16,7 @@ const PRIMARY =
 
 export default function RegisterForm() {
   const router = useRouter();
+  const t = useT();
   const [values, setValues] = useState({ username: '', email: '', password: '' });
   const [errors, setErrors] = useState<Partial<Record<keyof typeof values | 'api', string>>>({});
   const [showPassword, setShowPassword] = useState(false);
@@ -29,21 +32,21 @@ export default function RegisterForm() {
   const validate = () => {
     const errs: Partial<Record<keyof typeof values, string>> = {};
     if (!values.username.trim()) {
-      errs.username = 'Please enter a username.';
+      errs.username = t('auth.errUsername');
     } else if (values.username.trim().length > 100) {
-      errs.username = 'Username must not exceed 100 characters.';
+      errs.username = t('auth.errUsernameLong');
     }
 
     if (!values.email.trim()) {
-      errs.email = 'Please enter an email address.';
+      errs.email = t('auth.errEmail');
     } else if (!EMAIL_RE.test(values.email.trim())) {
-      errs.email = 'Please enter a valid email address.';
+      errs.email = t('auth.errEmailBad');
     }
 
     if (!values.password) {
-      errs.password = 'Please choose a password.';
+      errs.password = t('auth.errPasswordNew');
     } else if (values.password.length < 8) {
-      errs.password = 'Password must be at least 8 characters long.';
+      errs.password = t('auth.errPasswordShort');
     }
 
     return errs;
@@ -73,10 +76,8 @@ export default function RegisterForm() {
       window.dispatchEvent(new CustomEvent(SESSION_UPDATED_EVENT));
 
       router.push('/gallery');
-    } catch (err: any) {
-      setErrors({
-        api: err instanceof Error ? err.message : 'Registration failed. Please try again.',
-      });
+    } catch (err) {
+      setErrors({ api: authErrorText(err, t, 'auth.errRegister') });
     } finally {
       setSubmitting(false);
     }
@@ -87,18 +88,16 @@ export default function RegisterForm() {
 
   return (
     <div className="w-full max-w-[420px]">
-      <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70">[ Account ]</p>
+      <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70">{t('auth.label')}</p>
       <h1 className="mt-4 whitespace-nowrap font-display text-[clamp(18px,2.5vw,24px)] uppercase leading-[1.05] text-white">
-        Create an account
+        {t('auth.register.title')}
       </h1>
-      <p className="mt-3 text-[15px] leading-relaxed text-white/65">
-        Set up your account to explore, purchase, and embed 3D models.
-      </p>
+      <p className="mt-3 text-[15px] leading-relaxed text-white/65">{t('auth.register.lead')}</p>
 
       <div className="mt-8 rounded-lg border border-white/10 bg-white/5 p-5 sm:p-6">
         <form onSubmit={onSubmit} noValidate className="grid gap-4">
           {/* Username Field */}
-          <Field id="username" label="Username" error={errors.username}>
+          <Field id="username" label={t('auth.username')} error={errors.username}>
             <input
               id="username"
               name="username"
@@ -107,13 +106,13 @@ export default function RegisterForm() {
               autoFocus
               value={values.username}
               onChange={update('username')}
-              placeholder="e.g. alex_developer"
+              placeholder={t('auth.phUsername')}
               className={fieldClass('username')}
             />
           </Field>
 
           {/* Email Field */}
-          <Field id="email" label="Email" error={errors.email}>
+          <Field id="email" label={t('auth.email')} error={errors.email}>
             <input
               id="email"
               name="email"
@@ -127,7 +126,7 @@ export default function RegisterForm() {
           </Field>
 
           {/* Password Field */}
-          <Field id="password" label="Password" error={errors.password}>
+          <Field id="password" label={t('auth.password')} error={errors.password}>
             <div className="relative">
               <input
                 id="password"
@@ -136,13 +135,13 @@ export default function RegisterForm() {
                 autoComplete="new-password"
                 value={values.password}
                 onChange={update('password')}
-                placeholder="At least 8 characters"
+                placeholder={t('auth.phNewPassword')}
                 className={`${fieldClass('password')} pr-11`}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((prev) => !prev)}
-                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
                 className="absolute right-1 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-md text-white/65 transition-colors hover:text-white"
               >
                 {showPassword ? <EyeOff aria-hidden className="h-4 w-4" /> : <Eye aria-hidden className="h-4 w-4" />}
@@ -161,18 +160,18 @@ export default function RegisterForm() {
           )}
 
           <button type="submit" disabled={submitting} className={PRIMARY}>
-            {submitting ? 'Creating account…' : 'Create account'}
+            {submitting ? t('auth.register.busy') : t('auth.register.submit')}
           </button>
         </form>
 
         <div className="mt-5 border-t border-white/10 pt-4 text-center">
           <p className="text-sm text-white/65">
-            Already have an account?{' '}
+            {t('auth.haveAccount')}{' '}
             <Link
               href="/login"
               className="text-white underline-offset-4 transition-colors hover:underline hover:text-hud"
             >
-              Log in
+              {t('auth.loginLink')}
             </Link>
           </p>
         </div>

@@ -7,15 +7,18 @@ import ModelCard from '@/components/gallery/ModelCard';
 import DonateCard from '@/components/profile/DonateCard';
 import ProfileHeader from '@/components/profile/ProfileHeader';
 import { fetchCreator } from '@/lib/api';
+import { getT } from '@/lib/i18n/server';
 
 type Props = { params: Promise<{ handle: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { t } = await getT();
   const creator = await fetchCreator((await params).handle);
-  return { title: creator ? `${creator.name} — Lixyte` : 'Creator not found — Lixyte' };
+  return { title: creator ? `${creator.name} — Lixyte` : t('creators.metaNotFound') };
 }
 
 export default async function CreatorProfilePage({ params }: Props) {
+  const { t } = await getT();
   const creator = await fetchCreator((await params).handle);
   if (!creator) notFound();
 
@@ -38,7 +41,7 @@ export default async function CreatorProfilePage({ params }: Props) {
 
         <section aria-labelledby="models-title" className="lg:col-start-1 lg:row-start-1">
           <h2 id="models-title" className="border-b border-white/10 pb-2 text-white">
-            Models <span className="font-mono text-[12px] text-white/65">{creator.models.length}</span>
+            {t('creators.models')} <span className="font-mono text-[12px] text-white/65">{creator.models.length}</span>
           </h2>
           {creator.models.length > 0 ? (
             <ul className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -49,7 +52,7 @@ export default async function CreatorProfilePage({ params }: Props) {
               ))}
             </ul>
           ) : (
-            <p className="mt-4 text-white/65">No models yet.</p>
+            <p className="mt-4 text-white/65">{t('gallery.empty')}</p>
           )}
         </section>
       </div>

@@ -1,8 +1,9 @@
 // Landing section title row: mono label + Michroma heading on the left, optional "View all" link on the right
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
+import { getT } from '@/lib/i18n/server';
 
-export default function SectionHeading({
+export default async function SectionHeading({
   label,
   title,
   href,
@@ -11,6 +12,7 @@ export default function SectionHeading({
   title: string;
   href?: string;
 }) {
+  const { t } = await getT();
   return (
     <div className="mb-6 flex items-end justify-between gap-4">
       <div>
@@ -22,7 +24,7 @@ export default function SectionHeading({
           href={href}
           className="hidden items-center gap-1.5 whitespace-nowrap text-sm text-white/65 transition-colors hover:text-white sm:inline-flex md:mr-24"
         >
-          View all
+          {t('home.viewAll')}
           <ArrowRight aria-hidden className="h-4 w-4" />
         </Link>
       )}

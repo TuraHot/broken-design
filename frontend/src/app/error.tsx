@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect } from 'react';
 import { AlertTriangle, ArrowLeft, RotateCcw } from 'lucide-react';
+import { useT } from '@/lib/i18n/client';
 
 const HUD_CLIP =
   'polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px))';
@@ -14,6 +15,8 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const t = useT();
+
   useEffect(() => {
     console.error(error);
   }, [error]);
@@ -31,21 +34,20 @@ export default function GlobalError({
       >
         <p className="inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.16em] text-brand">
           <AlertTriangle aria-hidden className="h-3.5 w-3.5" />
-          [ 500 &middot; System error ]
+          {t('sys.500.label')}
         </p>
 
         <h1 className="mt-4 font-display text-[clamp(24px,4vw,38px)] uppercase leading-[1.05] text-white">
-          Something went wrong
+          {t('sys.500.title')}
         </h1>
 
         <p className="mt-3 text-[15px] leading-relaxed text-white/65">
-          An unexpected error occurred while loading this page. Please try again
-          or return to the home page.
+          {t('sys.500.body')}
         </p>
 
         {error?.digest && (
           <p className="mt-3 font-mono text-xs text-white/40">
-            Error ID: {error.digest}
+            {t('sys.500.errorId', { id: error.digest })}
           </p>
         )}
 
@@ -56,7 +58,7 @@ export default function GlobalError({
             className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-[15px] font-medium text-black transition-colors hover:bg-white/85"
           >
             <RotateCcw aria-hidden className="h-4 w-4" />
-            Try again
+            {t('sys.tryAgain')}
           </button>
 
           <Link
@@ -64,7 +66,7 @@ export default function GlobalError({
             className="inline-flex items-center gap-2 border border-white/40 px-3.5 py-2 font-mono text-[11px] uppercase tracking-[0.18em] text-white transition-colors hover:border-white hover:bg-white hover:text-black"
           >
             <ArrowLeft aria-hidden className="h-4 w-4" />
-            Back to home
+            {t('sys.backHome')}
           </Link>
         </div>
       </div>

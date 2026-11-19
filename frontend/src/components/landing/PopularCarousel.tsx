@@ -4,12 +4,14 @@
 import { useRef } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import ModelCard from '@/components/gallery/ModelCard';
+import { useT } from '@/lib/i18n/client';
 import type { Model } from '@/lib/types';
 
 const ARROW =
   'hidden h-9 w-9 place-items-center rounded-lg border border-white/15 bg-white/5 text-white/80 transition-colors hover:border-white/50 hover:text-white md:grid';
 
 export default function PopularCarousel({ models }: { models: Model[] }) {
+  const t = useT();
   const listRef = useRef<HTMLUListElement>(null);
 
   const scrollBy = (dir: 1 | -1) => {
@@ -22,10 +24,10 @@ export default function PopularCarousel({ models }: { models: Model[] }) {
   return (
     <div className="relative">
       <div className="absolute -top-12 right-0 flex gap-2">
-        <button type="button" aria-label="Scroll left" onClick={() => scrollBy(-1)} className={ARROW}>
+        <button type="button" aria-label={t('home.scrollLeft')} onClick={() => scrollBy(-1)} className={ARROW}>
           <ChevronLeft aria-hidden className="h-5 w-5" />
         </button>
-        <button type="button" aria-label="Scroll right" onClick={() => scrollBy(1)} className={ARROW}>
+        <button type="button" aria-label={t('home.scrollRight')} onClick={() => scrollBy(1)} className={ARROW}>
           <ChevronRight aria-hidden className="h-5 w-5" />
         </button>
       </div>

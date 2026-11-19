@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { ArrowRight, Store, User } from 'lucide-react';
 import { creatorHandle } from '@/lib/creators';
+import { useT } from '@/lib/i18n/client';
 import { readSession, type Session } from '@/lib/session';
 
 const PRIMARY_BTN =
@@ -16,6 +17,7 @@ const OUTLINE_BTN =
   'border border-white px-3 py-2 font-mono text-[10.5px] uppercase tracking-[0.18em] text-white transition-colors hover:bg-white hover:text-black';
 
 export default function CreatorActions() {
+  const t = useT();
   const [session, setSession] = useState<Session | null>(null);
 
   useEffect(() => {
@@ -36,26 +38,26 @@ export default function CreatorActions() {
         <>
           <Link href="/seller" className={PRIMARY_BTN}>
             <Store aria-hidden className="h-4 w-4" />
-            Seller dashboard
+            {t('creator.seller')}
           </Link>
           <Link href={`/creators/${handle}`} className={SECONDARY_BTN}>
             <User aria-hidden className="h-4 w-4" />
-            Creator profile
+            {t('creator.profile')}
           </Link>
         </>
       ) : user ? (
         <Link href="/me" className={PRIMARY_BTN}>
-          Become a creator
+          {t('creator.become')}
           <ArrowRight aria-hidden className="h-4 w-4" />
         </Link>
       ) : (
         <Link href="/login" className={PRIMARY_BTN}>
-          Get started
+          {t('creator.start')}
           <ArrowRight aria-hidden className="h-4 w-4" />
         </Link>
       )}
       <a href="#how-it-works" className={OUTLINE_BTN}>
-        See how it works
+        {t('creator.how')}
       </a>
     </div>
   );

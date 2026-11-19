@@ -6,15 +6,15 @@ import { useRouter } from 'next/navigation';
 import { FormEvent, useState } from 'react';
 import { EMAIL_RE, FIELD, Field } from './Field';
 import { requestPasswordReset, verifyResetOtp } from '@/lib/auth';
+import { authErrorText } from '@/lib/i18n/auth-error';
+import { useT } from '@/lib/i18n/client';
 
 const PRIMARY =
   'h-10 w-full rounded-lg bg-white text-[15px] font-medium text-black transition-colors hover:bg-white/85 disabled:opacity-60';
 
-const friendly = (err: unknown) =>
-  err instanceof Error && err.message !== 'Failed to fetch' ? err.message : 'Cannot reach the server. Please try again.';
-
 export default function ForgotPasswordForm() {
   const router = useRouter();
+  const t = useT();
   const [step, setStep] = useState<'email' | 'otp'>('email');
   const [email, setEmail] = useState('');
   const [mockOtp, setMockOtp] = useState<string | null>(null);
@@ -25,8 +25,8 @@ export default function ForgotPasswordForm() {
   const sendCode = async (e: FormEvent) => {
     e.preventDefault();
     if (busy) return;
-    if (!email.trim()) return setError('Enter your email.');
-    if (!EMAIL_RE.test(email.trim())) return setError('Enter a valid email address.');
+    if (!email.trim()) return setError(t('auth.errEmail'));
+    if (!EMAIL_RE.test(email.trim())) return setError(t('auth.errEmailBad'));
     setError(undefined);
     setBusy(true);
     try {
@@ -34,7 +34,7 @@ export default function ForgotPasswordForm() {
       setCode('');
       setStep('otp');
     } catch (err) {
-      setError(friendly(err));
+      setError(authErrorText(err, t));
     } finally {
       setBusy(false);
     }
@@ -43,14 +43,14 @@ export default function ForgotPasswordForm() {
   const verify = async (e: FormEvent) => {
     e.preventDefault();
     if (busy) return;
-    if (!/^\d{6}$/.test(code)) return setError('Enter the 6-digit code.');
+    if (!/^\d{6}$/.test(code)) return setError(t('auth.errCode'));
     setError(undefined);
     setBusy(true);
     try {
       const token = await verifyResetOtp(email, code);
       router.push(`/reset-password?token=${encodeURIComponent(token)}`);
     } catch (err) {
-      setError(friendly(err));
+      setError(authErrorText(err, t));
       setBusy(false);
     }
   };
@@ -59,18 +59,16 @@ export default function ForgotPasswordForm() {
 
   return (
     <div className="w-full max-w-[420px]">
-      <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70">[ Account ]</p>
-      <h1 className="mt-4 font-display text-[clamp(26px,4vw,36px)] uppercase leading-[1.05] text-white">Reset password</h1>
+      <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70">{t('auth.label')}</p>
+      <h1 className="mt-4 font-display text-[clamp(26px,4vw,36px)] uppercase leading-[1.05] text-white">{t('auth.forgot.title')}</h1>
       <p className="mt-3 text-[15px] leading-relaxed text-white/65">
-        {step === 'email'
-          ? 'Enter your email and we’ll send you a 6-digit verification code.'
-          : 'Enter the 6-digit code to continue.'}
+        {step === 'email' ? t('auth.forgot.leadEmail') : t('auth.forgot.leadCode')}
       </p>
 
       <div className="mt-8 rounded-lg border border-white/10 bg-white/5 p-5 sm:p-6">
         {step === 'email' ? (
           <form onSubmit={sendCode} noValidate className="grid gap-4">
-            <Field id="email" label="Email" error={error}>
+            <Field id="email" label={t('auth.email')} error={error}>
               <input
                 id="email"
                 type="email"
@@ -83,7 +81,7 @@ export default function ForgotPasswordForm() {
               />
             </Field>
             <button type="submit" disabled={busy} className={PRIMARY}>
-              {busy ? 'Sending…' : 'Send code'}
+              {busy ? t('auth.forgot.sending') : t('auth.forgot.send')}
             </button>
           </form>
         ) : (
@@ -91,20 +89,20 @@ export default function ForgotPasswordForm() {
             <div className="flex items-center justify-between gap-3 rounded-lg border border-white/10 px-3 py-2 text-sm">
               <span className="truncate text-white">{email.trim()}</span>
               <button type="button" onClick={() => { setStep('email'); setError(undefined); }} className="shrink-0 text-white/65 underline-offset-4 hover:text-white hover:underline">
-                Change
+                {t('auth.change')}
               </button>
             </div>
 
             {mockOtp && (
               <div className="rounded-lg border border-amber/40 bg-amber/5 p-3 text-sm text-white/80">
-                <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-amber">OTP CODE</p>
+                <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-amber">{t('auth.forgot.otpLabel')}</p>
                 <p className="mt-2 select-all text-center font-mono text-base tracking-[0.4em] text-white">{mockOtp}</p>
-                <p className="mt-2 text-xs text-white/50">Copy it into the box below. Valid for 10 minutes.</p>
+                <p className="mt-2 text-xs text-white/50">{t('auth.forgot.otpHint')}</p>
               </div>
             )}
 
             <form onSubmit={verify} noValidate className="grid gap-4">
-              <Field id="code" label="Verification code" error={error}>
+              <Field id="code" label={t('auth.code')} error={error}>
                 <input
                   id="code"
                   inputMode="numeric"
@@ -119,7 +117,7 @@ export default function ForgotPasswordForm() {
                 />
               </Field>
               <button type="submit" disabled={busy} className={PRIMARY}>
-                {busy ? 'Verifying…' : 'Verify and continue'}
+                {busy ? t('auth.forgot.verifying') : t('auth.forgot.verify')}
               </button>
             </form>
           </div>
@@ -127,9 +125,9 @@ export default function ForgotPasswordForm() {
       </div>
 
       <p className="mt-6 text-center text-sm text-white/65">
-        Remembered it?{' '}
+        {t('auth.forgot.remembered')}{' '}
         <Link href="/login" className="text-white underline-offset-4 hover:underline">
-          Back to log in
+          {t('auth.forgot.back')}
         </Link>
       </p>
     </div>

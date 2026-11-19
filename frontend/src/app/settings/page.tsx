@@ -8,6 +8,7 @@ import { AlertCircle, Check, Loader2, LogOut, Trash2, Upload } from 'lucide-reac
 import UserAvatar from '@/components/ui/UserAvatar';
 import { deleteMyAvatar, updateProfile, uploadMyAvatar } from '@/lib/auth';
 import { useT } from '@/lib/i18n/client';
+import { authErrorText } from '@/lib/i18n/auth-error';
 import {
   clearSession,
   readSession,
@@ -227,7 +228,7 @@ export default function SettingsPage() {
       setSession(readSession());
       setSaveSuccess(true);
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Failed to save profile.');
+      setSaveError(authErrorText(err, t, 'settings.errSave'));
     } finally {
       savingRef.current = false;
       setSaving(false);
@@ -313,7 +314,7 @@ export default function SettingsPage() {
                               key={index}
                               type="button"
                               disabled={saving}
-                              aria-label={`Preset ${index + 1}`}
+                              aria-label={t('settings.preset', { n: index + 1 })}
                               aria-pressed={active}
                               onClick={() => handleSelectPreset(index)}
                               className={`h-9 w-9 overflow-hidden rounded-full border-2 transition-all hover:scale-105 disabled:opacity-50 ${

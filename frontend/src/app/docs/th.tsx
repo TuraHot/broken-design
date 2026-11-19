@@ -87,6 +87,9 @@ export default function DocsTh() {
           <P>
             สำหรับโมเดลแบบเสียเงิน ให้เพิ่ม key ต่อท้ายที่อยู่: <C>https://YOUR_SITE/embed/MODEL_ID?key=YOUR_EMBED_KEY</C>
           </P>
+          <P>
+            ข้อความไม่กี่ข้อของตัวแสดงผล (กำลังโหลด, "แสดงเฉพาะตัวอย่าง") เป็นภาษาอังกฤษโดยปริยาย ต่อท้ายที่อยู่ด้วย <C>&amp;lang=th</C> เพื่อให้เป็นภาษาไทย
+          </P>
         </Section>
 
         <Section id="paid-models" title="โมเดลแบบเสียเงินและ embed key">

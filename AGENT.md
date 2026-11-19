@@ -106,6 +106,7 @@ Agent ทุกตัว **ห้ามละเมิด** กฎต่อไ�
   - `PATCH /api/models/:id` — แก้ไขรายละเอียด/ราคา/สัญญาอนุญาต *(ยังเป็น TODO stub — รอดำเนินการ)*
   - `DELETE /api/models/:id` — Soft Delete (`deleted_at = NOW()`, เฉพาะเจ้าของหรือแอดมิน)
 - **Payments (`/api`):**
+  - **แอดมินซื้อไม่ได้:** `checkout`, `confirm-mock`, `pay-mock` และ `purchases/:id/qr` ใช้ middleware `requireBuyer` (`auth.middleware.ts`) ที่ถามบทบาทจากฐานข้อมูลทุกครั้ง (ไม่เชื่อ role ใน JWT) แอดมินได้ `403 ADMIN_CANNOT_BUY` และบัญชีที่ถูกระงับได้ `403 ACCOUNT_SUSPENDED` (เส้นทาง QR เดิมไม่มีการเช็กระงับเลย ตอนนี้มีแล้ว) หน้าเว็บส่งแอดมินกลับ `/admin` ทุกหน้า ไม่มีปุ่ม "ดูเว็บไซต์" อีก
   - **บัญชีที่ถูกระงับซื้อหรือแก้คีย์ไม่ได้:** `checkout`, `confirm-mock`, `pay-mock` และ `regenerate-key` ใช้ middleware `requireNotSuspended` (`auth.middleware.ts`) ที่ถามฐานข้อมูลทุกครั้ง (token อยู่ได้ 1 วัน) ตอบ `403 ACCOUNT_SUSPENDED` / `401` ถ้าไม่พบบัญชี และไม่ปล่อยผ่านเมื่อฐานข้อมูลผิดพลาด ห้ามใส่กับ `/api/me/notifications` เพราะผู้ถูกระงับต้องอ่านเหตุผลได้
   - `POST /api/models/:id/checkout` — สร้างรายการสั่งซื้อรายชิ้น (`status = 'pending'`), ล็อก `amount_cents`, `currency`, `license_type` จากตาราง `models`, และสุ่ม `embed_key` 48 ตัวอักษร hex (`crypto.randomBytes(24)`)
   - `POST /api/purchases/:id/confirm-mock` (และ `/api/models/:id/pay-mock`) — ยืนยันจ่ายเงินจำลอง (`status = 'paid'`, `paid_at = NOW()`) เมื่อ `PAYMENT_PROVIDER=mock`

@@ -4,8 +4,9 @@
 // The menu items are a convenience; every page and API checks the role again on the server.
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useReport } from '@/components/report/ReportProvider';
+import NotificationBell from '@/components/notifications/NotificationBell';
 import UserAvatar from '@/components/ui/UserAvatar';
 import { CORE_API_URL, fetchNotices } from '@/lib/api';
 import { creatorHandle } from '@/lib/creators';
@@ -107,6 +108,8 @@ export default function AccountMenu() {
     };
   }, [open]);
 
+  const onUnreadChange = useCallback((n: number) => setUnread(n), []);
+
   const logOut = () => {
     clearSession();
     setSession(null);
@@ -139,6 +142,9 @@ export default function AccountMenu() {
   const isAdmin = user.role === 'admin';
 
   return (
+    <div className="flex items-center gap-1 sm:gap-2">
+    {/* The bell is for notices, which admins do not get (the API gives them none) */}
+    {!isAdmin && <NotificationBell token={session.token} unread={unread} onUnreadChange={onUnreadChange} />}
     <div ref={rootRef} className="relative">
       <button
         ref={buttonRef}
@@ -163,7 +169,7 @@ export default function AccountMenu() {
           </div>
           <ul className="pt-1">
             {isAdmin ? (
-              // An admin only reaches the public pages through "View Website"; this is the way back.
+              // An admin never uses the public pages (AdminOnlyRedirect sends them back); the only entry is the admin area.
               <li>
                 <Link href="/admin" className={itemClass}>
                   {t('menu.admin')}
@@ -215,6 +221,7 @@ export default function AccountMenu() {
           </ul>
         </div>
       )}
+    </div>
     </div>
   );
 }

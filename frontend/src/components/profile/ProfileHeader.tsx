@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import UserAvatar from '@/components/ui/UserAvatar';
 import { formatCount } from '@/lib/format';
+import { getT } from '@/lib/i18n/server';
 
 interface Props {
   name: string;
@@ -14,7 +15,8 @@ interface Props {
   likes: number;
 }
 
-export default function ProfileHeader({ name, handle, avatarUrl, bio, modelCount, downloads, likes }: Props) {
+export default async function ProfileHeader({ name, handle, avatarUrl, bio, modelCount, downloads, likes }: Props) {
+  const { t } = await getT();
   return (
     <header>
       <div className="relative h-32 overflow-hidden rounded-lg border border-white/10 bg-black sm:h-44">
@@ -44,7 +46,7 @@ export default function ProfileHeader({ name, handle, avatarUrl, bio, modelCount
             href="/creator"
             className="inline-block font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70 transition-colors hover:text-hud"
           >
-            [ Creator ]
+            {t('creators.label')}
           </Link>
           <h1 className="mt-1 font-display text-[clamp(22px,3vw,32px)] uppercase leading-[1.05] text-white">{name}</h1>
           <p className="mt-1 text-sm text-white/65">@{handle}</p>
@@ -55,15 +57,15 @@ export default function ProfileHeader({ name, handle, avatarUrl, bio, modelCount
       <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1 px-1 font-mono text-[12px] text-white/65 sm:px-4">
         <div className="flex gap-1.5">
           <dd className="text-white">{formatCount(modelCount)}</dd>
-          <dt>{modelCount === 1 ? 'model' : 'models'}</dt>
+          <dt>{modelCount === 1 ? t('creators.modelOne') : t('creators.modelMany')}</dt>
         </div>
         <div className="flex gap-1.5">
           <dd className="text-white">{formatCount(downloads)}</dd>
-          <dt>downloads</dt>
+          <dt>{t('creators.downloads')}</dt>
         </div>
         <div className="flex gap-1.5">
           <dd className="text-white">{formatCount(likes)}</dd>
-          <dt>likes</dt>
+          <dt>{t('creators.likes')}</dt>
         </div>
       </dl>
     </header>

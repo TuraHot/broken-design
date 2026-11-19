@@ -211,7 +211,7 @@ broken-design/
 │   │   │   └── viewer/                   # ButterflyScene.tsx, CreatorScene.tsx, CreatorViewer.tsx, EmbedIframeViewer.tsx, LilyScene.tsx, LilyViewer.tsx
 │   │   ├── lib/
 │   │   │   ├── api.ts, auth.ts, auth-paths.ts, session.ts
-│   │   │   ├── admin-api.ts, admin-view.ts, complaints.ts
+│   │   │   ├── admin-api.ts, complaints.ts
 │   │   │   ├── creators.ts, format.ts, licenses.ts, types.ts
 │   │   │   └── pagination.ts & pagination.test.mjs (4 test cases)
 │   │   └── types/model-viewer.d.ts

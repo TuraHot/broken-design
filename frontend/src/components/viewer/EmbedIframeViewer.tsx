@@ -4,6 +4,7 @@
 // Automatically falls back to preview.glb with a non-crashing notice when embed_key is invalid/revoked.
 import { useEffect, useRef, useState } from "react";
 import { CDN_SERVICE_URL } from "@/lib/api";
+import { useT } from "@/lib/i18n/client";
 
 export interface EmbedIframeViewerProps {
   id: string;
@@ -24,6 +25,7 @@ export default function EmbedIframeViewer({
   exposure = "1",
   shadowIntensity = "1",
 }: EmbedIframeViewerProps) {
+  const t = useT();
   const [ready, setReady] = useState(false);
   const [usingFallbackPreview, setUsingFallbackPreview] = useState(false);
   const [unavailable, setUnavailable] = useState(false);
@@ -80,7 +82,7 @@ export default function EmbedIframeViewer({
         />
       ) : (
         <div className="flex h-full w-full items-center justify-center p-4 text-center font-mono text-xs text-white/60">
-          {unavailable ? "3D model unavailable on CDN" : "Loading 3D viewer…"}
+          {unavailable ? t("embed.unavailable") : t("embed.loading")}
         </div>
       )}
 
@@ -89,7 +91,7 @@ export default function EmbedIframeViewer({
           role="status"
           className="pointer-events-none absolute bottom-3 left-3 rounded-md border border-white/20 bg-black/80 px-3 py-1.5 font-mono text-xs text-amber-400"
         >
-          ต้องซื้อเพื่อใช้งาน · แสดงไฟล์ตัวอย่าง (Preview)
+          {t("embed.previewOnly")}
         </div>
       )}
     </div>

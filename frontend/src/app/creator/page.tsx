@@ -5,51 +5,33 @@ import { CodeXml, Coins, LayoutDashboard, Scale, Upload, Zap, type LucideIcon } 
 import SectionHeading from '@/components/landing/SectionHeading';
 import CreatorActions from '@/components/creator/CreatorActions';
 import CreatorModel from '@/components/creator/CreatorModel';
+import { getT } from '@/lib/i18n/server';
+import type { MessageKey } from '@/lib/i18n/messages';
 
-export const metadata: Metadata = { title: 'Creators — Lixyte' };
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getT();
+  return { title: t('creator.meta') };
+}
 
 const HUD_CLIP = 'polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px))';
 
-const FEATURES: { icon: LucideIcon; title: string; body: React.ReactNode }[] = [
-  {
-    icon: Upload,
-    title: 'Upload a .glb',
-    body: 'Drop in a glTF 2.0 binary up to 50 MB. We check it on upload, so broken files never reach the gallery.',
-  },
-  {
-    icon: Coins,
-    title: 'Free or paid',
-    body: 'Give a model away or set a price. Buyers get their own embed key for it.',
-  },
-  {
-    icon: Scale,
-    title: 'Pick a license',
-    body: 'CC0, CC-BY, CC-BY-NC or Commercial, shown clearly on every model page.',
-  },
-  {
-    icon: CodeXml,
-    title: 'Embed anywhere',
-    body: <>One iframe or one {'<vm-model>'} tag puts your model on any website, with no hosting on their side.</>,
-  },
-  {
-    icon: Zap,
-    title: 'Fast delivery',
-    body: 'Models come from a cached CDN with range requests, so they start streaming before they finish loading.',
-  },
-  {
-    icon: LayoutDashboard,
-    title: 'Manage your work',
-    body: 'Edit titles, tags and prices, and retire models, all from one dashboard.',
-  },
+const FEATURES: { icon: LucideIcon; title: MessageKey; body: MessageKey }[] = [
+  { icon: Upload, title: 'creator.f1.title', body: 'creator.f1.body' },
+  { icon: Coins, title: 'creator.f2.title', body: 'creator.f2.body' },
+  { icon: Scale, title: 'creator.f3.title', body: 'creator.f3.body' },
+  { icon: CodeXml, title: 'creator.f4.title', body: 'creator.f4.body' },
+  { icon: Zap, title: 'creator.f5.title', body: 'creator.f5.body' },
+  { icon: LayoutDashboard, title: 'creator.f6.title', body: 'creator.f6.body' },
 ];
 
-const STEPS = [
-  { n: '01', title: 'Log in', body: 'Sign in with your email or Google. New here? The same form creates your account.' },
-  { n: '02', title: 'Upload', body: 'Add your .glb with a title, tags, a license and a price.' },
-  { n: '03', title: 'Share', body: 'Copy the embed code and paste it on your site. That is it.' },
+const STEPS: { n: string; title: MessageKey; body: MessageKey }[] = [
+  { n: '01', title: 'creator.s1.title', body: 'creator.s1.body' },
+  { n: '02', title: 'creator.s2.title', body: 'creator.s2.body' },
+  { n: '03', title: 'creator.s3.title', body: 'creator.s3.body' },
 ];
 
-export default function CreatorPage() {
+export default async function CreatorPage() {
+  const { t } = await getT();
   return (
     <main className="overflow-x-clip">
       <section className="relative mx-auto grid max-w-[1400px] items-center gap-10 px-4 pb-16 pt-24 md:px-6 lg:min-h-[calc(100dvh-2rem)] lg:grid-cols-[1.05fr_1fr]">
@@ -101,16 +83,15 @@ export default function CreatorPage() {
           </g>
         </svg>
         <div className="relative z-10">
-          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70">[ For creators ]</p>
+          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70">{t('creator.eyebrow')}</p>
           <h1 className="mt-4 font-display text-[clamp(28px,4vw,56px)] uppercase leading-[1.05] text-white">
-            Publish your 3D{' '}
+            {t('creator.title1')}{' '}
             <span className="bg-gradient-to-r from-hud via-violet to-amber bg-clip-text text-transparent">
-              Reach every site
+              {t('creator.title2')}
             </span>
           </h1>
           <p className="mt-5 max-w-[50ch] text-[15px] leading-relaxed text-white/65">
-            Upload a model once and anyone can put it on their website with a single line of code. You choose the
-            license and the price; we handle storage and fast delivery.
+            {t('creator.lead')}
           </p>
           <CreatorActions />
           <pre className="mt-8 max-w-full overflow-x-auto rounded-lg border border-white/10 bg-[#0d0d0d] px-4 py-3 font-mono text-[12.5px] text-white/65">
@@ -122,29 +103,29 @@ export default function CreatorPage() {
       </section>
 
       <div className="mx-auto grid max-w-[1400px] grid-cols-[minmax(0,1fr)] gap-20 px-4 pb-20 md:px-6">
-        <section aria-label="What you can do">
-          <SectionHeading label="Creators" title="What you can do" />
+        <section aria-label={t('creator.featuresAria')}>
+          <SectionHeading label={t('creator.featuresLabel')} title={t('creator.featuresTitle')} />
           <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {FEATURES.map(({ icon: Icon, title, body }) => (
               <li key={title} className="rounded-lg border border-white/10 bg-white/5 p-5">
                 <span className="grid h-10 w-10 place-items-center rounded-lg border border-hud/30 text-hud">
                   <Icon aria-hidden className="h-5 w-5" />
                 </span>
-                <h3 className="mt-4 text-[15px] font-medium text-white">{title}</h3>
-                <p className="mt-1.5 text-sm leading-relaxed text-white/65">{body}</p>
+                <h3 className="mt-4 text-[15px] font-medium text-white">{t(title)}</h3>
+                <p className="mt-1.5 text-sm leading-relaxed text-white/65">{t(body)}</p>
               </li>
             ))}
           </ul>
         </section>
 
-        <section id="how-it-works" aria-label="How it works" className="scroll-mt-24">
-          <SectionHeading label="Three steps" title="How it works" />
+        <section id="how-it-works" aria-label={t('creator.stepsAria')} className="scroll-mt-24">
+          <SectionHeading label={t('creator.stepsLabel')} title={t('creator.stepsTitle')} />
           <ol className="grid gap-4 md:grid-cols-3">
             {STEPS.map(({ n, title, body }) => (
               <li key={n} className="rounded-lg border border-white/10 bg-white/5 p-5">
                 <span className="font-mono text-[11px] tracking-[0.16em] text-hud/70">{n}</span>
-                <h3 className="mt-3 font-display text-base uppercase leading-snug text-white">{title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-white/65">{body}</p>
+                <h3 className="mt-3 font-display text-base uppercase leading-snug text-white">{t(title)}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-white/65">{t(body)}</p>
               </li>
             ))}
           </ol>

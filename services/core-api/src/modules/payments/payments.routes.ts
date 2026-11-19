@@ -2,7 +2,7 @@
 import { Router } from 'express';
 import crypto from 'crypto';
 import Stripe from 'stripe';
-import { requireAuth, requireNotSuspended } from '../../middlewares/auth.middleware';
+import { requireAuth, requireBuyer, requireNotSuspended } from '../../middlewares/auth.middleware';
 import { db } from '../../config/db';
 import { env } from '../../config/env';
 import { AppError } from '../../middlewares/error.middleware';
@@ -47,7 +47,7 @@ function requireMockProvider(
 
 // ─── 1. POST /api/models/:id/checkout ───────────────────────────────────────
 // สร้างคำสั่งซื้อรายชิ้น (pending) ล็อกราคา สกุลเงิน และประเภท License จากฐานข้อมูลจริง — กันซื้อซ้ำ
-paymentsRouter.post('/models/:id/checkout', requireAuth, requireNotSuspended, async (req, res) => {
+paymentsRouter.post('/models/:id/checkout', requireAuth, requireBuyer, async (req, res) => {
   const userId = req.user!.id;
   const modelId = req.params.id;
 
@@ -119,7 +119,7 @@ paymentsRouter.post('/models/:id/checkout', requireAuth, requireNotSuspended, as
 // ─── 2. POST /api/purchases/:id/confirm-mock ────────────────────────────────
 // กดจ่ายจำลอง → เปลี่ยน status เป็น paid, บันทึก paid_at = NOW(), embed_key พร้อมใช้ทันที
 // เปิดได้เฉพาะเมื่อ PAYMENT_PROVIDER=mock
-paymentsRouter.post('/purchases/:id/confirm-mock', requireAuth, requireMockProvider, requireNotSuspended, async (req, res) => {
+paymentsRouter.post('/purchases/:id/confirm-mock', requireAuth, requireMockProvider, requireBuyer, async (req, res) => {
   const userId = req.user!.id;
   const purchaseId = req.params.id;
 
@@ -157,7 +157,7 @@ paymentsRouter.post('/purchases/:id/confirm-mock', requireAuth, requireMockProvi
 });
 
 // ─── 2b. POST /api/models/:id/pay-mock (Alias by modelId for single-click mock pay) ─
-paymentsRouter.post('/models/:id/pay-mock', requireAuth, requireMockProvider, requireNotSuspended, async (req, res) => {
+paymentsRouter.post('/models/:id/pay-mock', requireAuth, requireMockProvider, requireBuyer, async (req, res) => {
   const userId = req.user!.id;
   const modelId = req.params.id;
 
@@ -203,7 +203,7 @@ paymentsRouter.post('/models/:id/pay-mock', requireAuth, requireMockProvider, re
 
 // ─── 2c. POST /api/purchases/:id/qr ─────────────────────────────────────────
 // สร้าง QR Code สำหรับชำระเงิน (PromptPay ผ่าน Stripe เมื่อ PAYMENT_PROVIDER=stripe หรือ Mock QR)
-paymentsRouter.post('/purchases/:id/qr', requireAuth, async (req, res) => {
+paymentsRouter.post('/purchases/:id/qr', requireAuth, requireBuyer, async (req, res) => {
   const userId = req.user!.id;
   const purchaseId = req.params.id;
 

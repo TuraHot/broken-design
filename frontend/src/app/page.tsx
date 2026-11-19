@@ -8,11 +8,13 @@ import ModelCard from "@/components/gallery/ModelCard";
 import PixieCursor from "@/components/PixieCursor";
 import LilyViewer from "@/components/viewer/LilyViewer";
 import { fetchModels } from "@/lib/api";
+import { getT } from "@/lib/i18n/server";
 
 const HUD_CLIP =
   "polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px))";
 
 export default async function HomePage() {
+  const { t } = await getT();
   // Popular = top of the popularity-sorted list. The API has no "recent" sort yet, so new arrivals take the
   // next models in that list as a stand-in.
   const { items } = await fetchModels({ page: 1 });
@@ -28,23 +30,22 @@ export default async function HomePage() {
         <div className="mx-auto max-w-[1400px] px-4 pt-24 md:px-6">
           <div className="max-w-[850px]">
             <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70">
-              [ Lixyte &middot; 3D asset repository &amp; CDN ]
+              {t('home.eyebrow')}
             </p>
             <h1 className="mt-4 font-display text-[clamp(20px,6.4vw,62px)] uppercase leading-[1.02] text-white">
-              3D models,
+              {t('home.title1')}
               <span className="block whitespace-nowrap bg-gradient-to-r from-hud via-violet to-amber bg-clip-text text-transparent">
-                one line of code
+                {t('home.title2')}
               </span>
             </h1>
             <p className="mt-5 max-w-[46ch] text-[15px] leading-relaxed text-white/65">
-              Browse free and paid .glb models, then put any of them on your website with one line of code. We host and
-              stream it from a fast CDN, so there is nothing to download or host yourself.
+              {t('home.lead')}
             </p>
           </div>
         </div>
 
         <div
-          aria-label="Get started"
+          aria-label={t('home.startRegion')}
           role="region"
           className="pointer-events-none absolute inset-x-0 bottom-0 pb-6"
         >
@@ -54,30 +55,29 @@ export default async function HomePage() {
               style={{ clipPath: HUD_CLIP }}
             >
               <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70">
-                [ Get started ]
+                {t('home.startLabel')}
               </p>
               <h2 className="mt-3 font-display text-lg uppercase leading-snug text-white">
-                Drop a model.
+                {t('home.startTitle1')}
                 <br />
-                Ship it in 3D.
+                {t('home.startTitle2')}
               </h2>
               <p className="mt-3 text-[15px] leading-relaxed text-white/65">
-                Pick a .glb, copy one line of code, and it&apos;s live on your
-                site.
+                {t('home.startBody')}
               </p>
               <div className="mt-5 flex flex-wrap items-center gap-3">
                 <Link
                   href="/login"
                   className="inline-flex items-center gap-2 rounded-lg bg-white px-3.5 py-1.5 text-[15px] font-medium text-black transition-colors hover:bg-white/85"
                 >
-                  Get started
+                  {t('home.getStarted')}
                   <ArrowRight aria-hidden className="h-4 w-4" />
                 </Link>
                 <Link
                   href="/gallery"
                   className="border border-white px-3 py-2 font-mono text-[10.5px] uppercase tracking-[0.18em] text-white transition-colors hover:bg-white hover:text-black"
                 >
-                  Explore gallery
+                  {t('home.explore')}
                 </Link>
               </div>
             </div>
@@ -87,20 +87,20 @@ export default async function HomePage() {
 
       <div className="relative z-10 mx-auto grid max-w-[1400px] grid-cols-[minmax(0,1fr)] gap-20 px-4 pb-20 pt-8 md:px-6">
         {popular.length > 0 && (
-          <section aria-label="Popular models">
-            <SectionHeading label="Trending" title="Popular models" href="/gallery" />
+          <section aria-label={t('home.popularAria')}>
+            <SectionHeading label={t('home.trending')} title={t('home.popular')} href="/gallery" />
             <PopularCarousel models={popular} />
           </section>
         )}
 
-        <section aria-label="Categories">
-          <SectionHeading label="Browse" title="Categories" />
+        <section aria-label={t('home.categories')}>
+          <SectionHeading label={t('home.browse')} title={t('home.categories')} />
           <Categories />
         </section>
 
         {arrivals.length > 0 && (
-          <section aria-label="New arrivals">
-            <SectionHeading label="Fresh" title="New arrivals" href="/gallery" />
+          <section aria-label={t('home.arrivals')}>
+            <SectionHeading label={t('home.fresh')} title={t('home.arrivals')} href="/gallery" />
             <ul className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
               {arrivals.map((m) => (
                 <li key={m.id}>
@@ -112,28 +112,27 @@ export default async function HomePage() {
         )}
 
         <section
-          aria-label="Join Lixyte"
+          aria-label={t('home.joinAria')}
           className="border border-hud/40 bg-[rgba(4,8,18,0.66)] p-6 backdrop-blur-sm md:p-10"
           style={{ clipPath: HUD_CLIP }}
         >
           <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70">
-                [ Join ]
+                {t('home.joinLabel')}
               </p>
               <h2 className="mt-3 font-display text-[clamp(20px,2.6vw,30px)] uppercase leading-snug text-white">
-                Publish your first model
+                {t('home.joinTitle')}
               </h2>
               <p className="mt-3 max-w-[52ch] text-[15px] leading-relaxed text-white/65">
-                Free account, one line of code to embed. Bring your own .glb and
-                it&apos;s live on your site.
+                {t('home.joinBody')}
               </p>
             </div>
             <Link
               href="/login"
               className="inline-flex shrink-0 items-center gap-2 self-start rounded-lg bg-white px-3.5 py-1.5 text-[15px] font-medium text-black transition-colors hover:bg-white/85 md:self-auto"
             >
-              Get started
+              {t('home.getStarted')}
               <ArrowRight aria-hidden className="h-4 w-4" />
             </Link>
           </div>

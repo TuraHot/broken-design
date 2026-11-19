@@ -8,10 +8,14 @@ import { FormEvent, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Eye, EyeOff } from 'lucide-react';
 import { checkEmail, login, register } from '@/lib/auth';
-import { saveSession, SESSION_UPDATED_EVENT } from '@/lib/session';
+import { authErrorText } from '@/lib/i18n/auth-error';
+import { useT } from '@/lib/i18n/client';
+import type { MessageKey } from '@/lib/i18n/messages';
+import { saveSession } from '@/lib/session';
 import { EMAIL_RE, FIELD, Field } from './Field';
 
 type Step = 'email' | 'login' | 'signup';
+type Translate = (key: MessageKey) => string;
 
 interface Values {
   email: string;
@@ -20,56 +24,46 @@ interface Values {
 }
 type Errors = Partial<Record<keyof Values, string>>;
 
-function validate(step: Step, v: Values): Errors {
+function validate(step: Step, v: Values, t: Translate): Errors {
   const errors: Errors = {};
   if (step === 'email') {
-    if (!v.email.trim()) errors.email = 'Enter your email.';
-    else if (!EMAIL_RE.test(v.email.trim())) errors.email = 'Enter a valid email address.';
+    if (!v.email.trim()) errors.email = t('auth.errEmail');
+    else if (!EMAIL_RE.test(v.email.trim())) errors.email = t('auth.errEmailBad');
     return errors;
   }
-  if (step === 'signup' && !v.name.trim()) errors.name = 'Enter a display name.';
-  if (!v.password) errors.password = step === 'login' ? 'Enter your password.' : 'Choose a password.';
-  else if (step === 'signup' && v.password.length < 8) errors.password = 'Use at least 8 characters.';
+  if (step === 'signup' && !v.name.trim()) errors.name = t('auth.errName');
+  if (!v.password) errors.password = step === 'login' ? t('auth.errPasswordLogin') : t('auth.errPasswordNew');
+  else if (step === 'signup' && v.password.length < 8) errors.password = t('auth.errPasswordShort');
   return errors;
 }
 
-const COPY = {
-  email: {
-    title: 'Welcome to Lixyte',
-    lead: 'Enter your email. We’ll check whether you already have an account.',
-    submit: 'Continue',
-  },
-  login: {
-    title: 'Welcome back',
-    lead: 'Enter your password to log in.',
-    submit: 'Log in',
-  },
-  signup: {
-    title: 'Create account',
-    lead: 'No account for this email yet. Set one up to publish and embed 3D models.',
-    submit: 'Create account',
-  },
-} as const;
+const COPY: Record<Step, { title: MessageKey; lead: MessageKey; submit: MessageKey }> = {
+  email: { title: 'auth.email.title', lead: 'auth.email.lead', submit: 'auth.email.submit' },
+  login: { title: 'auth.login.title', lead: 'auth.login.lead', submit: 'auth.login.submit' },
+  signup: { title: 'auth.signup.title', lead: 'auth.signup.lead', submit: 'auth.signup.submit' },
+};
 
 const PRIMARY =
   'mt-1 h-10 w-full rounded-lg bg-white text-[15px] font-medium text-black transition-colors hover:bg-white/85 disabled:opacity-60';
 
 export default function AuthForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const t = useT();
   const [step, setStep] = useState<Step>('email');
   const [values, setValues] = useState<Values>({ email: '', name: '', password: '' });
   const [errors, setErrors] = useState<Errors>({});
   const [showPassword, setShowPassword] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [checking, setChecking] = useState(false);
-  const [notice, setNotice] = useState(useSearchParams().get('registered') ? 'Account created. Please log in.' : '');
+  const [registeredNotice, setRegisteredNotice] = useState(() => Boolean(searchParams.get('registered')));
 
   const copy = COPY[step];
 
   const update = (key: keyof Values) => (e: React.ChangeEvent<HTMLInputElement>) => {
     const next = { ...values, [key]: e.target.value };
     setValues(next);
-    if (submitted) setErrors(validate(step, next));
+    if (submitted) setErrors(validate(step, next, t));
   };
 
   const goTo = (next: Step) => {
@@ -83,7 +77,7 @@ export default function AuthForm() {
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (checking) return;
-    const found = validate(step, values);
+    const found = validate(step, values, t);
     setErrors(found);
     setSubmitted(true);
     if (Object.keys(found).length > 0) return;
@@ -93,8 +87,8 @@ export default function AuthForm() {
         setChecking(true);
         const exists = await checkEmail(values.email);
         goTo(exists ? 'login' : 'signup');
-      } catch (err: any) {
-        setErrors({ email: err?.message || 'Unable to verify email address.' });
+      } catch (err) {
+        setErrors({ email: authErrorText(err, t, 'auth.errVerifyEmail') });
       } finally {
         setChecking(false);
       }
@@ -109,7 +103,7 @@ export default function AuthForm() {
           await register(values.email, values.password, values.name);
           goTo('email');
           setValues({ email: '', name: '', password: '' });
-          setNotice('Account created. Please log in.');
+          setRegisteredNotice(true);
           return;
         }
 
@@ -119,13 +113,8 @@ export default function AuthForm() {
         saveSession({ token: result.token, user: result.user });
 
         router.push('/gallery');
-      } catch (error: any) {
-        setErrors({
-          password:
-            error instanceof Error
-              ? error.message
-              : 'Authentication failed. Please try again.',
-        });
+      } catch (error) {
+        setErrors({ password: authErrorText(error, t) });
       } finally {
         setChecking(false);
       }
@@ -137,7 +126,7 @@ export default function AuthForm() {
   const described = (key: keyof Values) => (errors[key] ? `${key}-error` : undefined);
 
   const passwordField = (
-    <Field id="password" label="Password" error={errors.password}>
+    <Field id="password" label={t('auth.password')} error={errors.password}>
       <div className="relative">
         <input
           id="password"
@@ -149,13 +138,13 @@ export default function AuthForm() {
           onChange={update('password')}
           aria-invalid={Boolean(errors.password)}
           aria-describedby={described('password')}
-          placeholder={step === 'signup' ? 'At least 8 characters' : 'Your password'}
+          placeholder={step === 'signup' ? t('auth.phNewPassword') : t('auth.phPassword')}
           className={`${fieldClass('password')} pr-11`}
         />
         <button
           type="button"
           onClick={() => setShowPassword((v) => !v)}
-          aria-label={showPassword ? 'Hide password' : 'Show password'}
+          aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
           aria-pressed={showPassword}
           className="absolute right-1 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-md text-white/65 transition-colors hover:text-white"
         >
@@ -167,15 +156,15 @@ export default function AuthForm() {
 
   return (
     <div className="w-full max-w-[420px]">
-      <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70">[ Account ]</p>
+      <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70">{t('auth.label')}</p>
       <h1 className="mt-4 whitespace-nowrap font-display text-[clamp(12px,calc((100vw_-_32px)/23),18px)] uppercase leading-[1.05] text-white">
-        {copy.title}
+        {t(copy.title)}
       </h1>
-      <p className="mt-3 text-[15px] leading-relaxed text-white/65">{copy.lead}</p>
+      <p className="mt-3 text-[15px] leading-relaxed text-white/65">{t(copy.lead)}</p>
 
-      {notice && (
+      {registeredNotice && (
         <p role="status" className="mt-6 rounded-lg border border-hud/40 bg-hud/10 px-3 py-2 text-sm text-hud">
-          {notice}
+          {t('auth.createdNotice')}
         </p>
       )}
 
@@ -188,14 +177,14 @@ export default function AuthForm() {
               onClick={() => goTo('email')}
               className="shrink-0 text-white/65 underline-offset-4 transition-colors hover:text-white hover:underline"
             >
-              Change
+              {t('auth.change')}
             </button>
           </div>
         )}
 
         <form onSubmit={onSubmit} noValidate className="grid gap-4">
           {step === 'email' && (
-            <Field id="email" label="Email" error={errors.email}>
+            <Field id="email" label={t('auth.email')} error={errors.email}>
               <input
                 id="email"
                 name="email"
@@ -212,7 +201,7 @@ export default function AuthForm() {
           )}
 
           {step === 'signup' && (
-            <Field id="name" label="Display name" error={errors.name}>
+            <Field id="name" label={t('auth.displayName')} error={errors.name}>
               <input
                 id="name"
                 name="name"
@@ -223,7 +212,7 @@ export default function AuthForm() {
                 onChange={update('name')}
                 aria-invalid={Boolean(errors.name)}
                 aria-describedby={described('name')}
-                placeholder="Ada Lovelace"
+                placeholder={t('auth.phName')}
                 className={fieldClass('name')}
               />
             </Field>
@@ -234,28 +223,24 @@ export default function AuthForm() {
           {step === 'login' && (
             <div className="-mt-2 text-right">
               <Link href="/forgot-password" className="text-sm text-white/65 underline-offset-4 transition-colors hover:text-white hover:underline">
-                Forgot password?
+                {t('auth.forgotLink')}
               </Link>
             </div>
           )}
 
           <button type="submit" disabled={checking} className={PRIMARY}>
-            {checking
-              ? step === 'email'
-                ? 'Checking…'
-                : 'Please wait…'
-              : copy.submit}
+            {checking ? (step === 'email' ? t('auth.checking') : t('auth.wait')) : t(copy.submit)}
           </button>
         </form>
 
         <div className="mt-5 border-t border-white/10 pt-4 text-center">
           <p className="text-sm text-white/65">
-            Don&apos;t have an account?{' '}
+            {t('auth.noAccount')}{' '}
             <Link
               href="/register"
               className="text-white underline-offset-4 transition-colors hover:underline hover:text-hud"
             >
-              Create an account
+              {t('auth.createLink')}
             </Link>
           </p>
         </div>

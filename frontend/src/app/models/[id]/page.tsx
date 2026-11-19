@@ -13,18 +13,22 @@ import UserAvatar from '@/components/ui/UserAvatar';
 import { fetchCoreApiModels, fetchModel, fetchMoreFromCreator } from '@/lib/api';
 import { creatorHandle } from '@/lib/creators';
 import { formatCount, formatPrice } from '@/lib/format';
+import { getT } from '@/lib/i18n/server';
+import { tagLabel } from '@/lib/i18n/tag';
 
 type Props = { params: Promise<{ id: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { t } = await getT();
   const model = await fetchModel((await params).id);
-  return { title: model ? `${model.title} — Lixyte` : 'Model not found — Lixyte' };
+  return { title: model ? `${model.title} — Lixyte` : t('model.metaNotFound') };
 }
 
 const CARD = 'rounded-lg border border-white/10 bg-white/5 p-5';
 const LABEL = 'font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70';
 
 export default async function ModelDetailPage({ params }: Props) {
+  const { t } = await getT();
   const { id } = await params;
   const [model] = await Promise.all([fetchModel(id), fetchCoreApiModels()]);
   if (!model) notFound();
@@ -34,9 +38,9 @@ export default async function ModelDetailPage({ params }: Props) {
 
   return (
     <main className="mx-auto max-w-[1400px] px-4 pb-16 pt-24 md:px-6">
-      <nav aria-label="Breadcrumb" className="text-sm text-white/65">
+      <nav aria-label={t('model.breadcrumb')} className="text-sm text-white/65">
         <Link href="/gallery" className="transition-colors hover:text-white">
-          Gallery
+          {t('nav.gallery')}
         </Link>
         <span aria-hidden className="mx-2 text-white/40">
           /
@@ -59,7 +63,7 @@ export default async function ModelDetailPage({ params }: Props) {
                     free ? 'border-hud/40 text-hud' : 'border-white/25 text-white'
                   }`}
                 >
-                  {free ? 'Free' : formatPrice(model.priceCents)}
+                  {free ? t('gallery.free') : formatPrice(model.priceCents)}
                 </span>
                 <span className="rounded border border-white/15 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-white/65">
                   {model.license}
@@ -85,7 +89,7 @@ export default async function ModelDetailPage({ params }: Props) {
                 >
                   {model.creator}
                 </Link>
-                <p className="text-sm text-white/65">Owner</p>
+                <p className="text-sm text-white/65">{t('model.owner')}</p>
               </div>
             </div>
 
@@ -93,11 +97,11 @@ export default async function ModelDetailPage({ params }: Props) {
               <ModelLikeButton modelId={model.id} initialCount={model.likeCount} />
               <div className="flex items-center gap-1.5">
                 <Download aria-hidden className="h-4 w-4" />
-                <dt className="sr-only">Downloads</dt>
+                <dt className="sr-only">{t('model.downloads')}</dt>
                 <dd>{formatCount(model.downloadCount)}</dd>
               </div>
               <div>
-                <dt className="sr-only">Format</dt>
+                <dt className="sr-only">{t('model.format')}</dt>
                 <dd>.glb · glTF 2.0</dd>
               </div>
             </dl>
@@ -110,14 +114,14 @@ export default async function ModelDetailPage({ params }: Props) {
 
         <section aria-labelledby="description" className={CARD}>
           <h2 id="description" className={LABEL}>
-            [ Description ]
+            {t('loader.description')}
           </h2>
-          <p className="mt-3 text-[15px] leading-relaxed text-white/80">{model.description ?? 'No description yet.'}</p>
+          <p className="mt-3 text-[15px] leading-relaxed text-white/80">{model.description ?? t('model.noDescription')}</p>
           {model.tags.length > 0 && (
             <ul className="mt-4 flex flex-wrap gap-2">
-              {model.tags.map((t) => (
-                <li key={t} className="rounded border border-white/15 px-2 py-0.5 font-mono text-[11px] text-white/65">
-                  {t}
+              {model.tags.map((tag) => (
+                <li key={tag} className="rounded border border-white/15 px-2 py-0.5 font-mono text-[11px] text-white/65">
+                  {tagLabel(t, tag)}
                 </li>
               ))}
             </ul>
@@ -126,7 +130,7 @@ export default async function ModelDetailPage({ params }: Props) {
 
         <section aria-labelledby="how-to-use" className={CARD}>
           <h2 id="how-to-use" className={LABEL}>
-            [ How to use ]
+            {t('loader.howToUse')}
           </h2>
           <div className="mt-3">
             <EmbedSnippets id={model.id} paid={!free} />
@@ -137,7 +141,7 @@ export default async function ModelDetailPage({ params }: Props) {
       {more.length > 0 && (
         <section aria-labelledby="more-from" className="mt-16">
           <h2 id="more-from" className="font-display text-[clamp(18px,2.2vw,24px)] uppercase leading-snug text-white">
-            More from{' '}
+            {t('model.moreFrom')}{' '}
             <Link href={`/creators/${creatorHandle(model.creator)}`} className="transition-colors hover:text-hud">
               {model.creator}
             </Link>

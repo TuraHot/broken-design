@@ -1,8 +1,12 @@
 // Register page — standalone account creation at `/register`
 import type { Metadata } from 'next';
 import RegisterForm from '@/components/auth/RegisterForm';
+import { getT } from '@/lib/i18n/server';
 
-export const metadata: Metadata = { title: 'Create Account — Lixyte' };
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getT();
+  return { title: t('auth.meta.register') };
+}
 
 export default function RegisterPage() {
   return (

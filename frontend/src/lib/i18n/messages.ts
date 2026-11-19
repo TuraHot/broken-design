@@ -1,5 +1,13 @@
 // UI text in English and Thai. Add a key to `en` first; TypeScript then forces a Thai text for it in `th`.
 // `{name}` style placeholders are filled by `t(key, { name })`.
+// Text of one area lives in its own file under ./messages/ (auth, system, ...) and is spread into the two tables below,
+// so adding the text of a page does not touch this file and does not clash with other people's changes.
+import { accountEn, accountTh } from './messages/account';
+import { authEn, authTh } from './messages/auth';
+import { payEn, payTh } from './messages/pay';
+import { discoverEn, discoverTh } from './messages/discover';
+import { systemEn, systemTh } from './messages/system';
+
 export const LOCALES = ['en', 'th'] as const;
 export type Locale = (typeof LOCALES)[number];
 export const DEFAULT_LOCALE: Locale = 'en';
@@ -149,7 +157,6 @@ const en = {
   'admin.login': 'Log in',
   'admin.backHome': 'Back to home',
   'admin.navLabel': 'Admin',
-  'admin.viewSite': 'View Website',
   'admin.logout': 'Log out',
   'admin.search': 'Search',
   'admin.pagination': 'Pagination',
@@ -251,6 +258,10 @@ const en = {
   'notice.errLoad': 'Could not load your notices.',
   'notice.errSave': 'Could not update this notice. Please try again.',
   'menu.newNotices': '{n} new',
+  'bell.label': 'Notifications',
+  'bell.labelUnread': 'Notifications, {n} unread',
+  'bell.loading': 'Loading…',
+  'bell.viewAll': 'Open library',
   'admin.errAccount': 'Could not change this account. Please try again.',
   'admin.errStatus': 'Could not change the status. Please try again.',
   'admin.errNote': 'Could not save the note. Please try again.',
@@ -364,6 +375,11 @@ const en = {
   'admin.ov.recent': 'Recent purchases',
   'admin.ov.allPurchases': 'All purchases',
   'admin.ov.noPurchases': 'No paid purchases yet.',
+  ...authEn,
+  ...discoverEn,
+  ...accountEn,
+  ...payEn,
+  ...systemEn,
 } as const;
 
 export type MessageKey = keyof typeof en;
@@ -505,7 +521,6 @@ const th: Record<MessageKey, string> = {
   'admin.login': 'ล็อกอิน',
   'admin.backHome': 'กลับหน้าแรก',
   'admin.navLabel': 'ผู้ดูแล',
-  'admin.viewSite': 'ดูเว็บไซต์',
   'admin.logout': 'ออกจากระบบ',
   'admin.search': 'ค้นหา',
   'admin.pagination': 'การแบ่งหน้า',
@@ -607,6 +622,10 @@ const th: Record<MessageKey, string> = {
   'notice.errLoad': 'โหลดใบเตือนไม่สำเร็จ',
   'notice.errSave': 'อัปเดตใบเตือนนี้ไม่สำเร็จ กรุณาลองอีกครั้ง',
   'menu.newNotices': 'ใหม่ {n}',
+  'bell.label': 'การแจ้งเตือน',
+  'bell.labelUnread': 'การแจ้งเตือน ยังไม่อ่าน {n} รายการ',
+  'bell.loading': 'กำลังโหลด…',
+  'bell.viewAll': 'เปิดคลังของฉัน',
   'admin.errAccount': 'เปลี่ยนสถานะบัญชีนี้ไม่สำเร็จ กรุณาลองอีกครั้ง',
   'admin.errStatus': 'เปลี่ยนสถานะไม่สำเร็จ กรุณาลองอีกครั้ง',
   'admin.errNote': 'บันทึกโน้ตไม่สำเร็จ กรุณาลองอีกครั้ง',
@@ -720,6 +739,11 @@ const th: Record<MessageKey, string> = {
   'admin.ov.recent': 'การซื้อล่าสุด',
   'admin.ov.allPurchases': 'การซื้อทั้งหมด',
   'admin.ov.noPurchases': 'ยังไม่มีการซื้อที่ชำระแล้ว',
+  ...authTh,
+  ...discoverTh,
+  ...accountTh,
+  ...payTh,
+  ...systemTh,
 };
 
 export const MESSAGES: Record<Locale, Record<MessageKey, string>> = { en, th };

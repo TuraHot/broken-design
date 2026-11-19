@@ -14,7 +14,6 @@ import {
   RefreshCw,
   ShieldCheck,
   Sparkles,
-  Store,
   User as UserIcon,
 } from 'lucide-react';
 import AvatarUploader from '@/components/profile/AvatarUploader';
@@ -27,18 +26,22 @@ import {
 } from '@/lib/api';
 import { creatorHandle } from '@/lib/creators';
 import { formatPrice } from '@/lib/format';
+import { useT } from '@/lib/i18n/client';
+import { fromErr, serverError, type Msg } from '@/lib/i18n/msg';
 import { readSession, updateSessionUser } from '@/lib/session';
 import type { AuthUser, PurchaseItem } from '@/lib/types';
+
 
 const CARD = 'rounded-lg border border-white/10 bg-white/5 p-5 sm:p-6';
 const LABEL = 'font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70';
 
 export default function MePage() {
+  const t = useT();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [purchases, setPurchases] = useState<PurchaseItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  const [statusMsg, setStatusMsg] = useState<Msg | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
 
@@ -74,7 +77,7 @@ export default function MePage() {
           });
         }
       } catch (err: any) {
-        if (mounted) setStatusMsg(err?.message || 'Could not load your purchases.');
+        if (mounted) setStatusMsg(fromErr(err, 'acct.errLoadPurchases'));
       }
     })();
 
@@ -97,9 +100,9 @@ export default function MePage() {
         updateSessionUser({ is_seller: true, role: nextRole });
         return updated;
       });
-      setStatusMsg('Seller mode activated! You can now upload models and view your sales.');
+      setStatusMsg({ key: 'me.sellerOn' });
     } catch (err: any) {
-      setStatusMsg(err?.message || 'Failed to enable seller mode.');
+      setStatusMsg(fromErr(err, 'me.sellerFail'));
     } finally {
       setBusyAction(null);
     }
@@ -108,7 +111,7 @@ export default function MePage() {
   // Handle Regenerate Embed Key
   const handleRegenerateKey = async (purchaseId: string) => {
     if (!token) return;
-    if (!window.confirm('Are you sure you want to regenerate this key? Your previous embed_key will immediately stop streaming.')) {
+    if (!window.confirm(t('me.regenConfirm'))) {
       return;
     }
 
@@ -119,9 +122,9 @@ export default function MePage() {
       setPurchases((prev) =>
         prev.map((p) => (p.id === purchaseId ? { ...p, embedKey: res.embedKey } : p)),
       );
-      setStatusMsg('Embed key regenerated successfully.');
+      setStatusMsg({ key: 'me.regenDone' });
     } catch (err: any) {
-      setStatusMsg(err?.message || 'Could not regenerate key.');
+      setStatusMsg(fromErr(err, 'me.regenFail'));
     } finally {
       setBusyAction(null);
     }
@@ -141,7 +144,7 @@ export default function MePage() {
 
       if (!res.ok) {
         const body = await res.json().catch(() => null);
-        throw new Error(body?.error?.message || `Download failed (${res.status})`);
+        throw body?.error?.message ? serverError(body.error.message) : new Error('download failed');
       }
 
       const blob = await res.blob();
@@ -154,9 +157,9 @@ export default function MePage() {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-      setStatusMsg(`Downloading ${title}.glb (watermarked for your account)`);
+      setStatusMsg({ key: 'me.dlStarted', vars: { title } });
     } catch (err: any) {
-      setStatusMsg(err?.message || 'Download failed.');
+      setStatusMsg(fromErr(err, 'me.dlFailed'));
     } finally {
       setBusyAction(null);
     }
@@ -172,7 +175,7 @@ export default function MePage() {
   if (loading) {
     return (
       <main className="mx-auto max-w-[1200px] px-4 pb-16 pt-24 md:px-6">
-        <p className="font-mono text-sm text-white/50">Loading profile…</p>
+        <p className="font-mono text-sm text-white/50">{t('me.loading')}</p>
       </main>
     );
   }
@@ -182,23 +185,23 @@ export default function MePage() {
     return (
       <main className="mx-auto max-w-[800px] px-4 pb-16 pt-28 md:px-6">
         <div className={`${CARD} text-center`}>
-          <p className={LABEL}>[ Account Required ]</p>
-          <h1 className="mt-4 font-display text-2xl uppercase tracking-wide text-white">Sign In to View Your Profile</h1>
+          <p className={LABEL}>{t('me.needLabel')}</p>
+          <h1 className="mt-4 font-display text-2xl uppercase tracking-wide text-white">{t('me.needTitle')}</h1>
           <p className="mt-3 text-[15px] leading-relaxed text-white/65">
-            Log in to manage your purchased 3D models, access your streaming embed keys, or switch to Creator mode.
+            {t('me.needBody')}
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-4">
             <Link
               href="/login"
               className="h-10 rounded-lg bg-white px-5 text-sm font-medium leading-10 text-black transition-colors hover:bg-white/85"
             >
-              Log in to Lixyte
+              {t('me.needLogin')}
             </Link>
             <Link
               href="/gallery"
               className="h-10 rounded-lg border border-white/20 px-5 text-sm font-mono uppercase tracking-wider leading-10 text-white/80 transition-colors hover:bg-white/10"
             >
-              Browse Gallery
+              {t('me.browse')}
             </Link>
           </div>
         </div>
@@ -217,13 +220,13 @@ export default function MePage() {
       {/* Toast / Notification */}
       {statusMsg && (
         <div className="mb-6 flex items-center justify-between rounded-lg border border-hud/30 bg-hud/10 px-4 py-3 text-sm text-hud">
-          <span>{statusMsg}</span>
+          <span>{'key' in statusMsg ? t(statusMsg.key, statusMsg.vars) : statusMsg.text}</span>
           <button
             type="button"
             onClick={() => setStatusMsg(null)}
             className="ml-4 font-mono text-xs opacity-70 hover:opacity-100"
           >
-            [Close]
+            {t('acct.close')}
           </button>
         </div>
       )}
@@ -240,8 +243,8 @@ export default function MePage() {
             }
           />
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="font-display text-2xl uppercase text-white">{displayName}</h1>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="break-words font-display text-2xl uppercase text-white">{displayName}</h1>
               <span
                 className={`rounded border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider ${
                   user?.is_seller
@@ -249,10 +252,10 @@ export default function MePage() {
                     : 'border-white/20 bg-white/5 text-white/70'
                 }`}
               >
-                {user?.is_seller ? 'Creator' : 'Buyer'}
+                {user?.is_seller ? t('me.creator') : t('me.buyer')}
               </span>
             </div>
-            <p className="mt-1 font-mono text-xs text-white/50">{user?.email}</p>
+            <p className="mt-1 break-all font-mono text-xs text-white/50">{user?.email}</p>
           </div>
         </div>
 
@@ -265,14 +268,14 @@ export default function MePage() {
                 className="flex h-9 items-center gap-2 rounded-lg border border-hud/30 bg-hud/10 px-3.5 text-xs font-mono uppercase tracking-wider text-hud transition-colors hover:bg-hud/20"
               >
                 <UserIcon className="h-4 w-4" />
-                Creator Profile
+                {t('me.creatorProfile')}
               </Link>
               <Link
                 href="/upload"
                 className="flex h-9 items-center gap-2 rounded-lg bg-white px-3.5 text-xs font-mono uppercase tracking-wider text-black transition-colors hover:bg-white/85"
               >
                 <Layers className="h-4 w-4" />
-                Upload .glb
+                {t('me.uploadGlb')}
               </Link>
             </>
           ) : (
@@ -283,7 +286,7 @@ export default function MePage() {
               className="flex h-9 items-center gap-2 rounded-lg bg-white px-4 text-xs font-mono uppercase tracking-wider text-black transition-colors hover:bg-white/85 disabled:opacity-60"
             >
               <Sparkles className="h-4 w-4" />
-              {busyAction === 'enable-seller' ? 'Activating…' : 'Become a Creator'}
+              {busyAction === 'enable-seller' ? t('me.activating') : t('me.becomeCreator')}
             </button>
           )}
         </div>
@@ -294,10 +297,10 @@ export default function MePage() {
         <div className="mt-6 rounded-lg border border-hud/30 bg-gradient-to-r from-hud/10 via-transparent to-transparent p-5 sm:p-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className={LABEL}>[ Creator Opportunity ]</p>
-              <h2 className="mt-1 font-display text-lg uppercase text-white">Sell your 3D assets on Lixyte</h2>
+              <p className={LABEL}>{t('me.oppLabel')}</p>
+              <h2 className="mt-1 font-display text-lg uppercase text-white">{t('me.oppTitle')}</h2>
               <p className="mt-1 text-sm text-white/65">
-                Enable creator mode on this account to upload .glb files, set pricing or offer free downloads, and track analytics.
+                {t('me.oppBody')}
               </p>
             </div>
             <button
@@ -306,7 +309,7 @@ export default function MePage() {
               onClick={handleEnableSeller}
               className="whitespace-nowrap rounded-lg bg-hud px-4 py-2 font-mono text-xs uppercase tracking-wider text-black font-semibold transition-colors hover:bg-hud/85 disabled:opacity-60"
             >
-              Enable Seller Mode
+              {t('me.enableSeller')}
             </button>
           </div>
         </div>
@@ -316,39 +319,39 @@ export default function MePage() {
       <section className="mt-10">
         <div className="flex items-center justify-between border-b border-white/10 pb-3">
           <h2 className="font-display text-lg uppercase text-white">
-            Purchased Models & Embed Keys
+            {t('me.purchasesTitle')}
             <span className="ml-2 font-mono text-xs text-white/50">({purchases.length})</span>
           </h2>
           <Link
             href="/gallery"
             className="font-mono text-xs text-hud transition-colors hover:underline"
           >
-            Explore Gallery →
+            {t('me.explore')}
           </Link>
         </div>
 
         {purchases.length === 0 ? (
           <div className={`${CARD} mt-6 text-center py-12`}>
             <KeyRound className="mx-auto h-8 w-8 text-white/30" />
-            <h3 className="mt-3 font-display text-base uppercase text-white">No purchases yet</h3>
+            <h3 className="mt-3 font-display text-base uppercase text-white">{t('me.noneTitle')}</h3>
             <p className="mt-1 text-sm text-white/50">
-              When you purchase 3D models, your unique streaming embed_key and downloads will appear here.
+              {t('me.noneBody')}
             </p>
             <Link
               href="/gallery"
               className="mt-5 inline-block rounded-lg bg-white px-4 py-2 text-xs font-mono uppercase tracking-wider text-black transition-colors hover:bg-white/85"
             >
-              Browse 3D Models
+              {t('me.noneButton')}
             </Link>
           </div>
         ) : (
-          <div className="mt-6 grid gap-6">
+          <div className="mt-6 grid grid-cols-1 gap-6">
             {purchases.map((item) => {
               const vmSnippet = `<vm-model model-id="${item.modelId}" cdn-base="${CDN_SERVICE_URL}" key="${item.embedKey}" auto-rotate camera-controls></vm-model>`;
               const iframeSnippet = `<iframe src="http://localhost:3000/embed/${item.modelId}?key=${item.embedKey}" width="600" height="400" allow="fullscreen" style="border:0"></iframe>`;
 
               return (
-                <div key={item.id} className={`${CARD} space-y-4`}>
+                <div key={item.id} className={`${CARD} min-w-0 space-y-4`}>
                   {/* Top Bar: Title, License, Price, Actions */}
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
@@ -364,7 +367,7 @@ export default function MePage() {
                         </span>
                       </div>
                       <p className="mt-1 font-mono text-xs text-white/40">
-                        Purchased for {formatPrice(item.amountCents || item.priceCents)} · ID: {item.modelId}
+                        {t('me.purchasedFor', { price: formatPrice(item.amountCents || item.priceCents), id: item.modelId })}
                       </p>
                     </div>
 
@@ -376,7 +379,7 @@ export default function MePage() {
                         className="flex h-8 items-center gap-1.5 rounded-lg border border-white/20 bg-white/5 px-3 font-mono text-xs uppercase tracking-wider text-white transition-colors hover:bg-white/10 disabled:opacity-60"
                       >
                         <Download className="h-3.5 w-3.5" />
-                        Download .glb
+                        {t('me.download')}
                       </button>
                     </div>
                   </div>
@@ -384,12 +387,12 @@ export default function MePage() {
                   {/* Embed Key Box */}
                   <div className="rounded-lg border border-white/10 bg-black/60 p-4">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="flex items-center gap-2">
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
                         <KeyRound className="h-4 w-4 text-hud" />
                         <span className="font-mono text-xs uppercase tracking-wider text-white/80">
-                          Your Embed Key:
+                          {t('me.keyLabel')}
                         </span>
-                        <code className="rounded bg-white/10 px-2 py-0.5 font-mono text-xs text-hud">
+                        <code className="break-all rounded bg-white/10 px-2 py-0.5 font-mono text-xs text-hud">
                           {item.embedKey}
                         </code>
                       </div>
@@ -402,11 +405,11 @@ export default function MePage() {
                         >
                           {copiedKey === `key-${item.id}` ? (
                             <>
-                              <Check className="h-3 w-3 text-emerald-400" /> Copied
+                              <Check className="h-3 w-3 text-emerald-400" /> {t('me.copied')}
                             </>
                           ) : (
                             <>
-                              <Copy className="h-3 w-3" /> Copy Key
+                              <Copy className="h-3 w-3" /> {t('me.copyKey')}
                             </>
                           )}
                         </button>
@@ -416,10 +419,10 @@ export default function MePage() {
                           disabled={busyAction === `regen-${item.id}`}
                           onClick={() => handleRegenerateKey(item.id)}
                           className="flex h-7 items-center gap-1 rounded border border-red-500/30 px-2 font-mono text-[11px] text-red-400/80 transition-colors hover:bg-red-500/10 hover:text-red-300 disabled:opacity-50"
-                          title="Generate a new embed_key. Invalids the previous key immediately."
+                          title={t('me.regenerateTip')}
                         >
                           <RefreshCw className={`h-3 w-3 ${busyAction === `regen-${item.id}` ? 'animate-spin' : ''}`} />
-                          Regenerate Key
+                          {t('me.regenerate')}
                         </button>
                       </div>
                     </div>
@@ -428,14 +431,14 @@ export default function MePage() {
                     <div className="mt-3 pt-3 border-t border-white/5 flex flex-col gap-2 text-xs">
                       <div className="flex items-center justify-between">
                         <span className="font-mono text-[11px] text-white/50 flex items-center gap-1">
-                          <Code2 className="h-3.5 w-3.5" /> Web Component Snippet:
+                          <Code2 className="h-3.5 w-3.5" /> {t('me.snippet')}
                         </span>
                         <button
                           type="button"
                           onClick={() => copyText(vmSnippet, `vm-${item.id}`)}
                           className="font-mono text-[11px] text-hud/80 hover:text-hud"
                         >
-                          {copiedKey === `vm-${item.id}` ? '✓ Copied Code' : 'Copy <vm-model>'}
+                          {copiedKey === `vm-${item.id}` ? t('me.snippetCopied') : t('me.snippetCopy')}
                         </button>
                       </div>
                       <pre className="overflow-x-auto rounded bg-black/40 p-2 font-mono text-[11px] text-white/70">

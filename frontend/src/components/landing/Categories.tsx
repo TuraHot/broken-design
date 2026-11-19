@@ -11,6 +11,8 @@ import {
   User,
   type LucideIcon,
 } from "lucide-react";
+import { tagLabel } from "@/lib/i18n/tag";
+import { getT } from "@/lib/i18n/server";
 import { GALLERY_TAGS } from "@/lib/types";
 
 const ICONS: Record<(typeof GALLERY_TAGS)[number], LucideIcon> = {
@@ -24,7 +26,8 @@ const ICONS: Record<(typeof GALLERY_TAGS)[number], LucideIcon> = {
   animal: PawPrint,
 };
 
-export default function Categories() {
+export default async function Categories() {
+  const { t } = await getT();
   return (
     <ul className="grid grid-cols-2 gap-3 md:grid-cols-4">
       {GALLERY_TAGS.map((tag) => {
@@ -39,7 +42,7 @@ export default function Categories() {
                 <Icon aria-hidden className="h-5 w-5" />
               </span>
               <span className="font-mono text-[12px] uppercase tracking-[0.14em] text-white">
-                {tag}
+                {tagLabel(t, tag)}
               </span>
             </Link>
           </li>

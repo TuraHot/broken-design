@@ -1,16 +1,14 @@
+'use client';
+
 import { Loader2 } from 'lucide-react';
+import { useT } from '@/lib/i18n/client';
 
 const HUD_CLIP =
   'polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px))';
 
 /** Centred HUD loading panel following the dark/hud visual system. */
-export function HudLoader({
-  label = '[ Loading · Lixyte ]',
-  message = 'Syncing 3D asset stream…',
-}: {
-  label?: string;
-  message?: string;
-}) {
+export function HudLoader({ label, message }: { label?: string; message?: string }) {
+  const t = useT();
   return (
     <div
       role="status"
@@ -22,11 +20,11 @@ export function HudLoader({
         style={{ clipPath: HUD_CLIP }}
       >
         <div className="flex items-center justify-between gap-3">
-          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud/80">{label}</p>
+          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud/80">{label ?? t('loader.label')}</p>
           <Loader2 aria-hidden className="h-4 w-4 animate-spin text-hud motion-reduce:animate-none" />
         </div>
 
-        <p className="mt-4 text-sm text-white/80">{message}</p>
+        <p className="mt-4 text-sm text-white/80">{message ?? t('loader.message')}</p>
 
         <div className="mt-4 h-1 w-full overflow-hidden rounded-full bg-white/10">
           <div className="h-full w-2/3 animate-pulse rounded-full bg-gradient-to-r from-hud via-violet to-amber motion-reduce:animate-none" />
@@ -38,13 +36,14 @@ export function HudLoader({
 
 /** Skeleton matching the `/gallery` page shell and card grid. */
 export function GallerySkeleton() {
+  const t = useT();
   return (
-    <main aria-busy="true" aria-label="Loading gallery" className="mx-auto max-w-[1400px] px-4 pb-16 pt-24 md:px-6">
+    <main aria-busy="true" aria-label={t('loader.gallery')} className="mx-auto max-w-[1400px] px-4 pb-16 pt-24 md:px-6">
       <div className="flex items-center gap-2">
         <Loader2 aria-hidden className="h-3.5 w-3.5 animate-spin text-hud motion-reduce:animate-none" />
-        <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70">[ Syncing 3D library… ]</p>
+        <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70">{t('loader.gallerySync')}</p>
       </div>
-      <h1 className="mt-4 font-display text-[clamp(28px,4vw,48px)] uppercase leading-[1.02] text-white">Gallery</h1>
+      <h1 className="mt-4 font-display text-[clamp(28px,4vw,48px)] uppercase leading-[1.02] text-white">{t('nav.gallery')}</h1>
 
       <div className="mt-8 flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
         <div className="h-5 w-24 animate-pulse rounded bg-white/10 motion-reduce:animate-none" />
@@ -76,10 +75,11 @@ export function GallerySkeleton() {
 
 /** Skeleton matching `/models/[id]` layout (preview viewport + sticky action card). */
 export function ModelDetailSkeleton() {
+  const t = useT();
   return (
-    <main aria-busy="true" aria-label="Loading model details" className="mx-auto max-w-[1400px] px-4 pb-16 pt-24 md:px-6">
+    <main aria-busy="true" aria-label={t('loader.model')} className="mx-auto max-w-[1400px] px-4 pb-16 pt-24 md:px-6">
       <div className="flex items-center gap-2 text-sm text-white/65">
-        <span>Gallery</span>
+        <span>{t('nav.gallery')}</span>
         <span aria-hidden className="text-white/40">/</span>
         <span className="inline-block h-4 w-36 animate-pulse rounded bg-white/10 motion-reduce:animate-none" />
       </div>
@@ -88,7 +88,7 @@ export function ModelDetailSkeleton() {
         <div className="relative flex aspect-[4/3] w-full flex-col items-center justify-center gap-3 overflow-hidden rounded-lg border border-hud/25 bg-[rgba(4,8,18,0.66)]">
           <Loader2 aria-hidden className="h-6 w-6 animate-spin text-hud motion-reduce:animate-none" />
           <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud/80">
-            [ Connecting 3D stream… ]
+            {t('loader.modelSync')}
           </p>
         </div>
 
@@ -113,7 +113,7 @@ export function ModelDetailSkeleton() {
         </aside>
 
         <section className="rounded-lg border border-white/10 bg-white/5 p-5">
-          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70">[ Description ]</p>
+          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70">{t('loader.description')}</p>
           <div className="mt-3 space-y-2">
             <div className="h-4 w-full animate-pulse rounded bg-white/10 motion-reduce:animate-none" />
             <div className="h-4 w-5/6 animate-pulse rounded bg-white/5 motion-reduce:animate-none" />
@@ -121,7 +121,7 @@ export function ModelDetailSkeleton() {
         </section>
 
         <section className="rounded-lg border border-white/10 bg-white/5 p-5">
-          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70">[ How to use ]</p>
+          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70">{t('loader.howToUse')}</p>
           <div className="mt-4 h-28 w-full animate-pulse rounded-lg border border-white/10 bg-black/70 motion-reduce:animate-none" />
         </section>
       </div>

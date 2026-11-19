@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Heart } from 'lucide-react';
+import { useT } from '@/lib/i18n/client';
 import { CORE_API_URL } from '@/lib/api';
 import { formatCount } from '@/lib/format';
 import { readSession } from '@/lib/session';
@@ -18,6 +19,7 @@ export default function ModelLikeButton({
   initialCount: number;
 }) {
   const router = useRouter();
+  const t = useT();
   const [liked, setLiked] = useState(false);
   const [count, setCount] = useState(initialCount);
   const [busy, setBusy] = useState(false);
@@ -153,7 +155,7 @@ export default function ModelLikeButton({
         onClick={toggleLike}
         disabled={busy}
         aria-pressed={liked}
-        aria-label={liked ? 'Unlike this model' : 'Like this model'}
+        aria-label={liked ? t('model.unlike') : t('model.like')}
         className={`inline-flex items-center gap-1.5 rounded px-1 py-0.5 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-hud disabled:opacity-60 ${
           liked ? 'text-white hover:text-red-400' : 'text-white/65 hover:text-white'
         }`}
@@ -164,7 +166,7 @@ export default function ModelLikeButton({
             liked ? 'scale-110 fill-red-500 text-red-500' : 'fill-none'
           }`}
         />
-        <dt className="sr-only">Likes</dt>
+        <dt className="sr-only">{t('model.likes')}</dt>
         <dd>{formatCount(count)}</dd>
       </button>
     </div>

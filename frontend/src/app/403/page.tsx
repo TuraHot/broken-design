@@ -1,15 +1,18 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowLeft, LogIn, ShieldAlert } from 'lucide-react';
+import { getT } from '@/lib/i18n/server';
 
-export const metadata: Metadata = {
-  title: '403 Access Denied — Lixyte',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getT();
+  return { title: t('sys.403.meta') };
+}
 
 const HUD_CLIP =
   'polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px))';
 
-export default function ForbiddenPage() {
+export default async function ForbiddenPage() {
+  const { t } = await getT();
   return (
     <main className="relative isolate grid min-h-dvh place-items-center px-4 py-24 md:px-6">
       <div
@@ -23,16 +26,15 @@ export default function ForbiddenPage() {
       >
         <p className="inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.16em] text-amber">
           <ShieldAlert aria-hidden className="h-3.5 w-3.5" />
-          [ 403 &middot; Access denied ]
+          {t('sys.403.label')}
         </p>
 
         <h1 className="mt-4 font-display text-[clamp(26px,4.5vw,42px)] uppercase leading-[1.05] text-white">
-          Forbidden
+          {t('sys.403.title')}
         </h1>
 
         <p className="mt-3 text-[15px] leading-relaxed text-white/65">
-          You don&apos;t have permission to access this page or resource. Please
-          sign in with an authorized account or return to the gallery.
+          {t('sys.403.body')}
         </p>
 
         <div className="mt-7 flex flex-wrap items-center gap-3">
@@ -41,7 +43,7 @@ export default function ForbiddenPage() {
             className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-[15px] font-medium text-black transition-colors hover:bg-white/85"
           >
             <LogIn aria-hidden className="h-4 w-4" />
-            Sign in
+            {t('sys.403.signIn')}
           </Link>
 
           <Link
@@ -49,7 +51,7 @@ export default function ForbiddenPage() {
             className="inline-flex items-center gap-2 border border-white/40 px-3.5 py-2 font-mono text-[11px] uppercase tracking-[0.18em] text-white transition-colors hover:border-white hover:bg-white hover:text-black"
           >
             <ArrowLeft aria-hidden className="h-4 w-4" />
-            Back to home
+            {t('sys.backHome')}
           </Link>
         </div>
       </div>

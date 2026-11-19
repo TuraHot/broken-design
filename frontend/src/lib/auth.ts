@@ -23,29 +23,49 @@ interface CheckEmailResponse {
   exists: boolean;
 }
 
+/**
+ * A failed auth request. `code` says what kind of failure it was so the form can show it in the visitor's language:
+ * `API` = the server sent a message (shown as the server wrote it), `NETWORK` = the server could not be reached,
+ * `GENERIC` = a failure without a message. Extends Error, so code that only reads `err.message` keeps working.
+ */
+export class AuthError extends Error {
+  constructor(
+    public code: 'API' | 'NETWORK' | 'GENERIC',
+    message = '',
+  ) {
+    super(message || (code === 'NETWORK' ? 'Cannot reach the server. Please try again.' : 'Authentication failed. Please try again.'));
+  }
+}
+
 // ฟังก์ชันกลางสำหรับเรียก Auth API
 async function authRequest<T>(
   endpoint: string,
   body: Record<string, string>,
 ): Promise<T> {
-  const response = await fetch(
-    `${CORE_API_URL}/api/auth/${endpoint}`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
+  let response: Response;
+  try {
+    response = await fetch(
+      `${CORE_API_URL}/api/auth/${endpoint}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
       },
-      body: JSON.stringify(body),
-    },
-  );
+    );
+  } catch {
+    throw new AuthError('NETWORK');
+  }
 
-  const data = await response.json();
+  const data = await response.json().catch(() => null);
 
   if (!response.ok) {
-    throw new Error(
-      data?.error?.message || 'Authentication failed. Please try again.',
-    );
+    const message = data?.error?.message;
+    throw message ? new AuthError('API', message) : new AuthError('GENERIC');
   }
+  // A success answer that is not JSON is as unusable as a failure.
+  if (data === null) throw new AuthError('GENERIC');
 
   return data as T;
 }
@@ -105,12 +125,29 @@ export async function resetPassword(token: string, password: string): Promise<vo
   await authRequest<{ message: string }>('reset-password', { token, password });
 }
 
+// Sends a request for the signed-in account and returns the JSON body. Failures become AuthError so the page can
+// show them in the visitor's language (see authErrorText).
+async function accountRequest(url: string, init: RequestInit): Promise<any> {
+  let response: Response;
+  try {
+    response = await fetch(url, init);
+  } catch {
+    throw new AuthError('NETWORK');
+  }
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    const message = data?.error?.message;
+    throw message ? new AuthError('API', message) : new AuthError('GENERIC');
+  }
+  return data;
+}
+
 // อัปเดตชื่อที่แสดงของบัญชีปัจจุบัน (PATCH /api/auth/profile)
 export async function updateProfile(
   displayName: string,
   token: string,
 ): Promise<AuthUser> {
-  const response = await fetch(`${CORE_API_URL}/api/auth/profile`, {
+  const data = await accountRequest(`${CORE_API_URL}/api/auth/profile`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
@@ -118,11 +155,6 @@ export async function updateProfile(
     },
     body: JSON.stringify({ displayName: displayName.trim() }),
   });
-
-  const data = await response.json().catch(() => null);
-  if (!response.ok) {
-    throw new Error(data?.error?.message || 'Failed to update profile.');
-  }
 
   return data.user as AuthUser;
 }
@@ -136,29 +168,19 @@ export async function uploadMyAvatar(
   const form = new FormData();
   form.append('avatar', file, filename);
 
-  const response = await fetch(`${CDN_SERVICE_URL}/api/me/avatar`, {
+  const data = await accountRequest(`${CDN_SERVICE_URL}/api/me/avatar`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
     body: form,
   });
-
-  const data = await response.json().catch(() => null);
-  if (!response.ok) {
-    throw new Error(data?.error?.message || `Upload failed (${response.status})`);
-  }
 
   return data?.avatarPath ? `${CDN_SERVICE_URL}${data.avatarPath}` : null;
 }
 
 // ลบรูปโปรไฟล์ออกจาก cdn-service และ Supabase bucket: profile_logo
 export async function deleteMyAvatar(token: string): Promise<void> {
-  const response = await fetch(`${CDN_SERVICE_URL}/api/me/avatar`, {
+  await accountRequest(`${CDN_SERVICE_URL}/api/me/avatar`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },
   });
-
-  const data = await response.json().catch(() => null);
-  if (!response.ok) {
-    throw new Error(data?.error?.message || `Failed to remove avatar (${response.status})`);
-  }
 }

@@ -1,8 +1,12 @@
 // Forgot password — UI only until core-api auth exists.
 import type { Metadata } from 'next';
 import ForgotPasswordForm from '@/components/auth/ForgotPasswordForm';
+import { getT } from '@/lib/i18n/server';
 
-export const metadata: Metadata = { title: 'Reset password — Lixyte' };
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getT();
+  return { title: t('auth.meta.forgot') };
+}
 
 export default function ForgotPasswordPage() {
   return (

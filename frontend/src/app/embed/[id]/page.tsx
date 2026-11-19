@@ -1,5 +1,10 @@
 // Iframe viewer page (/embed/[id]?key=...) — CSP frame-ancestors * is set in next.config.ts
+// It is shown inside other people's sites, where the `lang` cookie is not sent, so `?lang=th` or `?lang=en` chooses the
+// language of its few messages (without it: the cookie if there is one, otherwise English).
 import EmbedIframeViewer from '@/components/viewer/EmbedIframeViewer';
+import { LocaleProvider } from '@/lib/i18n/client';
+import { isLocale } from '@/lib/i18n/messages';
+import { getLocale } from '@/lib/i18n/server';
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -22,8 +27,11 @@ export default async function EmbedPage({
 }) {
   const { id } = await params;
   const sp = (await searchParams) ?? {};
+  const asked = first(sp.lang);
+  const locale = isLocale(asked) ? asked : await getLocale();
 
   return (
+    <LocaleProvider locale={locale}>
     <EmbedIframeViewer
       id={id}
       embedKey={first(sp.key)}
@@ -33,5 +41,6 @@ export default async function EmbedPage({
       exposure={first(sp.exposure) || '1'}
       shadowIntensity={first(sp['shadow-intensity'] ?? sp.shadowIntensity) || '1'}
     />
+    </LocaleProvider>
   );
 }

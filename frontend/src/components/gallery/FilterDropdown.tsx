@@ -15,7 +15,8 @@ export default function FilterDropdown({
 }: {
   label: string;
   paramKey: 'tag' | 'license' | 'price';
-  options: readonly string[];
+  /** `value` goes into the URL, `label` is shown. The first option means "no filter". */
+  options: readonly { value: string; label: string }[];
   params?: ModelsParams;
 }) {
   const router = useRouter();
@@ -24,9 +25,8 @@ export default function FilterDropdown({
   const rootRef = useRef<HTMLDivElement>(null);
 
   const currentParam = params[paramKey];
-  const value =
-    options.find((o) => o.toLowerCase() === currentParam?.toLowerCase()) ?? options[0];
-  const chosen = value !== options[0];
+  const current = options.find((o) => o.value.toLowerCase() === currentParam?.toLowerCase()) ?? options[0];
+  const chosen = current !== options[0];
 
   useEffect(() => {
     if (!open) return;
@@ -44,17 +44,17 @@ export default function FilterDropdown({
     };
   }, [open]);
 
-  const selectOption = (o: string) => {
+  const selectOption = (o: { value: string; label: string }) => {
     if (isPending) return;
     setOpen(false);
     const isAll = o === options[0];
     const next: ModelsParams = { ...params, page: 1 };
     if (paramKey === 'tag') {
-      next.tag = isAll ? undefined : o.toLowerCase();
+      next.tag = isAll ? undefined : o.value.toLowerCase();
     } else if (paramKey === 'license') {
-      next.license = isAll ? undefined : (o.toUpperCase() as License);
+      next.license = isAll ? undefined : (o.value.toUpperCase() as License);
     } else if (paramKey === 'price') {
-      next.price = isAll ? undefined : (o.toLowerCase() as 'free' | 'paid');
+      next.price = isAll ? undefined : (o.value.toLowerCase() as 'free' | 'paid');
     }
     startTransition(() => {
       router.push(buildHref(next));
@@ -74,7 +74,7 @@ export default function FilterDropdown({
         } bg-white/5`}
       >
         <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70">{label}</span>
-        <span>{value}</span>
+        <span>{current.label}</span>
         {isPending ? (
           <Loader2 aria-hidden className="h-4 w-4 animate-spin text-hud motion-reduce:animate-none" />
         ) : (
@@ -88,17 +88,17 @@ export default function FilterDropdown({
           className="absolute right-0 top-full z-20 mt-2 max-h-72 min-w-[160px] overflow-auto rounded-lg border border-white/15 bg-black/95 p-1 backdrop-blur"
         >
           {options.map((o) => (
-            <li key={o}>
+            <li key={o.value}>
               <button
                 type="button"
-                aria-pressed={o === value}
+                aria-pressed={o === current}
                 onClick={() => selectOption(o)}
                 className={`flex w-full items-center justify-between gap-3 rounded-md px-3 py-1.5 text-left text-sm transition-colors hover:bg-white/10 ${
-                  o === value ? 'text-white' : 'text-white/65 hover:text-white'
+                  o === current ? 'text-white' : 'text-white/65 hover:text-white'
                 }`}
               >
-                {o}
-                {o === value && <Check aria-hidden className="h-4 w-4" />}
+                {o.label}
+                {o === current && <Check aria-hidden className="h-4 w-4" />}
               </button>
             </li>
           ))}

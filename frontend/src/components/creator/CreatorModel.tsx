@@ -4,16 +4,18 @@
 // follow the wings as they beat). Cards and lines only show from `md` up; on phones there is just the butterfly.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import CreatorViewer from '@/components/viewer/CreatorViewer';
+import { useT } from '@/lib/i18n/client';
+import type { MessageKey } from '@/lib/i18n/messages';
 import type { ButterflyAnchors } from '@/components/viewer/ButterflyScene';
 
 const CLIP = 'polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px))';
 
 // Facts come from the product scope (docs/PRD.md); nothing here is a live number.
 const CALLOUTS = [
-  { id: 'antenna', side: 'left', pos: 'left-0 top-[16%]', tag: 'Antenna', title: 'Embed', lines: ['<vm-model>', 'or iframe'] },
-  { id: 'fore', side: 'right', pos: 'right-0 top-[6%]', tag: 'Wing 01', title: 'Upload', lines: ['.glb, glTF 2.0', 'up to 50 MB'] },
-  { id: 'hind', side: 'right', pos: 'right-0 bottom-[12%]', tag: 'Wing 02', title: 'License', lines: ['Open licenses', 'Free or paid'] },
-] as const;
+  { id: 'antenna', side: 'left', pos: 'left-0 top-[16%]', tag: 'creator.c1.tag', title: 'creator.c1.title', lines: ['creator.c1.l1', 'creator.c1.l2'] },
+  { id: 'fore', side: 'right', pos: 'right-0 top-[6%]', tag: 'creator.c2.tag', title: 'creator.c2.title', lines: ['creator.c2.l1', 'creator.c2.l2'] },
+  { id: 'hind', side: 'right', pos: 'right-0 bottom-[12%]', tag: 'creator.c3.tag', title: 'creator.c3.title', lines: ['creator.c3.l1', 'creator.c3.l2'] },
+] as const satisfies readonly { id: string; side: string; pos: string; tag: MessageKey; title: MessageKey; lines: readonly MessageKey[] }[];
 
 type Id = (typeof CALLOUTS)[number]['id'];
 
@@ -21,6 +23,7 @@ type Id = (typeof CALLOUTS)[number]['id'];
 const SHOW_CALLOUTS = false;
 
 export default function CreatorModel() {
+  const t = useT();
   const cards = useRef<Partial<Record<Id, HTMLDivElement | null>>>({});
   const lines = useRef<Partial<Record<Id, SVGLineElement | null>>>({});
   const dots = useRef<Partial<Record<Id, SVGGElement | null>>>({});
@@ -76,11 +79,11 @@ export default function CreatorModel() {
             className={`absolute ${c.pos} w-[112px] border border-hud/40 bg-[rgba(4,8,18,0.66)] p-2.5 xl:w-[140px]`}
             style={{ clipPath: CLIP }}
           >
-            <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-hud/70">[ {c.tag} ]</p>
-            <p className="mt-1.5 font-display text-[11px] uppercase text-white">{c.title}</p>
+            <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-hud/70">[ {t(c.tag)} ]</p>
+            <p className="mt-1.5 font-display text-[11px] uppercase text-white">{t(c.title)}</p>
             {c.lines.map((l) => (
               <p key={l} className="mt-1 font-mono text-[10.5px] leading-snug text-white/65">
-                {l}
+                {t(l)}
               </p>
             ))}
           </div>

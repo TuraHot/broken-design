@@ -10,10 +10,13 @@ import path from 'node:path';
 const schema = fs.readFileSync(path.resolve(__dirname, '../../../../supabase/schema.sql'), 'utf8');
 const start = schema.indexOf('-- 9. Model license changes by an admin');
 
-test('schema.sql - section 9 onward exists and creates the new tables', () => {
+test('schema.sql - section 9 onward exists and creates the admin moderation tables', () => {
   assert.ok(start > 0, 'section 9 marker not found');
   const created = [...schema.slice(start).matchAll(/CREATE TABLE IF NOT EXISTS (\w+)/g)].map((m) => m[1]);
-  assert.deepEqual(created.sort(), ['model_license_changes', 'model_visibility_changes', 'notifications', 'password_resets', 'user_suspensions']);
+  // Later sections (for example password_resets) may add more tables after these; they only have to keep RLS on (next test).
+  for (const table of ['model_license_changes', 'model_visibility_changes', 'notifications', 'user_suspensions']) {
+    assert.ok(created.includes(table), `${table} is missing from section 9 onward`);
+  }
 });
 
 test('schema.sql - every table created from section 9 on enables row level security', () => {

@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
+import { useT } from '@/lib/i18n/client';
 
 const NAV_START_EVENT = 'lixyte:nav-start';
 const HUD_CLIP =
@@ -15,6 +16,7 @@ export function startNavigationLoading(targetPath: string) {
 }
 
 function NavigationProgressInner() {
+  const t = useT();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const searchKey = searchParams.toString();
@@ -101,7 +103,7 @@ function NavigationProgressInner() {
       <div
         role="status"
         aria-live="polite"
-        aria-label="Loading page"
+        aria-label={t('loader.page')}
         className="fixed inset-0 z-[65] flex cursor-wait items-center justify-center bg-black/60 p-4 backdrop-blur-[2px]"
       >
         <div
@@ -110,11 +112,11 @@ function NavigationProgressInner() {
         >
           <div className="flex items-center justify-between gap-3">
             <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud">
-              [ Navigating · Lixyte ]
+              {t('loader.navigating')}
             </span>
             <Loader2 aria-hidden className="h-4 w-4 animate-spin text-hud motion-reduce:animate-none" />
           </div>
-          <p className="mt-3 text-sm text-white/80">Loading view…</p>
+          <p className="mt-3 text-sm text-white/80">{t('loader.view')}</p>
           <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-white/10">
             <div className="h-full w-2/3 animate-pulse rounded-full bg-gradient-to-r from-hud via-violet to-amber motion-reduce:animate-none" />
           </div>

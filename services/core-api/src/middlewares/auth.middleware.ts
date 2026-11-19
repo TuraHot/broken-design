@@ -79,3 +79,27 @@ export async function requireNotSuspended(req: Request, _res: Response, next: Ne
   }
   next();
 }
+
+/**
+ * Use AFTER requireAuth on routes that BUY: checkout, payment, QR. The person must be allowed to act (not
+ * suspended) and must not be an admin: admins moderate the platform and never buy (PRD). Like requireNotSuspended
+ * it asks the database every time, so a token that says "user" cannot hide an admin account, and it never lets a
+ * request through when the database fails.
+ */
+export async function requireBuyer(req: Request, _res: Response, next: NextFunction) {
+  if (!req.user) {
+    throw new AppError(401, 'UNAUTHORIZED', 'Authentication required');
+  }
+  const result = await db.query(`SELECT suspended_at, role FROM users WHERE id = $1`, [req.user.id]);
+  const row = result.rows[0];
+  if (!row) {
+    throw new AppError(401, 'UNAUTHORIZED', 'Account not found');
+  }
+  if (row.suspended_at) {
+    throw new AppError(403, 'ACCOUNT_SUSPENDED', 'Your account has been suspended by an administrator');
+  }
+  if (row.role === 'admin') {
+    throw new AppError(403, 'ADMIN_CANNOT_BUY', 'Admin accounts cannot buy models');
+  }
+  next();
+}

@@ -40,6 +40,7 @@ export interface AuthUser {
   role: 'user' | 'creator' | 'admin';
   is_seller: boolean;
   avatar_url?: string | null;
+  avatar_hash?: string | null;
 }
 
 export interface PurchaseItem {

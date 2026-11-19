@@ -9,6 +9,8 @@ services:
         required: false
       - path: ./services/core-api/.env
         required: false
+    volumes:
+      - ./services/core-api/storage:/app/storage
     restart: unless-stopped
 
   cdn-service:

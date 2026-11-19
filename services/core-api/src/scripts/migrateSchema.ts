@@ -4,14 +4,15 @@ import { db } from "../config/db";
 async function runMigration() {
   console.log("--- Running database migration for Lixyte PostgreSQL schema ---");
   try {
-    // 1. Add avatar_url to users table
-    console.log("Adding avatar_url to users table...");
+    // 1. Add avatar_url and avatar_hash to users table
+    console.log("Adding avatar_url and avatar_hash to users table...");
     await db.query(`
-      ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT;
-      ALTER TABLE users ADD COLUMN IF NOT EXISTS is_seller BOOLEAN NOT NULL DEFAULT FALSE;
-      ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended_at TIMESTAMPTZ;
+      ALTER TABLE public.users ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+      ALTER TABLE public.users ADD COLUMN IF NOT EXISTS avatar_hash CHAR(64);
+      ALTER TABLE public.users ADD COLUMN IF NOT EXISTS is_seller BOOLEAN NOT NULL DEFAULT FALSE;
+      ALTER TABLE public.users ADD COLUMN IF NOT EXISTS suspended_at TIMESTAMPTZ;
     `);
-    console.log("✅ users.avatar_url column verified!");
+    console.log("✅ users.avatar_url and users.avatar_hash columns verified!");
 
     // 2. Ensure purchases table
     console.log("Migrating purchases table...");

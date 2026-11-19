@@ -9,6 +9,7 @@ import { useReport } from '@/components/report/ReportProvider';
 import { creatorHandle } from '@/lib/creators';
 import { useT } from '@/lib/i18n/client';
 import { clearSession, readSession, type Session } from '@/lib/session';
+import { getAvatarUrl } from '@/lib/auth';
 
 const itemClass =
   'flex w-full items-center rounded-md px-3 py-2 text-left text-sm text-white/65 transition-colors hover:bg-white/10 hover:text-white';
@@ -106,7 +107,7 @@ export default function AccountMenu() {
         className="grid h-9 w-9 overflow-hidden place-items-center rounded-full border border-hud/50 bg-white/5 text-[13px] font-medium text-white transition-colors hover:border-hud hover:bg-white/10"
       >
         {user.avatar_url ? (
-          <img src={user.avatar_url} alt={name} className="h-full w-full object-cover" />
+          <img src={getAvatarUrl(user.avatar_url) || ''} alt={name} className="h-full w-full object-cover" />
         ) : (
           initialsOf(name)
         )}
@@ -117,7 +118,7 @@ export default function AccountMenu() {
           <div className="flex items-center gap-2.5 border-b border-white/10 px-3 py-2.5">
             <div className="grid h-8 w-8 shrink-0 overflow-hidden place-items-center rounded-full border border-hud/40 bg-white/5 text-xs text-white">
               {user.avatar_url ? (
-                <img src={user.avatar_url} alt={name} className="h-full w-full object-cover" />
+                <img src={getAvatarUrl(user.avatar_url) || ''} alt={name} className="h-full w-full object-cover" />
               ) : (
                 initialsOf(name)
               )}

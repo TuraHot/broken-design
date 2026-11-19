@@ -9,6 +9,14 @@ export interface AuthUser {
   role: string;
   is_seller: boolean;
   avatar_url?: string | null;
+  avatar_hash?: string | null;
+}
+
+// แปลง Avatar URL ให้สมบูรณ์ (ถ้าเป็น relative /api/... ให้ชี้ไปที่ Core API)
+export function getAvatarUrl(url?: string | null): string | null {
+  if (!url) return null;
+  if (url.startsWith('/')) return `${CORE_API_URL}${url}`;
+  return url;
 }
 
 // ผลลัพธ์เมื่อ Login หรือ Register สำเร็จ

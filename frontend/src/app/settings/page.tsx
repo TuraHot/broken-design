@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AlertCircle, Camera, Check, Loader2, LogOut, Trash2, Upload } from 'lucide-react';
-import { updateProfile } from '@/lib/auth';
+import { getAvatarUrl, updateProfile } from '@/lib/auth';
 import { useT } from '@/lib/i18n/client';
 import { clearSession, readSession, type Session } from '@/lib/session';
 
@@ -146,19 +146,24 @@ export default function SettingsPage() {
             
             <div className="mt-5 flex flex-col gap-6 sm:flex-row sm:items-center">
               {/* Avatar Preview */}
-              <div className="relative group shrink-0">
+              <div className="relative group shrink-0 flex flex-col items-center">
                 <div className="grid h-24 w-24 overflow-hidden place-items-center rounded-full border-2 border-hud/60 bg-white/5 text-2xl font-semibold text-white shadow-lg">
                   {avatar ? (
-                    <img src={avatar} alt={name} className="h-full w-full object-cover" />
+                    <img src={getAvatarUrl(avatar) || ''} alt={name} className="h-full w-full object-cover" />
                   ) : (
                     <span>{initialsOf(name)}</span>
                   )}
                 </div>
+                {session?.user?.avatar_hash && (
+                  <p className="mt-2 max-w-[110px] truncate font-mono text-[10px] text-hud/80" title={`SHA-256: ${session.user.avatar_hash}`}>
+                    SHA-256: {session.user.avatar_hash.substring(0, 8)}…
+                  </p>
+                )}
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   title="Upload avatar"
-                  className="absolute bottom-0 right-0 grid h-8 w-8 place-items-center rounded-full border border-white/20 bg-black/90 text-white/80 transition-colors hover:border-hud hover:text-white"
+                  className="absolute bottom-6 right-0 grid h-8 w-8 place-items-center rounded-full border border-white/20 bg-black/90 text-white/80 transition-colors hover:border-hud hover:text-white"
                 >
                   <Camera className="h-4 w-4" />
                 </button>

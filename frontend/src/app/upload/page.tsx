@@ -19,6 +19,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { CDN_SERVICE_URL } from '@/lib/api';
+import { readToken } from '@/lib/session';
 
 // Supported licenses
 const LICENSES = [
@@ -206,7 +207,7 @@ export default function UploadPage() {
       formData.append('currency', 'USD');
 
       // Retrieve auth token if available (or use DEV_CREATOR_TOKEN for testing)
-      const token = (typeof window !== 'undefined' ? localStorage.getItem('token') : null) || DEV_CREATOR_TOKEN;
+      const token = (typeof window !== 'undefined' ? readToken() : null) || DEV_CREATOR_TOKEN;
 
       const res = await fetch(`${CDN_SERVICE_URL}/api/models`, {
         method: 'POST',

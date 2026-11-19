@@ -1,8 +1,10 @@
+import http from "http";
 import express from "express";
 import cors from "cors";
 import { env } from "./config/env";
 import { allowedOrigins } from "./config/cors";
 import { testDbConnection } from "./config/db";
+import { initSocketServer } from "./config/socket";
 import { authRouter } from "./modules/auth/auth.routes";
 import { modelsRouter } from "./modules/models/models.routes";
 import { paymentsRouter } from "./modules/payments/payments.routes";
@@ -14,8 +16,9 @@ import { notificationsRouter } from "./modules/notifications/notifications.route
 import { startSuspensionSweeper } from "./modules/admin/suspensionSweeper";
 import { errorHandler } from "./middlewares/error.middleware";
 
-
 export const app = express();
+export const httpServer = http.createServer(app);
+export const io = initSocketServer(httpServer);
 
 app.use(cors({ origin: allowedOrigins(), credentials: true }));
 // Stripe webhook requires the raw request body for signature verification
@@ -47,8 +50,8 @@ const isTest =
   process.argv.some((arg) => arg.includes("test"));
 
 if (!isTest) {
-  app.listen(env.port, () => {
-    console.log(`[Lixyte Core-API] running on http://localhost:${env.port}`);
+  httpServer.listen(env.port, () => {
+    console.log(`[Lixyte Core-API with Socket.IO] running on http://localhost:${env.port}`);
   });
   startSuspensionSweeper(); // lifts suspensions whose end time has passed (every 60 s)
 }

@@ -27,6 +27,7 @@ import {
 } from '@/lib/api';
 import { creatorHandle } from '@/lib/creators';
 import { formatPrice } from '@/lib/format';
+import { readSession, updateSessionUser } from '@/lib/session';
 import type { AuthUser, PurchaseItem } from '@/lib/types';
 
 const CARD = 'rounded-lg border border-white/10 bg-white/5 p-5 sm:p-6';
@@ -44,18 +45,10 @@ export default function MePage() {
   // 1. Load user & token from storage
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const storedToken = localStorage.getItem('token');
-    const storedUser = localStorage.getItem('user');
-
-    if (storedToken) {
-      setToken(storedToken);
-      if (storedUser) {
-        try {
-          setUser(JSON.parse(storedUser));
-        } catch {
-          // fallback if invalid json
-        }
-      }
+    const session = readSession();
+    if (session) {
+      setToken(session.token);
+      setUser(session.user as AuthUser);
     }
     setLoading(false);
   }, []);
@@ -76,7 +69,7 @@ export default function MePage() {
           setPurchases(purchaseList);
           setUser((prev) => {
             const next = prev ? { ...prev, is_seller: isSeller } : prev;
-            if (next) localStorage.setItem('user', JSON.stringify(next));
+            if (next) updateSessionUser({ is_seller: isSeller });
             return next;
           });
         }
@@ -99,7 +92,7 @@ export default function MePage() {
       await enableSellerMode(token);
       setUser((prev) => {
         const updated = prev ? { ...prev, is_seller: true } : prev;
-        if (updated) localStorage.setItem('user', JSON.stringify(updated));
+        if (updated) updateSessionUser({ is_seller: true });
         return updated;
       });
       setStatusMsg('Seller mode activated! You can now upload models and view your sales.');

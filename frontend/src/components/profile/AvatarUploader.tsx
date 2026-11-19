@@ -41,7 +41,7 @@ export default function AvatarUploader({
 
     const token =
       readSession()?.token ||
-      (typeof window !== "undefined" ? localStorage.getItem("token") : null);
+      (typeof window !== "undefined" ? readSession()?.token ?? null : null);
     if (!token) {
       setError("Please log in first to update your avatar.");
       if (inputRef.current) inputRef.current.value = "";

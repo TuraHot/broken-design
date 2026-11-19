@@ -6,6 +6,7 @@ import { Heart } from 'lucide-react';
 import { CORE_API_URL } from '@/lib/api';
 import { formatCount } from '@/lib/format';
 import { readSession } from '@/lib/session';
+import { getSocket } from '@/lib/socket';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -65,9 +66,34 @@ export default function ModelLikeButton({
 
     void loadLikeState();
     window.addEventListener('storage', loadLikeState);
+
+    // Real-time live update for like counts via Socket.IO
+    let cleanupSocket: (() => void) | undefined;
+    try {
+      const socket = getSocket();
+      if (socket) {
+        const onLikeUpdated = (data: { modelId: string; likeCount: number }) => {
+          if (data && data.modelId === modelId && typeof data.likeCount === 'number') {
+            setCount(data.likeCount);
+          }
+        };
+
+        socket.on('model:like_updated', onLikeUpdated);
+        socket.emit('join:model', modelId);
+
+        cleanupSocket = () => {
+          socket.off('model:like_updated', onLikeUpdated);
+          socket.emit('leave:model', modelId);
+        };
+      }
+    } catch {
+      // Socket optional fallback
+    }
+
     return () => {
       cancelled = true;
       window.removeEventListener('storage', loadLikeState);
+      if (cleanupSocket) cleanupSocket();
     };
   }, [modelId, initialCount, isRealModel]);
 

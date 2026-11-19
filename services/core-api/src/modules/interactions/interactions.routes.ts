@@ -2,6 +2,7 @@ import { Router, type NextFunction, type Request, type Response } from 'express'
 import { db } from '../../config/db';
 import { requireAuth } from '../../middlewares/auth.middleware';
 import { AppError } from '../../middlewares/error.middleware';
+import { notifyModelLike, notifyUser } from '../../config/socket';
 
 export const interactionsRouter = Router();
 
@@ -57,13 +58,14 @@ interactionsRouter.post(
         throw new AppError(403, 'ACCOUNT_SUSPENDED', 'Your account has been suspended by an administrator');
       }
 
-      const modelCheck = await db.query<{ id: string }>(
-        `SELECT id FROM models WHERE id = $1 AND hidden_at IS NULL AND deleted_at IS NULL`,
+      const modelCheck = await db.query<{ id: string; owner_id: string; title: string }>(
+        `SELECT id, owner_id, title FROM models WHERE id = $1 AND hidden_at IS NULL AND deleted_at IS NULL`,
         [id],
       );
       if (modelCheck.rows.length === 0) {
         throw new AppError(404, 'MODEL_NOT_FOUND', 'Model not found');
       }
+      const model = modelCheck.rows[0];
 
       const del = await db.query<{ user_id: string }>(
         `DELETE FROM likes WHERE user_id = $1 AND model_id = $2 RETURNING user_id`,
@@ -83,10 +85,52 @@ interactionsRouter.post(
         `SELECT COUNT(*)::int AS like_count FROM likes WHERE model_id = $1`,
         [id],
       );
+      const likeCount = Number(countRes.rows[0]?.like_count ?? 0);
+
+      // 1. Broadcast live like count to all clients viewing the model or in gallery
+      notifyModelLike(id, likeCount);
+
+      // 2. If newly liked and not own model: insert notice & send real-time notification to owner
+      if (liked && model.owner_id !== userId) {
+        try {
+          const userRes = await db.query<{ display_name: string }>(
+            `SELECT display_name FROM users WHERE id = $1`,
+            [userId],
+          );
+          const likerName = userRes.rows[0]?.display_name || 'มีผู้ใช้งาน';
+
+          // Insert notice into database inbox
+          await db.query(
+            `INSERT INTO notifications (user_id, kind, model_id, data)
+             VALUES ($1, 'model_liked', $2, $3::jsonb)`,
+            [
+              model.owner_id,
+              id,
+              JSON.stringify({
+                liker_id: userId,
+                liker_name: likerName,
+                model_title: model.title,
+                message: `${likerName} ได้กดถูกใจโมเดล 3D "${model.title}" ของคุณ`,
+              }),
+            ],
+          );
+
+          // Emit real-time notification to owner via Socket.IO
+          notifyUser(model.owner_id, {
+            type: 'like',
+            title: 'มีคนกดถูกใจโมเดลของคุณ!',
+            message: `${likerName} ได้กดถูกใจโมเดล 3D "${model.title}" ของคุณ`,
+            modelId: id,
+            data: { likerName, modelTitle: model.title },
+          });
+        } catch (err) {
+          console.error('[Socket/Notice] Failed to create like notification:', err);
+        }
+      }
 
       res.json({
         liked,
-        likeCount: Number(countRes.rows[0]?.like_count ?? 0),
+        likeCount,
       });
     } catch (err) {
       next(err);

@@ -8,7 +8,7 @@ import { FormEvent, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Eye, EyeOff } from 'lucide-react';
 import { checkEmail, login, register } from '@/lib/auth';
-import { SESSION_UPDATED_EVENT } from '@/lib/session';
+import { saveSession, SESSION_UPDATED_EVENT } from '@/lib/session';
 import { EMAIL_RE, FIELD, Field } from './Field';
 
 type Step = 'email' | 'login' | 'signup';
@@ -115,12 +115,8 @@ export default function AuthForm() {
 
         const result = await login(values.email, values.password);
 
-        // Store tokens for authentication across the app
-        localStorage.setItem('token', result.token);
-        if (result.user) {
-          localStorage.setItem('user', JSON.stringify(result.user));
-        }
-        window.dispatchEvent(new CustomEvent(SESSION_UPDATED_EVENT));
+        // Store tokens for authentication across the app (per-tab session isolation)
+        saveSession({ token: result.token, user: result.user });
 
         router.push('/gallery');
       } catch (error: any) {

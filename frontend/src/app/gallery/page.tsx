@@ -3,8 +3,8 @@ import type { Metadata } from 'next';
 import FilterBar from '@/components/gallery/FilterBar';
 import ModelCard from '@/components/gallery/ModelCard';
 import Pagination from '@/components/gallery/Pagination';
-import { fetchModels } from '@/lib/api';
-import { isPublicModel, parseParams } from '@/lib/pagination';
+import { fetchCoreApiModels, fetchModels } from '@/lib/api';
+import { extractAvailableTags, isPublicModel, parseParams } from '@/lib/pagination';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -16,9 +16,12 @@ export default async function GalleryPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const params = parseParams(await searchParams);
+  const [rawSearchParams, allModels] = await Promise.all([searchParams, fetchCoreApiModels()]);
+  const availableTags = extractAvailableTags(allModels);
+  const params = parseParams(rawSearchParams, availableTags);
   const rawData = await fetchModels(params);
   const items = rawData.items.filter(isPublicModel);
+  const tags = extractAvailableTags([...allModels, ...items]);
   const data = {
     ...rawData,
     items,
@@ -34,7 +37,7 @@ export default async function GalleryPage({
         <p className="text-sm text-white/65">
           {data.total} {data.total === 1 ? 'model' : 'models'}
         </p>
-        <FilterBar params={params} />
+        <FilterBar params={params} tags={tags} />
       </div>
 
       {data.items.length > 0 ? (

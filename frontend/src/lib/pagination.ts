@@ -61,15 +61,30 @@ type RawParams = Record<string, string | string[] | undefined>;
 
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
+/** Extract unique lowercase tags from publicly visible models only. */
+export function extractAvailableTags(models: Model[]): string[] {
+  const seen = new Set<string>();
+  for (const model of models) {
+    if (!isPublicModel(model)) continue;
+    for (const rawTag of model.tags ?? []) {
+      const tag = rawTag.trim().toLowerCase();
+      if (tag) seen.add(tag);
+    }
+  }
+  const known = VALID_TAGS.filter((t) => seen.has(t));
+  const custom = [...seen].filter((t) => !VALID_TAGS.includes(t)).sort((a, b) => a.localeCompare(b));
+  return [...known, ...custom];
+}
+
 /** Read Next.js `searchParams` into validated params; anything unknown is dropped. */
-export function parseParams(raw: RawParams): ModelsParams {
+export function parseParams(raw: RawParams, extraAllowedTags: readonly string[] = []): ModelsParams {
   const params: ModelsParams = {};
 
   const q = first(raw.q)?.trim();
   if (q) params.q = q;
 
   const tag = first(raw.tag)?.trim().toLowerCase();
-  if (tag && VALID_TAGS.includes(tag)) {
+  if (tag && (VALID_TAGS.includes(tag) || extraAllowedTags.includes(tag))) {
     params.tag = tag;
   }
 

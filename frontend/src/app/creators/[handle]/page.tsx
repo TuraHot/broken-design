@@ -24,6 +24,7 @@ export default async function CreatorProfilePage({ params }: Props) {
       <ProfileHeader
         name={creator.name}
         handle={creator.handle}
+        avatarUrl={creator.avatarUrl}
         bio={creator.bio}
         modelCount={creator.models.length}
         downloads={creator.totalDownloads}

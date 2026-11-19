@@ -9,6 +9,7 @@ export interface Session {
   user: AuthUser;
 }
 
+export const SESSION_UPDATED_EVENT = 'lixyte:session-updated';
 const STORAGE_KEYS = ['token', 'accessToken', 'user'] as const;
 
 /** `exp` (seconds) from a JWT payload, or `null` when it cannot be read. This does not verify the signature. */
@@ -45,6 +46,22 @@ export function readSession(): Session | null {
   }
 }
 
+/** Update fields on the stored sign-in user and notify listeners in this tab. */
+export function updateSessionUser(patch: Partial<AuthUser>): Session | null {
+  const current = readSession();
+  if (!current) return null;
+  const nextUser: AuthUser = { ...current.user, ...patch };
+  try {
+    localStorage.setItem('user', JSON.stringify(nextUser));
+  } catch {
+    // Storage can be blocked in private mode.
+  }
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(SESSION_UPDATED_EVENT));
+  }
+  return { token: current.token, user: nextUser };
+}
+
 /** Forget the saved sign-in (log out on this device). */
 export function clearSession(): void {
   stopViewingSite();
@@ -52,5 +69,8 @@ export function clearSession(): void {
     STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
   } catch {
     // Storage can be blocked (private mode); nothing to clear then.
+  }
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(SESSION_UPDATED_EVENT));
   }
 }

@@ -8,11 +8,15 @@ import { supabase } from '../config/supabase';
 import { db } from '../config/db';
 import { env } from '../config/env';
 
-let bucketInitialized = false;
+const BUCKET_RE = /^[a-z0-9_-]{1,63}$/i;
+const initializedBuckets = new Set<string>();
 
 export async function ensureSupabaseModelsBucket(bucketName: string): Promise<void> {
-  if (bucketInitialized || !supabase) return;
-  bucketInitialized = true;
+  if (!BUCKET_RE.test(bucketName)) {
+    throw new Error('Invalid storage bucket name');
+  }
+  if (initializedBuckets.has(bucketName) || !supabase) return;
+  initializedBuckets.add(bucketName);
 
   // 1. Try creating bucket + RLS policies via PostgreSQL Pool if connected
   if (env.databaseUrl) {
@@ -25,16 +29,16 @@ export async function ensureSupabaseModelsBucket(bucketName: string): Promise<vo
       );
       await db.query(`
         DO $$ BEGIN
-          CREATE POLICY "Public Read Access for models bucket" ON storage.objects FOR SELECT USING (bucket_id = '${bucketName}');
+          CREATE POLICY "Public Read Access for ${bucketName} bucket" ON storage.objects FOR SELECT USING (bucket_id = '${bucketName}');
         EXCEPTION WHEN duplicate_object THEN null; END $$;
         DO $$ BEGIN
-          CREATE POLICY "Allow Uploads to models bucket" ON storage.objects FOR INSERT WITH CHECK (bucket_id = '${bucketName}');
+          CREATE POLICY "Allow Uploads to ${bucketName} bucket" ON storage.objects FOR INSERT WITH CHECK (bucket_id = '${bucketName}');
         EXCEPTION WHEN duplicate_object THEN null; END $$;
         DO $$ BEGIN
-          CREATE POLICY "Allow Updates on models bucket" ON storage.objects FOR UPDATE USING (bucket_id = '${bucketName}') WITH CHECK (bucket_id = '${bucketName}');
+          CREATE POLICY "Allow Updates on ${bucketName} bucket" ON storage.objects FOR UPDATE USING (bucket_id = '${bucketName}') WITH CHECK (bucket_id = '${bucketName}');
         EXCEPTION WHEN duplicate_object THEN null; END $$;
         DO $$ BEGIN
-          CREATE POLICY "Allow Deletes from models bucket" ON storage.objects FOR DELETE USING (bucket_id = '${bucketName}');
+          CREATE POLICY "Allow Deletes from ${bucketName} bucket" ON storage.objects FOR DELETE USING (bucket_id = '${bucketName}');
         EXCEPTION WHEN duplicate_object THEN null; END $$;
       `);
       return;
@@ -84,12 +88,18 @@ export async function uploadBufferToSupabaseBucket(
 }
 
 export class SupabaseStorage implements StorageAdapter {
-  private bucket = env.supabaseStorageBucket || 'models';
+  private bucket: string;
   private localCacheDir = path.resolve(env.storageDir);
+
+  constructor(bucketName?: string) {
+    this.bucket = bucketName || env.supabaseStorageBucket || 'models';
+  }
 
   private resolveLocalCachePath(hashKey: string): string {
     const cleanKey = assertSafeKey(hashKey);
-    const resolved = path.resolve(this.localCacheDir, ...cleanKey.split('/'));
+    const defaultBucket = env.supabaseStorageBucket || 'models';
+    const parts = this.bucket === defaultBucket ? cleanKey.split('/') : [this.bucket, ...cleanKey.split('/')];
+    const resolved = path.resolve(this.localCacheDir, ...parts);
     if (!resolved.startsWith(this.localCacheDir + path.sep)) {
       throw new Error('Resolved cache path escapes localCacheDir');
     }

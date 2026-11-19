@@ -9,8 +9,9 @@ import LicenseRules from '@/components/model/LicenseRules';
 import ModelActions from '@/components/model/ModelActions';
 import ModelLikeButton from '@/components/model/ModelLikeButton';
 import ModelPreview from '@/components/model/ModelPreview';
+import UserAvatar from '@/components/ui/UserAvatar';
 import { fetchCoreApiModels, fetchModel, fetchMoreFromCreator } from '@/lib/api';
-import { creatorHandle, initials } from '@/lib/creators';
+import { creatorHandle } from '@/lib/creators';
 import { formatCount, formatPrice } from '@/lib/format';
 
 type Props = { params: Promise<{ id: string }> };
@@ -74,12 +75,7 @@ export default async function ModelDetailPage({ params }: Props) {
             />
 
             <div className="flex items-center gap-3 border-t border-white/10 pt-5">
-              <span
-                aria-hidden
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-hud/30 font-mono text-sm text-hud"
-              >
-                {initials(model.creator)}
-              </span>
+              <UserAvatar name={model.creator} avatarUrl={model.creatorAvatarUrl} size="md" />
               <div className="min-w-0">
                 <Link
                   href={`/creators/${creatorHandle(model.creator)}`}

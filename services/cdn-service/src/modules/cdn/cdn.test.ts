@@ -9,6 +9,7 @@ import type { AddressInfo } from "net";
 import express from "express";
 import jwt from "jsonwebtoken";
 import { db } from "../../config/db";
+import { env } from "../../config/env";
 import { errorHandler } from "../../middlewares/error.middleware";
 import { cdnRouter } from "./cdn.routes";
 import { parseRangeSpec, resolveRange } from "./range";
@@ -16,6 +17,7 @@ import { contentDisposition } from "./cdn.service";
 import {
   assertSafeKey,
   assetKey,
+  avatarKey,
   candidateKeys,
   legacyKey,
 } from "../../storage/keys";
@@ -94,6 +96,15 @@ function resetDb() {
   if (sql.includes("FROM models m")) {
     const m = models[params[0]];
     return { rows: m ? [{ ...m }] : [], rowCount: m ? 1 : 0 };
+  }
+  if (sql.includes("FROM users WHERE id")) {
+    const u = users[params[0]];
+    return {
+      rows: u
+        ? [{ id: params[0], avatar_hash: u.avatar_hash ?? null, suspended_at: u.suspended_at ?? null }]
+        : [],
+      rowCount: u ? 1 : 0,
+    };
   }
   if (sql.includes("FROM purchases WHERE embed_key")) {
     const rows = purchases.filter(
@@ -647,6 +658,48 @@ test("scoped storage layout: streams from <model_id>/ folder even without flat f
   const legacyRes = await get(`/models/${PAID_ID}/preview.glb`);
   assert.equal(legacyRes.status, 200);
   assert.deepEqual(Buffer.from(await legacyRes.arrayBuffer()), PREVIEW);
+
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+});
+
+// ─── User Logo / Avatar ─────────────────────────────────────────────────────
+test("user avatar: avatarKey whitelist and GET /cdn/users/:id/avatar.webp streaming", async () => {
+  const avatarBytes = Buffer.from("RIFF....WEBPuserAvatarLogo");
+  const avatarHash = crypto.createHash("sha256").update(avatarBytes).digest("hex");
+  const key = avatarKey(OWNER, avatarHash);
+  assert.equal(key, `${OWNER}/avatar.${avatarHash}.webp`);
+
+  assert.throws(() => assertSafeKey(`avatars/bad-uuid/avatar.${avatarHash}.webp`), /Invalid or unsafe storage key/);
+  assert.throws(() => assertSafeKey(`${OWNER}/avatar.${avatarHash}.png`), /Invalid or unsafe storage key/);
+
+  const local = new LocalDiskStorage(env.supabaseAvatarBucket);
+  const tmpDir = fs.mkdtempSync(path.join(TEST_STORAGE_DIR, "tmp-avatar-"));
+  const tmpFile = path.join(tmpDir, "avatar.tmp");
+  fs.writeFileSync(tmpFile, avatarBytes);
+  await local.put(key, tmpFile);
+
+  // User without avatar_hash -> 404
+  const noneRes = await get(`/users/${OWNER}/avatar.webp`);
+  assert.equal(noneRes.status, 404);
+  assert.equal(await errCode(noneRes), "AVATAR_NOT_FOUND");
+
+  // User with avatar_hash -> 200 WebP with ETag
+  users[OWNER].avatar_hash = avatarHash;
+  const okRes = await get(`/users/${OWNER}/avatar.webp`);
+  assert.equal(okRes.status, 200);
+  assert.equal(okRes.headers.get("content-type"), "image/webp");
+  assert.equal(okRes.headers.get("etag"), `"${avatarHash}"`);
+  assert.deepEqual(Buffer.from(await okRes.arrayBuffer()), avatarBytes);
+
+  // Suspended user -> 404
+  users[OWNER].suspended_at = new Date();
+  const suspendedRes = await get(`/users/${OWNER}/avatar.webp`);
+  assert.equal(suspendedRes.status, 404);
+  await suspendedRes.arrayBuffer();
+
+  // Invalid UUID -> 404
+  const badIdRes = await get("/users/not-a-uuid/avatar.webp");
+  assert.equal(badIdRes.status, 404);
 
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });

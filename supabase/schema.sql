@@ -14,9 +14,12 @@ CREATE TABLE IF NOT EXISTS users (
     display_name VARCHAR(100) NOT NULL,
     role user_role NOT NULL DEFAULT 'user',
     is_seller BOOLEAN NOT NULL DEFAULT FALSE,
+    avatar_hash CHAR(64),
     suspended_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_hash CHAR(64);
 
 -- 3. Models Table (เพิ่ม hidden_at สำหรับแอดมินซ่อนโมเดล)
 CREATE TABLE IF NOT EXISTS models (
@@ -106,7 +109,6 @@ CREATE INDEX IF NOT EXISTS idx_complaints_status ON complaints (status, created_
 CREATE INDEX IF NOT EXISTS idx_complaints_reporter ON complaints (reporter_id, created_at DESC);
 
 -- 7. Seed Initial Accounts (Admin must be set in DB, cannot register via UI)
--- Password for both initial accounts: Admin@BrokenDesign2026!
 INSERT INTO users (email, password_hash, display_name, role, is_seller)
 VALUES (
     'admin@brokendesign.com',
@@ -120,12 +122,12 @@ SET role = 'admin', suspended_at = NULL;
 INSERT INTO users (email, password_hash, display_name, role, is_seller)
 VALUES (
     'creator@brokendesign.com',
-    '$2b$10$NTrckoyeBuWvh0BdeqForOSS1zaDO/W4olcjACKVrtUbSBp9dshgS',
+    '$2b$10$jQ6UMGcwnEje.2C3/QLsjuz6b8vLWFRPuJCxsWmGvnQlcZ/UJyWqq',
     'Demo Creator',
     'creator',
     true
 ) ON CONFLICT (email) DO UPDATE
-SET role = 'creator', is_seller = true, suspended_at = NULL;
+SET password_hash = EXCLUDED.password_hash, role = 'creator', is_seller = true, suspended_at = NULL;
 
 -- 8. Supabase Storage Bucket ('models') & RLS Policies
 -- Stored object keys follow `<model_id>/{model,preview,poster}.<sha256>.<ext>` (with flat legacy key fallback).
@@ -156,4 +158,35 @@ DO $$ BEGIN
     CREATE POLICY "Allow Deletes from models bucket"
     ON storage.objects FOR DELETE
     USING (bucket_id = 'models');
+EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+-- 8.1 Supabase Storage Bucket ('profile_logo') & RLS Policies
+-- Stored object keys follow `<user_id>/avatar.<sha256>.webp`.
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('profile_logo', 'profile_logo', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+DO $$ BEGIN
+    CREATE POLICY "Public Read Access for profile_logo bucket"
+    ON storage.objects FOR SELECT
+    USING (bucket_id = 'profile_logo');
+EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+DO $$ BEGIN
+    CREATE POLICY "Allow Uploads to profile_logo bucket"
+    ON storage.objects FOR INSERT
+    WITH CHECK (bucket_id = 'profile_logo');
+EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+DO $$ BEGIN
+    CREATE POLICY "Allow Updates on profile_logo bucket"
+    ON storage.objects FOR UPDATE
+    USING (bucket_id = 'profile_logo')
+    WITH CHECK (bucket_id = 'profile_logo');
+EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+DO $$ BEGIN
+    CREATE POLICY "Allow Deletes from profile_logo bucket"
+    ON storage.objects FOR DELETE
+    USING (bucket_id = 'profile_logo');
 EXCEPTION WHEN duplicate_object THEN null; END $$;

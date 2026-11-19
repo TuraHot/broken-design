@@ -15,6 +15,7 @@ interface ModelRow {
   id: string;
   owner_id: string;
   creator: string;
+  creator_avatar_hash?: string | null;
   title: string;
   description: string | null;
   tags: string[];
@@ -39,6 +40,9 @@ function formatModelResponse(row: ModelRow) {
     id: row.id,
     ownerId: row.owner_id,
     creator: row.creator,
+    creatorAvatarUrl: row.creator_avatar_hash?.trim()
+      ? `${env.cdnServiceUrl}/cdn/users/${row.owner_id}/avatar.webp?v=${row.creator_avatar_hash.trim().slice(0, 12)}`
+      : undefined,
     title: row.title,
     description: row.description ?? '',
     tags: row.tags ?? [],
@@ -121,6 +125,7 @@ modelsRouter.get('/', async (req, res, next) => {
            m.id,
            m.owner_id,
            u.display_name AS creator,
+           u.avatar_hash AS creator_avatar_hash,
            m.title,
            m.description,
            m.tags,
@@ -169,6 +174,7 @@ modelsRouter.get('/:id', async (req, res, next) => {
          m.id,
          m.owner_id,
          u.display_name AS creator,
+         u.avatar_hash AS creator_avatar_hash,
          m.title,
          m.description,
          m.tags,

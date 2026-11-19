@@ -16,6 +16,7 @@ import {
   Store,
   User as UserIcon,
 } from 'lucide-react';
+import AvatarUploader from '@/components/profile/AvatarUploader';
 import {
   CDN_SERVICE_URL,
   enableSellerMode,
@@ -23,7 +24,7 @@ import {
   fetchSellerStatus,
   regenerateEmbedKey,
 } from '@/lib/api';
-import { creatorHandle, initials } from '@/lib/creators';
+import { creatorHandle } from '@/lib/creators';
 import { formatPrice } from '@/lib/format';
 import type { AuthUser, PurchaseItem } from '@/lib/types';
 
@@ -230,10 +231,15 @@ export default function MePage() {
 
       {/* Profile Header */}
       <div className={`${CARD} flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between`}>
-        <div className="flex items-center gap-4">
-          <div className="grid h-16 w-16 place-items-center rounded-full border border-hud/40 bg-hud/10 font-mono text-xl font-bold text-hud">
-            {initials(displayName)}
-          </div>
+        <div className="flex flex-wrap items-center gap-4">
+          <AvatarUploader
+            name={displayName}
+            avatarUrl={user?.avatar_url}
+            size="lg"
+            onUpdated={(nextUrl) =>
+              setUser((prev) => (prev ? { ...prev, avatar_url: nextUrl } : prev))
+            }
+          />
           <div>
             <div className="flex items-center gap-2">
               <h1 className="font-display text-2xl uppercase text-white">{displayName}</h1>

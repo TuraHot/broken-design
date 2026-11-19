@@ -9,6 +9,7 @@ export interface Model {
   id: string;
   title: string;
   creator: string;
+  creatorAvatarUrl?: string;
   tags: string[];
   license: License;
   priceCents: number;
@@ -39,6 +40,7 @@ export interface AuthUser {
   display_name: string;
   role: 'user' | 'creator' | 'admin';
   is_seller: boolean;
+  avatar_url?: string | null;
 }
 
 export interface PurchaseItem {

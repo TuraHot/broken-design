@@ -4,6 +4,7 @@ import type { Model } from './types';
 export interface CreatorProfile {
   handle: string;
   name: string;
+  avatarUrl?: string;
   bio: string;
   models: Model[];
   totalDownloads: number;
@@ -34,6 +35,7 @@ export function buildProfile(name: string, models: Model[]): CreatorProfile {
   return {
     handle: creatorHandle(name),
     name,
+    avatarUrl: sorted.find((m) => m.creatorAvatarUrl)?.creatorAvatarUrl,
     bio: 'Sample bio until creators can write their own.',
     models: sorted,
     totalDownloads: sorted.reduce((n, m) => n + m.downloadCount, 0),

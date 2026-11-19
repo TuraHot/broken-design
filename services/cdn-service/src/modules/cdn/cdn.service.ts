@@ -94,6 +94,42 @@ export async function loadModel(id: string): Promise<CdnModel> {
   return normaliseModelRow(row);
 }
 
+export interface CdnUserAvatar {
+  id: string;
+  avatar_hash: string;
+}
+
+/** Load an active user's avatar hash. 404 when missing, suspended, or no avatar uploaded. */
+export async function loadUserAvatar(userId: string): Promise<CdnUserAvatar> {
+  if (!isUuid(userId)) {
+    throw new AppError(404, "AVATAR_NOT_FOUND", "User avatar not found");
+  }
+
+  let row: { id: string; avatar_hash: string | null; suspended_at: Date | string | null } | undefined;
+  try {
+    const result = await db.query(
+      `SELECT id, avatar_hash, suspended_at FROM users WHERE id = $1`,
+      [userId],
+    );
+    row = result.rows[0] as typeof row;
+  } catch (err) {
+    if (!supabase) throw err;
+    const { data, error } = await supabase
+      .from("users")
+      .select("id, avatar_hash, suspended_at")
+      .eq("id", userId)
+      .maybeSingle();
+    if (error) throw err;
+    row = (data as typeof row) ?? undefined;
+  }
+
+  const hash = row?.avatar_hash?.trim() || null;
+  if (!row || row.suspended_at || !hash) {
+    throw new AppError(404, "AVATAR_NOT_FOUND", "User avatar not found");
+  }
+  return { id: row.id, avatar_hash: hash };
+}
+
 /**
  * Hidden models and models whose owner is suspended stop being served immediately — for everyone, buyers included.
  * Soft-deleted models are only served to people who bought them (`allowDeleted`).
@@ -324,6 +360,7 @@ export interface SendAssetOptions {
   contentType: string;
   cacheControl: string;
   downloadName?: string; // set → Content-Disposition: attachment
+  bucketName?: string; // defaults to SUPABASE_STORAGE_BUCKET ('models')
 }
 
 export interface SendAssetResult {
@@ -343,22 +380,23 @@ function isNotFoundError(err: any): boolean {
 async function openStream(
   storageKeys: string | string[],
   range?: { start: number; end: number },
+  bucketName?: string,
 ) {
   const candidates = Array.isArray(storageKeys) ? storageKeys : [storageKeys];
   let firstPrimaryErr: unknown = null;
 
   for (const key of candidates) {
     try {
-      return await getStorage().getStream(key, range);
+      return await getStorage(bucketName).getStream(key, range);
     } catch (primaryErr) {
       if (firstPrimaryErr === null) firstPrimaryErr = primaryErr;
       // Fallback between LocalDiskStorage and SupabaseStorage if the file exists in the other store
       try {
         if (env.storageProvider === "local" && supabase) {
-          return await new SupabaseStorage().getStream(key, range);
+          return await new SupabaseStorage(bucketName).getStream(key, range);
         }
         if (env.storageProvider === "supabase") {
-          return await new LocalDiskStorage().getStream(key, range);
+          return await new LocalDiskStorage(bucketName).getStream(key, range);
         }
       } catch {
         // Ignore secondary error and continue to next candidate key
@@ -423,19 +461,23 @@ export async function sendAsset(
   let range: ResolvedRange | null = null;
 
   if (!spec) {
-    opened = await openStream(opts.storageKey);
+    opened = await openStream(opts.storageKey, undefined, opts.bucketName);
   } else if (spec.kind === "suffix") {
     // "last N bytes" needs the total size first; adapters report it alongside the stream.
-    const probe = await openStream(opts.storageKey);
+    const probe = await openStream(opts.storageKey, undefined, opts.bucketName);
     probe.stream.destroy();
     range = resolveRange(spec, probe.size) ?? unsatisfiable(probe.size);
-    opened = await openStream(opts.storageKey, range);
+    opened = await openStream(opts.storageKey, range, opts.bucketName);
   } else {
     // Open with the requested bounds directly (adapters stop at EOF), then validate against the real size.
-    opened = await openStream(opts.storageKey, {
-      start: spec.start,
-      end: spec.kind === "bounded" ? spec.end : Number.MAX_SAFE_INTEGER,
-    });
+    opened = await openStream(
+      opts.storageKey,
+      {
+        start: spec.start,
+        end: spec.kind === "bounded" ? spec.end : Number.MAX_SAFE_INTEGER,
+      },
+      opts.bucketName,
+    );
     range = resolveRange(spec, opened.size);
     if (!range) {
       opened.stream.destroy();

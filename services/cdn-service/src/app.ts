@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import { env } from "./config/env";
 import { uploadRouter } from "./modules/upload/upload.routes";
+import { avatarRouter } from "./modules/upload/avatar.routes";
 import { cdnRouter, verifyWatermarkMiddleware, verifyWatermarkHandler } from "./modules/cdn/cdn.routes";
 import { errorHandler } from "./middlewares/error.middleware";
 import { testDbConnection } from "./config/db";
@@ -22,6 +23,7 @@ app.get("/health", async (_req, res) => {
 });
 
 app.use("/api", uploadRouter);
+app.use("/api", avatarRouter);
 app.use("/cdn", cdnRouter);
 app.post("/verify-watermark", verifyWatermarkMiddleware, verifyWatermarkHandler);
 app.post("/api/verify-watermark", verifyWatermarkMiddleware, verifyWatermarkHandler);

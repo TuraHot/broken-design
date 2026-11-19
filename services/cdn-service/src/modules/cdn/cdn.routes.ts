@@ -34,12 +34,13 @@ import {
   isContentHash,
   isPaid,
   loadModel,
+  loadUserAvatar,
   readAssetBuffer,
   savePurchaseWatermarkHash,
   sendAsset,
   type PaidDownloadAccess,
 } from "./cdn.service";
-import { candidateKeys } from "../../storage/keys";
+import { avatarKey, candidateKeys } from "../../storage/keys";
 
 export { verifyEmbedKeyConstantTime } from "./cdn.service";
 
@@ -328,6 +329,18 @@ cdnRouter.post(
   verifyWatermarkMiddleware,
   verifyWatermarkHandler,
 );
+
+// ─── GET /cdn/users/:id/avatar.webp ────────────────────────────────────────
+cdnRouter.get("/users/:id/avatar.webp", async (req, res) => {
+  const user = await loadUserAvatar(String(req.params.id));
+  await sendAsset(req, res, {
+    storageKey: avatarKey(user.id, user.avatar_hash),
+    etag: user.avatar_hash,
+    contentType: CONTENT_TYPES.webp,
+    cacheControl: CACHE.publicShort,
+    bucketName: env.supabaseAvatarBucket,
+  });
+});
 
 // ─── GET /cdn/models/:id/poster.webp ───────────────────────────────────────
 cdnRouter.get("/models/:id/poster.webp", async (req, res) => {

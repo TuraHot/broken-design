@@ -6,8 +6,9 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { LogOut } from 'lucide-react';
+import AvatarUploader from '@/components/profile/AvatarUploader';
 import { useT } from '@/lib/i18n/client';
-import { clearSession, readSession, type Session } from '@/lib/session';
+import { clearSession, readSession, SESSION_UPDATED_EVENT, type Session } from '@/lib/session';
 
 const CARD = 'rounded-lg border border-white/10 bg-white/5 p-5 sm:p-6';
 const LABEL = 'font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70';
@@ -28,8 +29,15 @@ export default function SettingsPage() {
   const [session, setSession] = useState<Session | null>(null);
 
   useEffect(() => {
-    setSession(readSession());
+    const sync = () => setSession(readSession());
+    sync();
     setReady(true);
+    window.addEventListener('storage', sync);
+    window.addEventListener(SESSION_UPDATED_EVENT, sync);
+    return () => {
+      window.removeEventListener('storage', sync);
+      window.removeEventListener(SESSION_UPDATED_EVENT, sync);
+    };
   }, []);
 
   const logOut = () => {
@@ -55,7 +63,17 @@ export default function SettingsPage() {
         <div className="mt-8 grid grid-cols-[minmax(0,1fr)] gap-6">
           <section aria-labelledby="profile-title" className={CARD}>
             <h2 id="profile-title" className={LABEL}>{t('settings.profile')}</h2>
-            <dl className="mt-2 divide-y divide-white/10">
+            <div className="mt-4">
+              <AvatarUploader
+                name={session.user.display_name?.trim() || session.user.email}
+                avatarUrl={session.user.avatar_url}
+                size="lg"
+                onUpdated={(nextUrl) =>
+                  setSession((prev) => (prev ? { ...prev, user: { ...prev.user, avatar_url: nextUrl } } : prev))
+                }
+              />
+            </div>
+            <dl className="mt-4 divide-y divide-white/10">
               <Row label={t('settings.displayName')}>{session.user.display_name || '—'}</Row>
               <Row label={t('settings.email')}>{session.user.email}</Row>
               <Row label={t('settings.accountType')}>{session.user.is_seller ? t('settings.buyerSeller') : t('settings.buyer')}</Row>

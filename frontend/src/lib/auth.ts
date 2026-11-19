@@ -8,6 +8,7 @@ export interface AuthUser {
   display_name: string;
   role: string;
   is_seller: boolean;
+  avatar_url?: string | null;
 }
 
 // ผลลัพธ์เมื่อ Login หรือ Register สำเร็จ

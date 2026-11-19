@@ -5,9 +5,15 @@ import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { db } from '../../config/db';
 import { env } from '../../config/env';
+import { requireAuth } from '../../middlewares/auth.middleware';
 import { AppError } from '../../middlewares/error.middleware';
 
 export const authRouter = Router();
+
+function buildAvatarUrl(userId: string, avatarHash?: string | null): string | null {
+  const clean = avatarHash?.trim();
+  return clean ? `${env.cdnServiceUrl}/cdn/users/${userId}/avatar.webp?v=${clean.slice(0, 12)}` : null;
+}
 
 // [Member 1] POST /api/auth/register
 // authRouter.post('/register', async (_req, res) => {
@@ -79,7 +85,7 @@ authRouter.post('/register', async (req, res) => {
     const result = await db.query(
       `INSERT INTO users (email, password_hash, display_name)
        VALUES ($1, $2, $3)
-       RETURNING id, email, display_name, role, is_seller`,
+       RETURNING id, email, display_name, role, is_seller, avatar_hash`,
       [normalizedEmail, passwordHash, displayName],
     );
 
@@ -98,7 +104,14 @@ authRouter.post('/register', async (req, res) => {
     res.status(201).json({
       message: 'Registration successful',
       token,
-      user,
+      user: {
+        id: user.id,
+        email: user.email,
+        display_name: user.display_name,
+        role: user.role,
+        is_seller: user.is_seller,
+        avatar_url: buildAvatarUrl(user.id, user.avatar_hash),
+      },
     });
   } catch (error) {
     if (
@@ -125,7 +138,7 @@ authRouter.post('/login', async (req, res) => {
   const { email, password } = parsed.data;
 
   const result = await db.query(
-    `SELECT id, email, password_hash, display_name, role, is_seller, suspended_at
+    `SELECT id, email, password_hash, display_name, role, is_seller, avatar_hash, suspended_at
      FROM users
      WHERE email = $1`,
     [email.toLowerCase()],
@@ -167,6 +180,36 @@ authRouter.post('/login', async (req, res) => {
       display_name: user.display_name,
       role: user.role,
       is_seller: user.is_seller,
+      avatar_url: buildAvatarUrl(user.id, user.avatar_hash),
+    },
+  });
+});
+
+// GET /api/auth/me — return latest profile & avatar URL for the signed-in account
+authRouter.get('/me', requireAuth, async (req, res) => {
+  const result = await db.query(
+    `SELECT id, email, display_name, role, is_seller, avatar_hash, suspended_at
+     FROM users
+     WHERE id = $1`,
+    [req.user!.id],
+  );
+
+  const user = result.rows[0];
+  if (!user) {
+    throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
+  }
+  if (user.suspended_at) {
+    throw new AppError(403, 'ACCOUNT_SUSPENDED', 'This account has been suspended');
+  }
+
+  res.json({
+    user: {
+      id: user.id,
+      email: user.email,
+      display_name: user.display_name,
+      role: user.role,
+      is_seller: user.is_seller,
+      avatar_url: buildAvatarUrl(user.id, user.avatar_hash),
     },
   });
 });

@@ -9,10 +9,17 @@ import { uploadBufferToSupabaseBucket } from './supabase.storage';
 
 export class LocalDiskStorage implements StorageAdapter {
   private baseDir = path.resolve(env.storageDir);
+  private bucket: string;
+
+  constructor(bucketName?: string) {
+    this.bucket = bucketName || env.supabaseStorageBucket || 'models';
+  }
 
   private resolveSafePath(hashKey: string): string {
     const cleanKey = assertSafeKey(hashKey);
-    const resolved = path.resolve(this.baseDir, ...cleanKey.split('/'));
+    const defaultBucket = env.supabaseStorageBucket || 'models';
+    const parts = this.bucket === defaultBucket ? cleanKey.split('/') : [this.bucket, ...cleanKey.split('/')];
+    const resolved = path.resolve(this.baseDir, ...parts);
     if (!resolved.startsWith(this.baseDir + path.sep)) {
       throw new Error('Resolved storage path escapes baseDir');
     }
@@ -34,10 +41,10 @@ export class LocalDiskStorage implements StorageAdapter {
       }
     }
 
-    // Sync uploaded asset to Supabase Storage bucket ('models') when Supabase is configured
+    // Sync uploaded asset to Supabase Storage bucket when Supabase is configured
     if (supabase && process.env.NODE_ENV !== 'test') {
       const fileBuffer = await fsp.readFile(targetPath);
-      await uploadBufferToSupabaseBucket(env.supabaseStorageBucket || 'models', cleanKey, fileBuffer);
+      await uploadBufferToSupabaseBucket(this.bucket, cleanKey, fileBuffer);
     }
   }
 
@@ -53,7 +60,7 @@ export class LocalDiskStorage implements StorageAdapter {
     const targetPath = this.resolveSafePath(cleanKey);
     await fsp.unlink(targetPath).catch(() => undefined);
     if (supabase && process.env.NODE_ENV !== 'test') {
-      await supabase.storage.from(env.supabaseStorageBucket || 'models').remove([cleanKey]).catch(() => undefined);
+      await supabase.storage.from(this.bucket).remove([cleanKey]).catch(() => undefined);
     }
   }
 }

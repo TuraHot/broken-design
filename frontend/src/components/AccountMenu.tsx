@@ -6,18 +6,14 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { useReport } from '@/components/report/ReportProvider';
+import UserAvatar from '@/components/ui/UserAvatar';
+import { CORE_API_URL } from '@/lib/api';
 import { creatorHandle } from '@/lib/creators';
 import { useT } from '@/lib/i18n/client';
-import { clearSession, readSession, type Session } from '@/lib/session';
+import { clearSession, readSession, SESSION_UPDATED_EVENT, updateSessionUser, type Session } from '@/lib/session';
 
 const itemClass =
   'flex w-full items-center rounded-md px-3 py-2 text-left text-sm text-white/65 transition-colors hover:bg-white/10 hover:text-white';
-
-function initialsOf(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  const letters = parts.length > 1 ? parts[0][0] + parts[parts.length - 1][0] : (parts[0] ?? '?').slice(0, 2);
-  return letters.toUpperCase();
-}
 
 export default function AccountMenu() {
   const pathname = usePathname();
@@ -29,6 +25,7 @@ export default function AccountMenu() {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const syncedTokenRef = useRef<string | null>(null);
 
   // Read the saved sign-in after mount (localStorage does not exist on the server), again on every
   // page change (the login form saves it just before it navigates), and when another tab changes it.
@@ -39,10 +36,40 @@ export default function AccountMenu() {
   }, [pathname]);
 
   useEffect(() => {
-    const onStorage = () => setSession(readSession());
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
+    const sync = () => setSession(readSession());
+    window.addEventListener('storage', sync);
+    window.addEventListener(SESSION_UPDATED_EVENT, sync);
+    return () => {
+      window.removeEventListener('storage', sync);
+      window.removeEventListener(SESSION_UPDATED_EVENT, sync);
+    };
   }, []);
+
+  useEffect(() => {
+    const token = session?.token;
+    if (!token) {
+      syncedTokenRef.current = null;
+      return;
+    }
+    if (syncedTokenRef.current === token) return;
+    syncedTokenRef.current = token;
+
+    let cancelled = false;
+    fetch(`${CORE_API_URL}/api/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: 'no-store',
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && data?.user) {
+          updateSessionUser(data.user);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.token]);
 
   useEffect(() => {
     if (!open) return;
@@ -97,9 +124,9 @@ export default function AccountMenu() {
         aria-expanded={open}
         aria-haspopup="true"
         aria-label={t('menu.account', { name })}
-        className="grid h-9 w-9 place-items-center rounded-full border border-hud/50 bg-white/5 text-[13px] font-medium text-white transition-colors hover:border-hud hover:bg-white/10"
+        className="rounded-full transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-hud"
       >
-        {initialsOf(name)}
+        <UserAvatar name={name} avatarUrl={user.avatar_url} size="sm" />
       </button>
 
       {open && (

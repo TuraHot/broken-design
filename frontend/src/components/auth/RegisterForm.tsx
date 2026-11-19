@@ -67,7 +67,6 @@ export default function RegisterForm() {
 
       // Save user session
       localStorage.setItem('token', result.token);
-      localStorage.setItem('accessToken', result.token);
       if (result.user) {
         localStorage.setItem('user', JSON.stringify(result.user));
       }

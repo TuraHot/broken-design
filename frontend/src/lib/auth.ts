@@ -83,6 +83,28 @@ export async function register(
   });
 }
 
+// ขอรหัส OTP สำหรับรีเซ็ตรหัสผ่าน (คืน devOtp เฉพาะโหมดเดโม / mock mailbox)
+export async function requestPasswordReset(email: string): Promise<string | null> {
+  const result = await authRequest<{ message: string; devOtp?: string }>('forgot-password', {
+    email: email.trim().toLowerCase(),
+  });
+  return result.devOtp ?? null;
+}
+
+// ตรวจ OTP แล้วรับ token แบบใช้ครั้งเดียวสำหรับตั้งรหัสผ่านใหม่
+export async function verifyResetOtp(email: string, otp: string): Promise<string> {
+  const result = await authRequest<{ token: string }>('verify-reset-otp', {
+    email: email.trim().toLowerCase(),
+    otp,
+  });
+  return result.token;
+}
+
+// ตั้งรหัสผ่านใหม่ด้วย token จากลิงก์
+export async function resetPassword(token: string, password: string): Promise<void> {
+  await authRequest<{ message: string }>('reset-password', { token, password });
+}
+
 // อัปเดตชื่อที่แสดงของบัญชีปัจจุบัน (PATCH /api/auth/profile)
 export async function updateProfile(
   displayName: string,

@@ -1,76 +1,129 @@
 'use client';
 
-// Request a password reset — UI only: validates the email but sends nothing yet.
+// Reset password, step 1 + 2: enter email -> demo mailbox shows the 6-digit OTP -> enter it -> /reset-password.
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { FormEvent, useState } from 'react';
-import { AlertCircle } from 'lucide-react';
 import { EMAIL_RE, FIELD, Field } from './Field';
+import { requestPasswordReset, verifyResetOtp } from '@/lib/auth';
 
-function validate(email: string) {
-  if (!email.trim()) return 'Enter your email.';
-  if (!EMAIL_RE.test(email.trim())) return 'Enter a valid email address.';
-  return undefined;
-}
+const PRIMARY =
+  'h-10 w-full rounded-lg bg-white text-[15px] font-medium text-black transition-colors hover:bg-white/85 disabled:opacity-60';
+
+const friendly = (err: unknown) =>
+  err instanceof Error && err.message !== 'Failed to fetch' ? err.message : 'Cannot reach the server. Please try again.';
 
 export default function ForgotPasswordForm() {
+  const router = useRouter();
+  const [step, setStep] = useState<'email' | 'otp'>('email');
   const [email, setEmail] = useState('');
+  const [mockOtp, setMockOtp] = useState<string | null>(null);
+  const [code, setCode] = useState('');
   const [error, setError] = useState<string>();
-  const [submitted, setSubmitted] = useState(false);
+  const [busy, setBusy] = useState(false);
 
-  const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setEmail(e.target.value);
-    if (submitted) setError(validate(e.target.value));
-  };
-
-  const onSubmit = (e: FormEvent) => {
+  const sendCode = async (e: FormEvent) => {
     e.preventDefault();
-    setError(validate(email));
-    setSubmitted(true);
+    if (busy) return;
+    if (!email.trim()) return setError('Enter your email.');
+    if (!EMAIL_RE.test(email.trim())) return setError('Enter a valid email address.');
+    setError(undefined);
+    setBusy(true);
+    try {
+      setMockOtp(await requestPasswordReset(email));
+      setCode('');
+      setStep('otp');
+    } catch (err) {
+      setError(friendly(err));
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const ready = submitted && !error;
+  const verify = async (e: FormEvent) => {
+    e.preventDefault();
+    if (busy) return;
+    if (!/^\d{6}$/.test(code)) return setError('Enter the 6-digit code.');
+    setError(undefined);
+    setBusy(true);
+    try {
+      const token = await verifyResetOtp(email, code);
+      router.push(`/reset-password?token=${encodeURIComponent(token)}`);
+    } catch (err) {
+      setError(friendly(err));
+      setBusy(false);
+    }
+  };
+
+  const cls = (bad: boolean) => `${FIELD} ${bad ? 'border-red-400/70 focus:border-red-300' : 'border-white/15 focus:border-white/50'}`;
 
   return (
     <div className="w-full max-w-[420px]">
       <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70">[ Account ]</p>
       <h1 className="mt-4 font-display text-[clamp(26px,4vw,36px)] uppercase leading-[1.05] text-white">Reset password</h1>
       <p className="mt-3 text-[15px] leading-relaxed text-white/65">
-        Enter your email and we&apos;ll send you a link to choose a new password.
+        {step === 'email'
+          ? 'Enter your email and we’ll send you a 6-digit verification code.'
+          : 'Enter the 6-digit code to continue.'}
       </p>
 
       <div className="mt-8 rounded-lg border border-white/10 bg-white/5 p-5 sm:p-6">
-        <form onSubmit={onSubmit} noValidate className="grid gap-4">
-          <Field id="email" label="Email" error={error}>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={onChange}
-              aria-invalid={Boolean(error)}
-              aria-describedby={error ? 'email-error' : undefined}
-              placeholder="you@example.com"
-              className={`${FIELD} ${error ? 'border-red-400/70 focus:border-red-300' : 'border-white/15 focus:border-white/50'}`}
-            />
-          </Field>
+        {step === 'email' ? (
+          <form onSubmit={sendCode} noValidate className="grid gap-4">
+            <Field id="email" label="Email" error={error}>
+              <input
+                id="email"
+                type="email"
+                autoComplete="email"
+                autoFocus
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                className={cls(Boolean(error))}
+              />
+            </Field>
+            <button type="submit" disabled={busy} className={PRIMARY}>
+              {busy ? 'Sending…' : 'Send code'}
+            </button>
+          </form>
+        ) : (
+          <div className="grid gap-4">
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-white/10 px-3 py-2 text-sm">
+              <span className="truncate text-white">{email.trim()}</span>
+              <button type="button" onClick={() => { setStep('email'); setError(undefined); }} className="shrink-0 text-white/65 underline-offset-4 hover:text-white hover:underline">
+                Change
+              </button>
+            </div>
 
-          <button
-            type="submit"
-            className="h-10 w-full rounded-lg bg-white text-[15px] font-medium text-black transition-colors hover:bg-white/85"
-          >
-            Send reset link
-          </button>
-
-          <div role="status" aria-live="polite">
-            {ready && (
-              <p className="flex items-start gap-1.5 text-sm text-amber">
-                <AlertCircle aria-hidden className="mt-0.5 h-4 w-4 shrink-0" />
-                Password reset isn&apos;t connected yet. No email was sent.
-              </p>
+            {mockOtp && (
+              <div className="rounded-lg border border-amber/40 bg-amber/5 p-3 text-sm text-white/80">
+                <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-amber">OTP CODE</p>
+                <p className="mt-2 select-all text-center font-mono text-base tracking-[0.4em] text-white">{mockOtp}</p>
+                <p className="mt-2 text-xs text-white/50">Copy it into the box below. Valid for 10 minutes.</p>
+              </div>
             )}
+
+            <form onSubmit={verify} noValidate className="grid gap-4">
+              <Field id="code" label="Verification code" error={error}>
+                <input
+                  id="code"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={6}
+                  autoComplete="one-time-code"
+                  autoFocus
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+                  placeholder="123456"
+                  className={`${cls(Boolean(error))} text-center font-mono text-lg tracking-[0.5em]`}
+                />
+              </Field>
+              <button type="submit" disabled={busy} className={PRIMARY}>
+                {busy ? 'Verifying…' : 'Verify and continue'}
+              </button>
+            </form>
           </div>
-        </form>
+        )}
       </div>
 
       <p className="mt-6 text-center text-sm text-white/65">

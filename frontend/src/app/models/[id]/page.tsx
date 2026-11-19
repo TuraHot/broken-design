@@ -73,6 +73,7 @@ export default async function ModelDetailPage({ params }: Props) {
               title={model.title}
               free={free}
               priceLabel={formatPrice(model.priceCents)}
+              creator={model.creator}
             />
 
             <div className="flex items-center gap-3 border-t border-white/10 pt-5">

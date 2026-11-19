@@ -130,7 +130,7 @@ export function queryModels(models: Model[], params: ModelsParams, pageSize = PA
       const inTags = m.tags.some((t) => t.toLowerCase().includes(q));
       if (!inTitle && !inDesc && !inCreator && !inTags) return false;
     }
-    if (params.tag && !m.tags.includes(params.tag)) return false;
+    if (params.tag && !m.tags.some((t) => t.toLowerCase() === params.tag!.toLowerCase())) return false;
     if (params.license && m.license !== params.license) return false;
     if (params.price === 'free' && m.priceCents !== 0) return false;
     if (params.price === 'paid' && m.priceCents <= 0) return false;

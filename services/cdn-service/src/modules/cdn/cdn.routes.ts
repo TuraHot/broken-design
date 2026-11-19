@@ -183,6 +183,15 @@ cdnRouter.get("/models/:id/download", downloadLimiter, async (req, res) => {
   const model = await loadModel(String(req.params.id));
   let purchaseInfo: PaidDownloadAccess | null = null;
 
+  // If user has role as creator and is attempting to download their own uploaded model, reject
+  if (user && user.role === "creator" && model.owner_id === user.id) {
+    throw new AppError(
+      403,
+      "OWN_MODEL",
+      "Creators cannot download their own uploaded models",
+    );
+  }
+
   if (isPaid(model)) {
     assertServable(model, { allowDeleted: true });
     if (!user)

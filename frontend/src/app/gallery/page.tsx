@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import FilterBar from '@/components/gallery/FilterBar';
 import ModelCard from '@/components/gallery/ModelCard';
 import Pagination from '@/components/gallery/Pagination';
-import { fetchCoreApiModels, fetchModels } from '@/lib/api';
+import { fetchAvailableTags, fetchModels } from '@/lib/api';
 import { extractAvailableTags, isPublicModel, parseParams } from '@/lib/pagination';
 
 export const dynamic = 'force-dynamic';
@@ -16,12 +16,14 @@ export default async function GalleryPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const [rawSearchParams, allModels] = await Promise.all([searchParams, fetchCoreApiModels()]);
-  const availableTags = extractAvailableTags(allModels);
-  const params = parseParams(rawSearchParams, availableTags);
+  const [rawSearchParams, apiTags] = await Promise.all([
+    searchParams,
+    fetchAvailableTags(false),
+  ]);
+  const params = parseParams(rawSearchParams, apiTags);
   const rawData = await fetchModels(params);
   const items = rawData.items.filter(isPublicModel);
-  const tags = extractAvailableTags([...allModels, ...items]);
+  const tags = apiTags.length > 0 ? apiTags : extractAvailableTags(items);
   const data = {
     ...rawData,
     items,

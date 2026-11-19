@@ -161,6 +161,25 @@ modelsRouter.get('/', async (req, res, next) => {
   }
 });
 
+// GET /api/models/tags - Returns all distinct tags across visible models
+modelsRouter.get('/tags', async (_req, res, next) => {
+  try {
+    const result = await db.query<{ tag: string }>(
+      `SELECT DISTINCT LOWER(UNNEST(m.tags)) AS tag
+       FROM models m
+       JOIN users u ON u.id = m.owner_id
+       WHERE m.hidden_at IS NULL
+         AND m.deleted_at IS NULL
+         AND u.suspended_at IS NULL
+       ORDER BY tag ASC`
+    );
+    const tags = result.rows.map((r) => r.tag).filter(Boolean);
+    res.json({ tags });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // [Member 3 & 5] GET /api/models/:id
 modelsRouter.get('/:id', async (req, res, next) => {
   try {

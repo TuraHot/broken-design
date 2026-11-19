@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useReport } from '@/components/report/ReportProvider';
 import { creatorHandle } from '@/lib/creators';
 import { useT } from '@/lib/i18n/client';
+import { fetchNotices } from '@/lib/api';
 import { clearSession, readSession, type Session } from '@/lib/session';
 
 const itemClass =
@@ -27,6 +28,7 @@ export default function AccountMenu() {
   const [ready, setReady] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
   const [open, setOpen] = useState(false);
+  const [unread, setUnread] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
@@ -37,6 +39,22 @@ export default function AccountMenu() {
     setReady(true);
     setOpen(false);
   }, [pathname]);
+
+  // Everyone except admins sees how many notices they have not read yet (a suspension or its end, a license change).
+  const noticeToken = session && session.user.role !== 'admin' ? session.token : null;
+  useEffect(() => {
+    if (!noticeToken) {
+      setUnread(0);
+      return;
+    }
+    let cancelled = false;
+    fetchNotices(noticeToken)
+      .then((d) => !cancelled && setUnread(d.unread))
+      .catch(() => !cancelled && setUnread(0));
+    return () => {
+      cancelled = true;
+    };
+  }, [noticeToken, pathname]);
 
   useEffect(() => {
     const onStorage = () => setSession(readSession());
@@ -121,6 +139,11 @@ export default function AccountMenu() {
                 <li>
                   <Link href="/me" className={itemClass}>
                     {t('menu.library')}
+                    {unread > 0 && (
+                      <span className="ml-2 rounded border border-amber/50 px-1.5 py-0.5 font-mono text-[10px] uppercase text-amber">
+                        {t('menu.newNotices', { n: unread })}
+                      </span>
+                    )}
                   </Link>
                 </li>
                 {user.is_seller && (

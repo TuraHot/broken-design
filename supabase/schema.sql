@@ -157,3 +157,60 @@ DO $$ BEGIN
     ON storage.objects FOR DELETE
     USING (bucket_id = 'models');
 EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+-- 9. Model license changes by an admin (history) and notifications to users (owner inbox)
+CREATE TABLE IF NOT EXISTS model_license_changes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    model_id UUID NOT NULL REFERENCES models(id) ON DELETE CASCADE,
+    admin_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    old_license license_type NOT NULL,
+    new_license license_type NOT NULL,
+    reason TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_license_changes_model ON model_license_changes (model_id, created_at DESC);
+-- Supabase serves public tables through its REST API: RLS on with no policy closes that door. core-api uses the
+-- table owner role (DATABASE_URL), which is not affected, so nothing else changes.
+ALTER TABLE model_license_changes ENABLE ROW LEVEL SECURITY;
+
+CREATE TABLE IF NOT EXISTS notifications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    kind VARCHAR(50) NOT NULL,
+    model_id UUID REFERENCES models(id) ON DELETE SET NULL,
+    data JSONB NOT NULL DEFAULT '{}',
+    read_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications (user_id, read_at, created_at DESC);
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+
+-- 10. Timed suspensions with a reason, and their history
+-- suspended_until NULL = suspended until an admin restores the account. core-api lifts expired ones every minute
+-- (modules/admin/suspensionSweeper.ts), so every existing suspended_at check keeps working.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended_until TIMESTAMPTZ;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS suspension_reason TEXT;
+
+CREATE TABLE IF NOT EXISTS user_suspensions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    admin_id UUID REFERENCES users(id) ON DELETE SET NULL, -- NULL = lifted automatically when the time ran out
+    action VARCHAR(10) NOT NULL CHECK (action IN ('suspend', 'restore', 'expire')),
+    reason TEXT,
+    until TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_user_suspensions_user ON user_suspensions (user_id, created_at DESC);
+ALTER TABLE user_suspensions ENABLE ROW LEVEL SECURITY;
+
+-- 11. Hide / restore of a model by an admin (history). Hiding also creates a notification for the owner.
+CREATE TABLE IF NOT EXISTS model_visibility_changes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    model_id UUID NOT NULL REFERENCES models(id) ON DELETE CASCADE,
+    admin_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    action VARCHAR(10) NOT NULL CHECK (action IN ('hide', 'restore')),
+    reason TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_visibility_changes_model ON model_visibility_changes (model_id, created_at DESC);
+ALTER TABLE model_visibility_changes ENABLE ROW LEVEL SECURITY;

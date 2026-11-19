@@ -279,9 +279,9 @@ broken-design/
 | **Seller** | `POST /api/seller/enable` | เปิดโหมดคนขาย (`is_seller = true`) ให้บัญชีปัจจุบัน |
 | **Seller** | `GET /api/seller/models` & `/sales` | ดูรายการโมเดลของตัวเองและสรุปยอดขายทั้งหมด |
 | **Admin** | `GET /api/admin/overview` | ดูสรุปยอดรวมระบบ, สถิติ 7 วัน, Top 5 โมเดล, รายการซื้อ/ผู้ใช้ล่าสุด และคำร้องเรียนที่เปิดอยู่ (ตรวจ `role = 'admin'` จาก DB) |
-| **Admin** | `GET /api/admin/users` & `PATCH .../suspend` | ดูรายชื่อผู้ใช้ และระงับ/คืนสิทธิ์บัญชี (ห้ามแอดมินระงับตัวเอง) |
-| **Admin** | `GET /api/admin/models` & `PATCH .../hide` | ดูรายการโมเดลทั้งหมด (รวมซ่อน/ลบ) และซ่อน/แสดงผลโมเดล |
-| **Admin** | `GET /api/admin/purchases` | ดูรายการสั่งซื้อทั้งหมดพร้อมข้อมูลผู้ซื้อ โมเดล ราคา และ `watermark_hash` |
+| **Admin** | `GET /api/admin/users` & `PATCH .../suspend` | ดูรายชื่อผู้ใช้ และระงับ/คืนสิทธิ์บัญชี พร้อมเหตุผลและเวลาสิ้นสุด (ไม่ส่งเวลา = จนกว่าแอดมินจะปลด) ผู้ใช้ได้รับใบเตือนทุกครั้ง (ห้ามแอดมินระงับตัวเอง) |
+| **Admin** | `GET /api/admin/models`, `PATCH .../hide` & `PATCH .../license` | ดูรายการโมเดลทั้งหมด (รวมซ่อน/ลบ) ซ่อน/แสดงผลโมเดล และแก้ license พร้อมเหตุผล (เจ้าของได้รับใบเตือน) |
+| **Admin** | `GET /api/admin/purchases` & `GET .../purchases/:id` | ดูรายการสั่งซื้อทั้งหมด (กรองสถานะ/ช่วงวันที่) และรายละเอียดรายการเดียว พร้อมข้อมูลผู้ซื้อ โมเดล ราคา และ `watermark_hash` |
 | **Admin** | `GET /api/admin/complaints` & `PATCH .../:id` | ดูรายการคำร้องเรียนจากผู้ใช้ เปลี่ยนสถานะ (`open`/`in_review`/`resolved`/`dismissed`) และบันทึกโน้ต |
 | **Complaints** | `POST /api/complaints` | ผู้ใช้ที่ล็อกอินส่งคำร้องเรียน/แจ้งปัญหา (`model`/`account`/`purchase`/`other`, จำกัด 5 ครั้ง/ชั่วโมง) |
 

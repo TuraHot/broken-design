@@ -1,11 +1,39 @@
 'use client';
 
 // /admin/models — every model, including hidden and deleted ones
-import AdminList, { type Column } from '@/components/admin/AdminList';
-import { Badge, ConfirmAction } from '@/components/admin/ui';
-import { setModelHidden, type AdminModel } from '@/lib/admin-api';
+import { useState } from 'react';
+import AdminList, { type Column, type RowApi } from '@/components/admin/AdminList';
+import EditModelDialog from '@/components/admin/EditModelDialog';
+import { Badge } from '@/components/admin/ui';
+import type { AdminModel } from '@/lib/admin-api';
 import { formatDate, formatMoney } from '@/lib/format';
-import { adminErrorText } from '@/lib/i18n/admin-error';
+import { useT } from '@/lib/i18n/client';
+
+// The single Edit button of a row; the dialog holds license change and hide / restore.
+function EditAction({ model, api }: { model: AdminModel; api: RowApi<AdminModel> }) {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label={t('admin.actionOn', { action: t('admin.edit'), name: model.title })}
+        className="h-8 whitespace-nowrap rounded-lg border border-white/15 px-3 text-sm text-white/80 transition-colors hover:border-white/40 hover:text-white"
+      >
+        {t('admin.edit')}
+      </button>
+      {open && (
+        <EditModelDialog
+          model={model}
+          onClose={() => setOpen(false)}
+          onLicenseChanged={(license) => api.update(model.id, (row) => ({ ...row, license }))}
+          onHiddenChanged={(isHidden) => api.update(model.id, (row) => ({ ...row, isHidden }))}
+        />
+      )}
+    </>
+  );
+}
 
 const COLUMNS: Column<AdminModel>[] = [
   {
@@ -38,21 +66,7 @@ const COLUMNS: Column<AdminModel>[] = [
   { header: 'admin.col.created', cell: (m) => <span className="font-mono text-[13px] text-white/65">{formatDate(m.createdAt)}</span> },
   {
     header: 'admin.col.action',
-    cell: (m, api, t) => (
-      <ConfirmAction
-        label={m.isHidden ? t('admin.restore') : t('admin.hide')}
-        ariaLabel={t('admin.actionOn', { action: m.isHidden ? t('admin.restore') : t('admin.hide'), name: m.title })}
-        onConfirm={async () => {
-          api.notify(null);
-          try {
-            const res = await setModelHidden(m.id, !m.isHidden);
-            api.update(m.id, (row) => ({ ...row, isHidden: res.isHidden }));
-          } catch (err) {
-            api.notify(adminErrorText(err, t, 'admin.errModel'));
-          }
-        }}
-      />
-    ),
+    cell: (m, api) => (m.isDeleted ? <span className="text-white/40">—</span> : <EditAction model={m} api={api} />),
   },
 ];
 

@@ -99,13 +99,14 @@ Agent ทุกตัว **ห้ามละเมิด** กฎต่อไ�
 - **Auth (`/api/auth`):**
   - `POST /api/auth/check-email` — ตรวจสอบว่าอีเมลมีบัญชีในระบบแล้วหรือไม่ (`{ exists: boolean }`)
   - `POST /api/auth/register` — สมัครสมาชิก (`bcrypt` + ออก JWT)
-  - `POST /api/auth/login` — ล็อกอิน (บล็อกผู้ใช้ที่ `suspended_at IS NOT NULL` ด้วย `403 ACCOUNT_SUSPENDED`)
+  - `POST /api/auth/login` — ล็อกอิน (บล็อกผู้ใช้ที่ `suspended_at IS NOT NULL` ด้วย `403 ACCOUNT_SUSPENDED` โดยข้อความบอกเหตุผลและวันหมดเวลา เพราะผู้ถูกระงับเข้ามาอ่านใบเตือนในเว็บไม่ได้ ถ้า `suspended_until` ผ่านแล้วจะปลดและให้ล็อกอินต่อ)
 - **Models (`/api/models`):**
   - `GET /api/models?q=&tag=&license=&price=free|paid&page=` — ค้นหา กรอง แบ่งหน้า (กรอง `hidden_at IS NULL AND deleted_at IS NULL AND u.suspended_at IS NULL`)
   - `GET /api/models/:id` — รายละเอียดโมเดล (ไม่ส่ง `fileUrl` ของโมเดลเสียเงิน)
   - `PATCH /api/models/:id` — แก้ไขรายละเอียด/ราคา/สัญญาอนุญาต *(ยังเป็น TODO stub — รอดำเนินการ)*
   - `DELETE /api/models/:id` — Soft Delete (`deleted_at = NOW()`, เฉพาะเจ้าของหรือแอดมิน)
 - **Payments (`/api`):**
+  - **บัญชีที่ถูกระงับซื้อหรือแก้คีย์ไม่ได้:** `checkout`, `confirm-mock`, `pay-mock` และ `regenerate-key` ใช้ middleware `requireNotSuspended` (`auth.middleware.ts`) ที่ถามฐานข้อมูลทุกครั้ง (token อยู่ได้ 1 วัน) ตอบ `403 ACCOUNT_SUSPENDED` / `401` ถ้าไม่พบบัญชี และไม่ปล่อยผ่านเมื่อฐานข้อมูลผิดพลาด ห้ามใส่กับ `/api/me/notifications` เพราะผู้ถูกระงับต้องอ่านเหตุผลได้
   - `POST /api/models/:id/checkout` — สร้างรายการสั่งซื้อรายชิ้น (`status = 'pending'`), ล็อก `amount_cents`, `currency`, `license_type` จากตาราง `models`, และสุ่ม `embed_key` 48 ตัวอักษร hex (`crypto.randomBytes(24)`)
   - `POST /api/purchases/:id/confirm-mock` (และ `/api/models/:id/pay-mock`) — ยืนยันจ่ายเงินจำลอง (`status = 'paid'`, `paid_at = NOW()`) เมื่อ `PAYMENT_PROVIDER=mock`
   - `GET /api/me/purchases` — ดึงรายการโมเดลที่ซื้อแล้วพร้อม `embed_key`, `amount_cents`, `currency`, `license_type`, `watermark_hash`, `paid_at`
@@ -118,10 +119,15 @@ Agent ทุกตัว **ห้ามละเมิด** กฎต่อไ�
 - **Admin (`/api/admin`):** *(ทุก Route ตรวจ `role === 'admin'` และ `suspended_at IS NULL` จากฐานข้อมูลจริงผ่าน `requireActiveAdmin`)*
   - `GET /api/admin/overview` — สรุปยอดรวมระบบ, สถิติ 7 วันล่าสุด, สัดส่วน Free/Paid & License, Top 5 โมเดล, รายการซื้อและผู้ใช้ล่าสุด, คำร้องเรียนที่เปิดอยู่
   - `GET /api/admin/users` — รายชื่อผู้ใช้ (ค้นหาด้วย `q` + แบ่งหน้า `page`, `pageSize`)
-  - `PATCH /api/admin/users/:id/suspend` — ระงับหรือคืนสิทธิ์บัญชีผู้ใช้ (`{ suspended: boolean }`, ห้ามระงับตัวเอง)
+  - `PATCH /api/admin/users/:id/suspend` — ระงับหรือคืนสิทธิ์บัญชีผู้ใช้ (`{ suspended, reason?, until? }`: ระงับต้องมี `reason` 10–1000 ตัวอักษร และ `until` เป็นเวลาในอนาคตไม่เกิน 365 วัน (ไม่ส่ง = ระงับจนกว่าแอดมินจะปลด); ปลดระงับ `reason` ไม่บังคับและห้ามมี `until`; ห้ามระงับตัวเอง และ **ห้ามระงับบัญชีแอดมิน** (`403 CANNOT_SUSPEND_ADMIN` เงื่อนไขอยู่ใน SQL ด้วย แอดมินสองคนจะได้ไม่ระงับกันจนไม่มีใครปลดได้ แต่แอดมินที่เคยถูกระงับไว้ก่อนยังปลดได้)) อัปเดตผู้ใช้ + บันทึกประวัติ (`user_suspensions`) + ส่งใบเตือน (`notifications`) ใน SQL statement เดียว
+  - `GET /api/admin/users/:id/suspensions` และ `GET /api/admin/models/:id/history` — ประวัติการระงับ/ปลด/หมดเวลา และประวัติของโมเดล (แก้ license, ซ่อน/คืนสถานะ) ใครทำ เมื่อไร เหตุผล ล่าสุด 50 รายการ อ่านอย่างเดียว; `GET /api/admin/users` ส่ง `suspendedUntil` และ `suspensionReason` ด้วย
+  - **Suspension sweeper** (`modules/admin/suspensionSweeper.ts`) — core-api ปลด `suspended_at` ของผู้ที่ `suspended_until <= NOW()` ทุก 60 วินาที (และตอนเริ่มระบบ) พร้อมบันทึกประวัติ `expire` และส่งใบเตือน ทำให้จุดที่เช็ก `suspended_at` ทั้งหมด (core-api, cdn-service) ทำงานต่อได้โดยไม่ต้องแก้ ปลดช้าได้ไม่เกิน ~1 นาที
   - `GET /api/admin/models` — รายการโมเดลทั้งหมดรวมโมเดลที่ซ่อนและถูกลบ
-  - `PATCH /api/admin/models/:id/hide` — ซ่อนหรือแสดงผลโมเดลคืน (`{ hidden: boolean }`)
-  - `GET /api/admin/purchases` — รายการสั่งซื้อทั้งหมดพร้อมข้อมูลผู้ซื้อ, โมเดล และ `watermark_hash` (ไม่ส่ง `embed_key`)
+  - `PATCH /api/admin/models/:id/hide` — ซ่อนหรือแสดงผลโมเดลคืน (`{ hidden, reason? }`: **ซ่อนต้องมี `reason` 10–1000 ตัวอักษร** เพราะซ่อนแล้วโมเดลหายจากแกลเลอรีและ CDN ปิดกั้นทุกคนรวมถึงผู้ซื้อ; คืนสถานะ `reason` ไม่บังคับ) อัปเดตโมเดล + บันทึกประวัติ (`model_visibility_changes`) + ส่งใบเตือนเจ้าของ (`model_hidden` / `model_restored`) ใน SQL statement เดียว ซ่อนโมเดลที่ซ่อนอยู่แล้ว (หรือคืนสถานะโมเดลที่แสดงอยู่) ไม่เขียนอะไรและตอบสถานะปัจจุบัน
+  - `PATCH /api/admin/models/:id/license` — แอดมินแก้ license ของโมเดล (`{ license, reason }` เหตุผล 10–1000 ตัวอักษร ห้ามเลือก license เดิม) แก้ + บันทึกประวัติ (`model_license_changes`) + ส่งใบเตือนให้เจ้าของ (`notifications`) ใน SQL statement เดียว ผู้ซื้อเดิมยังคง `purchases.license_type` ที่ซื้อไว้
+  - `GET /api/me/notifications`, `PATCH /api/me/notifications/:id/read`, `PATCH /api/me/notifications/read-all` — กล่องใบเตือนของเจ้าของ (ทุก query กรอง `user_id` ของผู้เรียกเสมอ)
+  - `GET /api/admin/purchases` — รายการสั่งซื้อทั้งหมดพร้อมข้อมูลผู้ซื้อ, โมเดล และ `watermark_hash` (ไม่ส่ง `embed_key`) กรองได้ด้วย `?status=paid|pending`, `?from=` และ `?to=` (`YYYY-MM-DD` รวมวันสุดท้าย ตามเวลา UTC) ร่วมกับ `q`
+  - `GET /api/admin/purchases/:id` — รายละเอียดการซื้อรายการเดียว (ผู้ซื้อ, โมเดล + เจ้าของ + license ปัจจุบัน, ยอดและ license ที่ล็อกตอนซื้อ, เวลา, `provider_session_id`, `watermark_hash`) อ่านอย่างเดียว ไม่ส่ง `embed_key`
   - `GET /api/admin/complaints` — รายการคำร้องเรียน (กรอง `?status=` ได้, เรียง `open` และ `in_review` ขึ้นก่อน)
   - `PATCH /api/admin/complaints/:id` — เปลี่ยนสถานะคำร้องเรียน (`open`, `in_review`, `resolved`, `dismissed`) พร้อมบันทึก `admin_note`
 - **Complaints (`/api/complaints`):**
@@ -147,9 +153,10 @@ Agent ทุกตัว **ห้ามละเมิด** กฎต่อไ�
 
 ## 5. โครงสร้างฐานข้อมูล (`supabase/schema.sql`)
 
-- **`users`**: `id (UUID)`, `email (UNIQUE)`, `password_hash`, `display_name`, `role ('user'|'creator'|'admin')`, `is_seller (BOOLEAN)`, `suspended_at (TIMESTAMPTZ)`, `created_at`
+- **`users`**: `id (UUID)`, `email (UNIQUE)`, `password_hash`, `display_name`, `role ('user'|'creator'|'admin')`, `is_seller (BOOLEAN)`, `suspended_at (TIMESTAMPTZ)`, `suspended_until (TIMESTAMPTZ, ว่าง = ไม่มีกำหนด)`, `suspension_reason (TEXT)`, `created_at`
 - **`models`**: `id (UUID)`, `owner_id (FK users)`, `title`, `description`, `tags (TEXT[] GIN)`, `license ('CC0'|'CC-BY'|'CC-BY-NC'|'COMMERCIAL')`, `file_hash (CHAR(64))`, `file_size (BIGINT)`, `preview_hash (CHAR(64))`, `poster_hash (CHAR(64))`, `price_cents (INT)`, `currency (CHAR(3))`, `view_count`, `download_count`, `hidden_at`, `deleted_at`, `created_at`
 - **`purchases`**: `id (UUID)`, `user_id (FK users)`, `model_id (FK models)`, `status ('pending'|'paid')`, `amount_cents (INT)`, `currency (VARCHAR(10))`, `license_type (VARCHAR(50))`, `watermark_hash (VARCHAR(128))`, `paid_at (TIMESTAMPTZ)`, `provider_session_id`, `embed_key (VARCHAR(64) UNIQUE)`, `created_at`, `UNIQUE(user_id, model_id)`
+- **ตารางที่เพิ่มจากส่วนที่ 9 ของ `schema.sql` (`notifications`, `user_suspensions`, `model_license_changes`, `model_visibility_changes`):** ต้องสั่ง `ENABLE ROW LEVEL SECURITY` ทุกตาราง (ไม่ต้องมี policy) เพราะ Supabase เปิดตารางใน schema `public` ผ่าน REST API ผู้ที่มี anon key จะอ่าน/แก้แถวได้ตรง ๆ ถ้าไม่เปิด core-api ต่อผ่าน `DATABASE_URL` ด้วย role เจ้าของตารางซึ่งไม่ติด RLS จึงไม่กระทบ มีเทสต์ `src/scripts/schema.test.ts` กันตารางใหม่ที่ลืมเปิด (ตารางเดิม เช่น `users`, ยังไม่ได้เปิด RLS: ต้องตรวจก่อนเพราะ cdn-service อ่านผ่าน REST client)
 - **`likes`** & **`comments`**: ตารางสำหรับระบบถูกใจและคอมเมนต์
 - **`complaints`**: `id (UUID)`, `reporter_id (FK users)`, `category ('model'|'account'|'purchase'|'other')`, `model_id (FK models, ON DELETE SET NULL)`, `message (TEXT 10..2000)`, `status ('open'|'in_review'|'resolved'|'dismissed')`, `admin_note`, `handled_by (FK users)`, `handled_at (TIMESTAMPTZ)`, `created_at`
 - **Multi-Layer GLB Watermarking (`services/cdn-service/src/utils/glbWatermark.ts`):**
@@ -179,9 +186,9 @@ Agent ทุกตัว **ห้ามละเมิด** กฎต่อไ�
 | **CDN Service, Upload & Watermarking** (`services/cdn-service`) | **100%** | ✅ **23/23 tests** | `POST /api/models`, `GET /cdn/models/:id/:hash.glb`, `/preview.glb`, `/file.glb?key=`, `/download`, `/poster.webp`, `POST /cdn/verify-watermark`, HTTP Range (`206`/`416`), ETag (`304`), Rate Limit, Constant-time `embed_key` check, Dual-layer GLB Watermarking (Metadata HMAC + 64-vertex steganography) |
 | **Core API — Auth & CORS** (`services/core-api/src/modules/auth`, `config/cors.ts`) | **100%** | ✅ **6/6 tests** | `POST /api/auth/check-email`, `POST /api/auth/register`, `POST /api/auth/login` (**2/2**), และ CORS `localhost`/`127.0.0.1` handling (**4/4**) |
 | **Core API — Models** (`services/core-api/src/modules/models`) | **90%** | ✅ ใช้งานได้ (ขาด `PATCH`) | `GET /api/models` (search, tag, license, price, pagination), `GET /api/models/:id` (ซ่อน `fileUrl` สำหรับโมเดลเสียเงิน), `DELETE /api/models/:id` (Soft delete) \| **คงเหลือ:** `PATCH /api/models/:id` (แก้ไขชื่อ/รายละเอียด/ราคา/สัญญาอนุญาต — ยังเป็น TODO stub) |
-| **Core API — Payments** (`services/core-api/src/modules/payments`) | **100%** | ✅ **12/12 tests** | `POST /api/models/:id/checkout`, `POST /api/purchases/:id/confirm-mock`, `POST /api/models/:id/pay-mock`, `GET /api/me/purchases`, `GET /api/purchases/:id`, `POST /api/purchases/:id/regenerate-key` |
+| **Core API — Payments** (`services/core-api/src/modules/payments`) | **100%** | ✅ **15/15 tests** | `POST /api/models/:id/checkout`, `POST /api/purchases/:id/confirm-mock`, `POST /api/models/:id/pay-mock`, `GET /api/me/purchases`, `GET /api/purchases/:id`, `POST /api/purchases/:id/regenerate-key` |
 | **Core API — Seller** (`services/core-api/src/modules/seller`) | **100%** | ✅ **5/5 tests** | `POST /api/seller/enable`, `GET /api/seller/status`, `GET /api/seller/models`, `GET /api/seller/sales` |
-| **Core API — Admin & Complaints** (`services/core-api/src/modules/admin`, `complaints`) | **100%** | ✅ **25/25 tests** | `/api/admin/*` ครบทั้ง 8 endpoints (`overview`, `users`, `users/:id/suspend`, `models`, `models/:id/hide`, `purchases`, `complaints`, `complaints/:id`) ผ่าน **20/20** + `POST /api/complaints` (rate limit 5/hr) ผ่าน **5/5** *(รวม Core API ทั้งหมด **48/48 tests**)* |
+| **Core API — Admin & Complaints** (`services/core-api/src/modules/admin`, `complaints`) | **100%** | ✅ **49/49 tests** | `/api/admin/*` ครบทั้ง 12 endpoints (`overview`, `users`, `users/:id/suspend`, `users/:id/suspensions`, `models`, `models/:id/hide`, `models/:id/license`, `models/:id/history`, `purchases`, `purchases/:id`, `complaints`, `complaints/:id`) ผ่าน **38/38** (รวมเทสต์ sweeper 2 ข้อ) + `POST /api/complaints` (rate limit 5/hr) ผ่าน **5/5** + `/api/me/notifications` ผ่าน **6/6** *(รวม Core API ทั้งหมด **83/83 tests**)* |
 | **Frontend — Public Pages, Error Pages (`403`/`404`/`500`), Auth, Upload & Embed** (`frontend`) | **100%** | ✅ **4/4 tests** | หน้าแรก (`/`), `/gallery` (ค้นหา/กรอง/แบ่งหน้า), `/models/[id]`, `/creator`, `/creators/[handle]`, `/upload`, `/login`, `/embed/[id]`, `public/embed.js` (`<vm-model>`), เมนูบัญชี (`AccountMenu.tsx`), หน้า `403`, `not-found.tsx` (404), และ `error.tsx` (500) |
 | **Frontend — Admin Dashboard & Report Modal** (`frontend/src/app/admin/*`) | **100%** | ✅ พร้อมใช้งาน | `/admin`, `/admin/models`, `/admin/users`, `/admin/purchases`, `/admin/complaints` พร้อม Modal แจ้งปัญหา (`ReportForm.tsx`) ในเมนูผู้ใช้และ Footer *(เหลือเชื่อมปุ่ม Report ใน `/models/[id]` ให้เรียก `useReport().openReport()`)* |
 | **Frontend — Buyer & Seller Dashboards** (`frontend/src/app/me`, `seller`) | **100%** | ✅ พร้อมใช้งาน | `/me` (รายการที่ซื้อ, `embed_key`, Regenerate Key, ดาวน์โหลด `.glb` ฝังลายน้ำ, เปิดโหมดคนขาย) และ `/seller` (สรุปรายได้, ยอดขาย, โมเดลของฉัน, Soft Delete) เชื่อม API จริงครบ |
@@ -257,7 +264,7 @@ cd services/cdn-service
 npx.cmd tsc --noEmit -p .
 npm.cmd test
 
-# 2. ตรวจ Type-check และรัน Unit Tests ของ Core API (ต้องผ่านครบ 48/48 tests)
+# 2. ตรวจ Type-check และรัน Unit Tests ของ Core API (ต้องผ่านครบ 83/83 tests)
 cd services/core-api
 npx.cmd tsc --noEmit -p .
 npm.cmd test

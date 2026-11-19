@@ -2,6 +2,7 @@
 
 // Seller Dashboard — sales summary, my models, soft delete, and links to public profile & upload
 import { useEffect, useState } from 'react';
+import NoticeBox from '@/components/notifications/NoticeBox';
 import Link from 'next/link';
 import {
   AlertCircle,
@@ -203,6 +204,9 @@ export default function SellerPage() {
           </button>
         </div>
       )}
+
+      {/* Notices from admins (for example a license change and the reason) */}
+      {token && <NoticeBox token={token} />}
 
       {/* Top Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-white/10 pb-6">

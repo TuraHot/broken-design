@@ -21,3 +21,10 @@ export function formatDate(iso: string | null | undefined) {
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? '—' : d.toISOString().slice(0, 10);
 }
+
+/** ISO timestamp -> `2026-11-16 09:30:05 UTC`; `—` when empty or invalid. Use it where the order of events matters. */
+export function formatDateTime(iso: string | null | undefined) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '—' : `${d.toISOString().replace('T', ' ').slice(0, 19)} UTC`;
+}

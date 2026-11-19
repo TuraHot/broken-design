@@ -4,8 +4,9 @@
 // complaint in a dialog, where the admin can read it and respond (status, note, hide the model).
 import { useState } from 'react';
 import type { RowApi } from './AdminList';
-import { Badge, ConfirmAction } from './ui';
+import { Badge } from './ui';
 import Modal from '@/components/ui/Modal';
+import ReasonField, { isReasonValid } from './ReasonField';
 import {
   setModelHidden,
   updateComplaint,
@@ -51,6 +52,56 @@ export function ComplaintMessage({ row, api }: { row: AdminComplaint; api: RowAp
         </Modal>
       )}
     </div>
+  );
+}
+
+/**
+ * Hide or restore the reported model. Both go through one form with a written reason that the owner receives as a
+ * notice: hiding needs it (10 characters or more), restoring may have one.
+ */
+function ReportedModelAction({ row, api, onError }: { row: AdminComplaint; api: RowApi<AdminComplaint>; onError: (message: string | null) => void }) {
+  const t = useT();
+  const model = row.model!;
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  const requiresReason = !model.isHidden; // hiding needs one, restoring does not
+  const valid = isReasonValid(reason, requiresReason);
+
+  return (
+    <form
+      noValidate
+      onSubmit={async (e) => {
+        e.preventDefault();
+        if (!valid || busy) return;
+        setBusy(true);
+        onError(null);
+        try {
+          const res = await setModelHidden(model.id, { hidden: !model.isHidden, ...(reason.trim() ? { reason: reason.trim() } : {}) });
+          api.update(row.id, (r) => (r.model ? { ...r, model: { ...r.model, isHidden: res.isHidden } } : r));
+          setReason('');
+        } catch (err) {
+          onError(adminErrorText(err, t, 'admin.errModel'));
+        } finally {
+          setBusy(false);
+        }
+      }}
+      className="grid gap-2"
+    >
+      <ReasonField
+        id={`model-reason-${row.id}`}
+        label={t(model.isHidden ? 'admin.edit.restoreReason' : 'admin.license.reason')}
+        value={reason}
+        onChange={setReason}
+        required={requiresReason}
+        rows={3}
+      />
+      {!model.isHidden && <p className="text-xs text-white/50">{t('admin.edit.hideWarning')}</p>}
+      <div>
+        <button type="submit" disabled={!valid || busy} className={BTN}>
+          {busy ? t('admin.license.saving') : t(model.isHidden ? 'admin.edit.restoreSubmit' : 'admin.edit.hideSubmit')}
+        </button>
+      </div>
+    </form>
   );
 }
 
@@ -176,19 +227,7 @@ function ComplaintDetails({ row, api }: { row: AdminComplaint; api: RowApi<Admin
           <div className="grid gap-1.5">
             <span className="text-sm text-white/65">{t('admin.reportedModel')}</span>
             <div>
-              <ConfirmAction
-                label={row.model.isHidden ? t('admin.restoreModel') : t('admin.hideModel')}
-                ariaLabel={t('admin.actionOn', { action: row.model.isHidden ? t('admin.restore') : t('admin.hide'), name: row.model.title })}
-                onConfirm={async () => {
-                  setError(null);
-                  try {
-                    const res = await setModelHidden(row.model!.id, !row.model!.isHidden);
-                    api.update(row.id, (r) => (r.model ? { ...r, model: { ...r.model, isHidden: res.isHidden } } : r));
-                  } catch (err) {
-                    setError(adminErrorText(err, t, 'admin.errModel'));
-                  }
-                }}
-              />
+              <ReportedModelAction row={row} api={api} onError={setError} />
             </div>
           </div>
         )}

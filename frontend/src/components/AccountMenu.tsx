@@ -122,7 +122,7 @@ export default function AccountMenu() {
     <div className={`flex items-center gap-1.5 sm:gap-2 ${ready ? '' : 'invisible'}`}>
       <Link
         href="/login"
-        className="inline-flex h-9 items-center whitespace-nowrap rounded-lg px-2.5 text-[14px] font-medium text-ink/75 transition-colors hover:bg-ink/10 hover:text-ink sm:px-3 sm:text-[15px]"
+        className="hidden h-9 items-center min-[375px]:inline-flex whitespace-nowrap rounded-lg px-2.5 text-[14px] font-medium text-ink/75 transition-colors hover:bg-ink/10 hover:text-ink sm:px-3 sm:text-[15px]"
       >
         {t('nav.login')}
       </Link>

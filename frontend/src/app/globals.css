@@ -14,6 +14,8 @@
   --c-highlight: 184 146 255;
   --c-warn: 255 176 112;
   --c-danger: 252 165 165;
+  /* Hero title size: Michroma is wide, the light theme's condensed face can be much larger. */
+  --hero-title-size: clamp(30px, 4.6vw, 68px);
 }
 
 html[data-theme='light'] {
@@ -26,6 +28,13 @@ html[data-theme='light'] {
   --c-highlight: 201 242 61;
   --c-warn: 168 90 0;
   --c-danger: 185 28 28;
+  --hero-title-size: clamp(56px, 9vw, 128px);
+}
+
+/* Light theme type: condensed display face and a monospace text face (next/font variables set in layout.tsx). */
+html[data-theme='light'] body {
+  --font-display: var(--font-barlow);
+  --font-mono: var(--font-jetbrains);
 }
 
 html,

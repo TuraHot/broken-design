@@ -1,6 +1,6 @@
 // Root Layout — Lixyte
 import type { Metadata } from 'next';
-import { Chakra_Petch, Michroma, Share_Tech_Mono } from 'next/font/google';
+import { Barlow_Condensed, Chakra_Petch, JetBrains_Mono, Michroma, Share_Tech_Mono } from 'next/font/google';
 import AdminOnlyRedirect from '@/components/AdminOnlyRedirect';
 import Footer from '@/components/Footer';
 import Navbar from '@/components/Navbar';
@@ -16,6 +16,9 @@ import './globals.css';
 const chakra = Chakra_Petch({ subsets: ['latin', 'thai'], weight: ['400', '500', '600'], display: 'swap' });
 const michroma = Michroma({ subsets: ['latin'], weight: '400', display: 'swap', variable: '--font-display' });
 const shareTechMono = Share_Tech_Mono({ subsets: ['latin'], weight: '400', display: 'swap', variable: '--font-mono' });
+// The light theme's display and mono faces (globals.css swaps --font-display / --font-mono under html[data-theme='light']).
+const barlow = Barlow_Condensed({ subsets: ['latin'], weight: '700', display: 'swap', variable: '--font-barlow' });
+const jetbrains = JetBrains_Mono({ subsets: ['latin'], weight: ['400', '500'], display: 'swap', variable: '--font-jetbrains' });
 
 export const metadata: Metadata = {
   title: 'Lixyte',
@@ -29,7 +32,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         {/* Sets data-theme before the first paint (no flash); see lib/theme.ts. */}
         <script dangerouslySetInnerHTML={{ __html: themeBootstrapScript(THEME_READY_ROUTES) }} />
       </head>
-      <body className={`${chakra.className} ${michroma.variable} ${shareTechMono.variable}`}>
+      <body className={`${chakra.className} ${michroma.variable} ${shareTechMono.variable} ${barlow.variable} ${jetbrains.variable}`}>
         <LocaleProvider locale={locale}>
           <NavigationProgress />
           <ThemeSync />

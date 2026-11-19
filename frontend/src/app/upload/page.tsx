@@ -493,7 +493,7 @@ export default function UploadPage() {
                 </div>
               )}
               {submitError && (
-                <div className="flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-300">
+                <div role="alert" className="flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-300">
                   <AlertCircle className="h-4 w-4 shrink-0" />
                   <span>{submitError}</span>
                 </div>

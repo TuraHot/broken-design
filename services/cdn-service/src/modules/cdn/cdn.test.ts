@@ -12,6 +12,7 @@ import { db } from "../../config/db";
 import { env } from "../../config/env";
 import { errorHandler } from "../../middlewares/error.middleware";
 import { cdnRouter } from "./cdn.routes";
+import { uploadRouter } from "../upload/upload.routes";
 import { parseRangeSpec, resolveRange } from "./range";
 import { contentDisposition } from "./cdn.service";
 import {
@@ -97,11 +98,62 @@ function resetDb() {
     const m = models[params[0]];
     return { rows: m ? [{ ...m }] : [], rowCount: m ? 1 : 0 };
   }
+  if (sql.includes("WHERE (file_hash = $1 OR preview_hash = $1) AND owner_id <> $2")) {
+    const matches = Object.values(models)
+      .filter((m) => (m.file_hash === params[0] || m.preview_hash === params[0]) && m.owner_id !== params[1])
+      .slice(0, 1)
+      .map((m) => ({ id: m.id, owner_id: m.owner_id, title: m.title }));
+    return { rows: matches, rowCount: matches.length };
+  }
+  if (sql.includes("FROM models WHERE id = $1")) {
+    const m = models[params[0]];
+    return {
+      rows: m ? [{ id: m.id, owner_id: m.owner_id, title: m.title }] : [],
+      rowCount: m ? 1 : 0,
+    };
+  }
+  if (sql.includes("FROM models ORDER BY created_at DESC")) {
+    const rows = Object.values(models).map((m) => ({
+      id: m.id,
+      owner_id: m.owner_id,
+      title: m.title,
+    }));
+    return { rows, rowCount: rows.length };
+  }
+  if (sql.includes("INSERT INTO models")) {
+    const inserted: Row = {
+      id: params[0],
+      owner_id: params[1],
+      title: params[2],
+      description: params[3],
+      tags: params[4],
+      license: params[5],
+      file_hash: params[6],
+      file_size: params[7],
+      preview_hash: params[8],
+      poster_hash: params[9],
+      price_cents: params[10],
+      currency: params[11],
+      hidden_at: null,
+      deleted_at: null,
+      owner_suspended_at: null,
+    };
+    models[inserted.id] = inserted;
+    return { rows: [{ ...inserted }], rowCount: 1 };
+  }
   if (sql.includes("FROM users WHERE id")) {
     const u = users[params[0]];
     return {
       rows: u
-        ? [{ id: params[0], avatar_hash: u.avatar_hash ?? null, suspended_at: u.suspended_at ?? null }]
+        ? [
+            {
+              id: params[0],
+              role: u.role ?? "creator",
+              is_seller: u.is_seller ?? true,
+              avatar_hash: u.avatar_hash ?? null,
+              suspended_at: u.suspended_at ?? null,
+            },
+          ]
         : [],
       rowCount: u ? 1 : 0,
     };
@@ -146,10 +198,13 @@ function resetDb() {
 };
 
 const app = express();
+app.use("/api", uploadRouter);
 app.use("/cdn", cdnRouter);
 app.use(errorHandler);
 const server = app.listen(0);
-const base = `http://localhost:${(server.address() as AddressInfo).port}/cdn`;
+const port = (server.address() as AddressInfo).port;
+const base = `http://localhost:${port}/cdn`;
+const apiBase = `http://localhost:${port}/api`;
 after(() => {
   server.close();
   fs.rmSync(TEST_STORAGE_DIR, { recursive: true, force: true });
@@ -702,4 +757,161 @@ test("user avatar: avatarKey whitelist and GET /cdn/users/:id/avatar.webp stream
   assert.equal(badIdRes.status, 404);
 
   fs.rmSync(tmpDir, { recursive: true, force: true });
+});
+
+// ─── Anti-Reupload Watermark Guard on POST /api/models ──────────────────────
+async function postModelUpload(
+  uploaderId: string,
+  fileBuffer: Buffer,
+  opts: { previewBuffer?: Buffer; title?: string; license?: string; priceCents?: number } = {},
+) {
+  const form = new FormData();
+  form.append(
+    "file",
+    new Blob([new Uint8Array(fileBuffer)], { type: "model/gltf-binary" }),
+    "model.glb",
+  );
+  if (opts.previewBuffer) {
+    form.append(
+      "preview",
+      new Blob([new Uint8Array(opts.previewBuffer)], { type: "model/gltf-binary" }),
+      "preview.glb",
+    );
+  }
+  form.append("title", opts.title ?? "Reupload Attempt");
+  form.append("license", opts.license ?? "CC0");
+  form.append("price_cents", String(opts.priceCents ?? 0));
+
+  return fetch(`${apiBase}/models`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token(uploaderId, "creator")}` },
+    body: form,
+  });
+}
+
+test("upload guard: blocks unmodified re-upload of another creator's watermarked model (409 WATERMARK_CONFLICT)", async () => {
+  const rawGlb = await createSampleGlbBuffer(72);
+  const { buffer: watermarked } = await embedLicenseAndWatermark(rawGlb, {
+    modelId: PAID_ID,
+    ownerId: OWNER,
+    license: "COMMERCIAL",
+    purchaseId: "original",
+  });
+
+  const beforeCount = Object.keys(models).length;
+  const res = await postModelUpload(STRANGER, watermarked);
+  assert.equal(res.status, 409);
+  assert.equal(await errCode(res), "WATERMARK_CONFLICT");
+  assert.equal(Object.keys(models).length, beforeCount);
+});
+
+test("upload guard: blocks buyer-downloaded paid model from being re-uploaded", async () => {
+  const rawGlb = await createSampleGlbBuffer(72);
+  const realGlbHash = store(rawGlb, "glb");
+  models[PAID_ID].file_hash = realGlbHash;
+  models[PAID_ID].license = "COMMERCIAL";
+  purchases[0].id = "99999999-9999-4999-8999-999999999999";
+
+  const dlRes = await get(`/models/${PAID_ID}/download`, {
+    Authorization: `Bearer ${token(BUYER)}`,
+  });
+  assert.equal(dlRes.status, 200);
+  const buyerCopy = Buffer.from(await dlRes.arrayBuffer());
+
+  const res = await postModelUpload(BUYER, buyerCopy);
+  assert.equal(res.status, 409);
+  assert.equal(await errCode(res), "WATERMARK_CONFLICT");
+});
+
+test("upload guard: blocks re-upload after stripping extras or tampering asset.extras (Layer 2 DB scan)", async () => {
+  const rawGlb = await createSampleGlbBuffer(72);
+  const { buffer: watermarked } = await embedLicenseAndWatermark(rawGlb, {
+    modelId: PAID_ID,
+    ownerId: OWNER,
+    license: "COMMERCIAL",
+    purchaseId: "original",
+  });
+
+  const io = new NodeIO();
+
+  // Case A: stripped asset.extras and root.extras (e.g. Blender re-export)
+  const strippedDoc = await io.readBinary(new Uint8Array(watermarked));
+  delete strippedDoc.getRoot().getAsset().extras;
+  delete strippedDoc.getRoot().getAsset().copyright;
+  strippedDoc.getRoot().setExtras({});
+  const strippedU8 = await io.writeBinary(strippedDoc);
+  const strippedRes = await postModelUpload(
+    STRANGER,
+    Buffer.from(strippedU8.buffer, strippedU8.byteOffset, strippedU8.byteLength),
+  );
+  assert.equal(strippedRes.status, 409);
+  assert.equal(await errCode(strippedRes), "WATERMARK_CONFLICT");
+
+  // Case B: tampered asset.extras pointing to forged modelId/signature
+  const tamperedDoc = await io.readBinary(new Uint8Array(watermarked));
+  tamperedDoc.getRoot().getAsset().extras = {
+    platform: "Lixyte",
+    modelId: STRANGER,
+    ownerId: STRANGER,
+    license: "CC0",
+    purchaseId: "original",
+    signature: "f".repeat(64),
+  };
+  const tamperedU8 = await io.writeBinary(tamperedDoc);
+  const tamperedRes = await postModelUpload(
+    STRANGER,
+    Buffer.from(tamperedU8.buffer, tamperedU8.byteOffset, tamperedU8.byteLength),
+  );
+  assert.equal(tamperedRes.status, 409);
+  assert.equal(await errCode(tamperedRes), "WATERMARK_CONFLICT");
+});
+
+test("upload guard: blocks unwatermarked legacy file or preview matching foreign file_hash/preview_hash", async () => {
+  const legacyMain = await createSampleGlbBuffer(72);
+  const legacyPreview = await createSampleGlbBuffer(32);
+  models[PAID_ID].file_hash = crypto.createHash("sha256").update(legacyMain).digest("hex");
+  models[PAID_ID].preview_hash = crypto.createHash("sha256").update(legacyPreview).digest("hex");
+
+  const mainRes = await postModelUpload(STRANGER, legacyMain);
+  assert.equal(mainRes.status, 409);
+  assert.equal(await errCode(mainRes), "WATERMARK_CONFLICT");
+
+  const freshOwnMain = await createSampleGlbBuffer(20);
+  const previewRes = await postModelUpload(STRANGER, freshOwnMain, {
+    previewBuffer: legacyPreview,
+    priceCents: 500,
+  });
+  assert.equal(previewRes.status, 409);
+  assert.equal(await errCode(previewRes), "WATERMARK_CONFLICT");
+});
+
+test("upload guard: allows original owner upload and embeds watermark into preview GLB", async () => {
+  const mainGlb = await createSampleGlbBuffer(72);
+  const previewGlb = await createSampleGlbBuffer(68);
+  const res = await postModelUpload(OWNER, mainGlb, {
+    previewBuffer: previewGlb,
+    title: "Owner Original Paid Asset",
+    license: "COMMERCIAL",
+    priceCents: 1200,
+  });
+  assert.equal(res.status, 201);
+  const body = (await res.json()) as any;
+  assert.ok(body.model?.id);
+  assert.ok(body.model?.preview_hash);
+
+  // Verify the stored preview.glb itself carries Layer 1 metadata + Layer 2 vertex watermark
+  const previewKey = assetKey(body.model.id, "preview", body.model.preview_hash);
+  const local = new LocalDiskStorage();
+  const { stream } = await local.getStream(previewKey);
+  const chunks: Buffer[] = [];
+  for await (const c of stream) {
+    chunks.push(Buffer.isBuffer(c) ? c : Buffer.from(c));
+  }
+  const storedPreview = Buffer.concat(chunks);
+  const verifiedPreview = await verifyGlbWatermark(storedPreview, body.model.id);
+  assert.equal(verifiedPreview.isValidMetadata, true);
+  assert.equal(verifiedPreview.isValidVertexWatermark, true);
+  assert.equal(verifiedPreview.vertexBitMatchRatio, 1);
+  assert.equal((verifiedPreview.extractedMetadata as any)?.purchaseId, "preview");
+  assert.equal((verifiedPreview.extractedMetadata as any)?.ownerId, OWNER);
 });

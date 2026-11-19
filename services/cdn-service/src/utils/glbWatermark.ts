@@ -30,8 +30,19 @@ export interface VerifyWatermarkResult {
   vertexBitMatchRatio: number;
 }
 
+export interface ForeignAssetMatch {
+  matchedBy: "file_hash" | "metadata" | "vertex_watermark";
+  originalModelId: string;
+  originalOwnerId: string;
+  originalTitle?: string;
+  purchaseId?: string;
+  vertexBitMatchRatio?: number;
+}
+
 const VERTEX_WATERMARK_BITS = 64;
 const VERTEX_MATCH_THRESHOLD = 0.85;
+const MIN_DB_SCAN_VERTEX_BITS = 24;
+const SMALL_MESH_VERTEX_MATCH_THRESHOLD = 0.95;
 
 function createSilentIO(): NodeIO {
   const io = new NodeIO();
@@ -235,51 +246,139 @@ export async function embedLicenseAndWatermark(
   };
 }
 
-/**
- * ค้นหา modelId จากฐานข้อมูลเมื่อไฟล์ถูกตัด asset.extras ออกและไม่ได้ระบุ expectedModelId
- */
-async function findMatchingModelByVertexBits(extractedBits: number[]): Promise<{
-  modelId: string;
-  matchRatio: number;
-} | null> {
-  if (extractedBits.length === 0) return null;
+interface CandidateModelRow {
+  id: string;
+  owner_id: string;
+  title?: string | null;
+}
 
-  let modelIds: string[] = [];
+async function findModelOwnership(
+  modelId: string,
+): Promise<CandidateModelRow | null> {
   try {
     const res = await db.query(
-      `SELECT id FROM models ORDER BY created_at DESC LIMIT 500`,
+      `SELECT id, owner_id, title FROM models WHERE id = $1 LIMIT 1`,
+      [modelId],
     );
-    modelIds = res.rows.map((r: any) => String(r.id));
+    if (res.rows[0]) {
+      return res.rows[0] as CandidateModelRow;
+    }
   } catch {
     if (supabase) {
       try {
-        const { data } = await supabase.from("models").select("id").limit(500);
-        if (data) modelIds = data.map((r: any) => String(r.id));
+        const { data } = await supabase
+          .from("models")
+          .select("id, owner_id, title")
+          .eq("id", modelId)
+          .maybeSingle();
+        if (data) return data as CandidateModelRow;
+      } catch {
+        // Ignore DB lookup errors cleanly
+      }
+    }
+  }
+  return null;
+}
+
+async function listCandidateModelsForWatermarkScan(): Promise<
+  CandidateModelRow[]
+> {
+  try {
+    const res = await db.query(
+      `SELECT id, owner_id, title FROM models ORDER BY created_at DESC LIMIT 2000`,
+    );
+    return res.rows.map((r: any) => ({
+      id: String(r.id),
+      owner_id: String(r.owner_id),
+      title: r.title ? String(r.title) : null,
+    }));
+  } catch {
+    if (supabase) {
+      try {
+        const { data } = await supabase
+          .from("models")
+          .select("id, owner_id, title")
+          .order("created_at", { ascending: false })
+          .limit(2000);
+        if (data) {
+          return data.map((r: any) => ({
+            id: String(r.id),
+            owner_id: String(r.owner_id),
+            title: r.title ? String(r.title) : null,
+          }));
+        }
       } catch {
         // Ignore DB lookup errors during offline verification
       }
     }
   }
+  return [];
+}
 
-  let bestMatch: { modelId: string; matchRatio: number } | null = null;
-  for (const candidateId of modelIds) {
+/**
+ * ค้นหา modelId จากฐานข้อมูลเมื่อไฟล์ถูกตัดหรือปลอม asset.extras และไม่ได้ระบุ expectedModelId
+ */
+async function findMatchingModelByVertexBits(
+  extractedBits: number[],
+  preferForeignOwnerId?: string,
+): Promise<{
+  modelId: string;
+  ownerId: string;
+  title?: string;
+  matchRatio: number;
+} | null> {
+  if (extractedBits.length < MIN_DB_SCAN_VERTEX_BITS) return null;
+
+  const threshold =
+    extractedBits.length >= 48
+      ? VERTEX_MATCH_THRESHOLD
+      : SMALL_MESH_VERTEX_MATCH_THRESHOLD;
+
+  const candidates = await listCandidateModelsForWatermarkScan();
+  let bestAnyMatch: {
+    modelId: string;
+    ownerId: string;
+    title?: string;
+    matchRatio: number;
+  } | null = null;
+  let bestForeignMatch: {
+    modelId: string;
+    ownerId: string;
+    title?: string;
+    matchRatio: number;
+  } | null = null;
+
+  for (const candidate of candidates) {
     const expectedBits = signatureHexTo64Bits(
-      computeModelVertexPrefixHex(candidateId),
+      computeModelVertexPrefixHex(candidate.id),
     );
     let matched = 0;
     for (let i = 0; i < extractedBits.length; i++) {
       if (extractedBits[i] === expectedBits[i]) matched++;
     }
     const ratio = matched / extractedBits.length;
+    if (ratio < threshold) continue;
+
+    const matchObj = {
+      modelId: candidate.id,
+      ownerId: candidate.owner_id,
+      title: candidate.title || undefined,
+      matchRatio: ratio,
+    };
+
+    if (!bestAnyMatch || ratio > bestAnyMatch.matchRatio) {
+      bestAnyMatch = matchObj;
+    }
     if (
-      ratio >= VERTEX_MATCH_THRESHOLD &&
-      (!bestMatch || ratio > bestMatch.matchRatio)
+      preferForeignOwnerId &&
+      candidate.owner_id !== preferForeignOwnerId &&
+      (!bestForeignMatch || ratio > bestForeignMatch.matchRatio)
     ) {
-      bestMatch = { modelId: candidateId, matchRatio: ratio };
+      bestForeignMatch = matchObj;
     }
   }
 
-  return bestMatch;
+  return preferForeignOwnerId ? (bestForeignMatch ?? bestAnyMatch) : bestAnyMatch;
 }
 
 /**
@@ -288,6 +387,7 @@ async function findMatchingModelByVertexBits(extractedBits: number[]): Promise<{
 export async function verifyGlbWatermark(
   glbBuffer: Buffer,
   expectedModelId?: string,
+  opts?: { preferForeignOwnerId?: string },
 ): Promise<VerifyWatermarkResult> {
   if (
     !Buffer.isBuffer(glbBuffer) ||
@@ -381,8 +481,8 @@ export async function verifyGlbWatermark(
   let isValidVertexWatermark = false;
 
   if (extractedBits.length > 0) {
-    // Determine reference 64-bit signature for vertex comparison:
-    // Priority: expectedModelId -> valid metadata signature -> metadata modelId -> DB scan
+    // Only trust an explicit expectedModelId or cryptographically valid metadata;
+    // stripped or tampered metadata always falls back to a DB vertex scan.
     let referenceHex: string | null = null;
 
     if (expectedModelId && expectedModelId.trim() !== "") {
@@ -392,13 +492,6 @@ export async function verifyGlbWatermark(
       typeof candidateExtras?.signature === "string"
     ) {
       referenceHex = candidateExtras.signature;
-    } else if (
-      typeof candidateExtras?.modelId === "string" &&
-      candidateExtras.modelId.trim() !== ""
-    ) {
-      referenceHex = computeModelVertexPrefixHex(
-        candidateExtras.modelId.trim(),
-      );
     }
 
     if (referenceHex) {
@@ -412,13 +505,18 @@ export async function verifyGlbWatermark(
       vertexBitMatchRatio = Number((matched / extractedBits.length).toFixed(4));
       isValidVertexWatermark = vertexBitMatchRatio >= VERTEX_MATCH_THRESHOLD;
     } else {
-      const dbMatch = await findMatchingModelByVertexBits(extractedBits);
+      const dbMatch = await findMatchingModelByVertexBits(
+        extractedBits,
+        opts?.preferForeignOwnerId,
+      );
       if (dbMatch) {
         vertexBitMatchRatio = Number(dbMatch.matchRatio.toFixed(4));
         isValidVertexWatermark = true;
         extractedMetadata = {
           ...(extractedMetadata || {}),
           recoveredModelId: dbMatch.modelId,
+          recoveredOwnerId: dbMatch.ownerId,
+          ...(dbMatch.title ? { recoveredTitle: dbMatch.title } : {}),
         };
       }
     }
@@ -430,4 +528,109 @@ export async function verifyGlbWatermark(
     extractedMetadata,
     vertexBitMatchRatio,
   };
+}
+
+/**
+ * ตรวจจับว่าไฟล์ .glb ที่กำลังอัปโหลดเป็นโมเดลหรือพรีวิวที่มีอยู่แล้วของผู้สร้างคนอื่นบนแพลตฟอร์มหรือไม่
+ * ตรวจครบ 3 ชั้น: 1) SHA-256 hash ตรงกับโมเดล/พรีวิวเดิม 2) Metadata Watermark 3) Vertex Steganography
+ */
+export async function detectForeignPlatformAsset(
+  glbBuffer: Buffer,
+  uploaderId: string,
+): Promise<ForeignAssetMatch | null> {
+  // Check 1: Exact SHA-256 hash match (catches unwatermarked legacy files or unwatermarked previews)
+  const rawHash = crypto.createHash("sha256").update(glbBuffer).digest("hex");
+  let hashMatch: CandidateModelRow | null = null;
+  try {
+    const res = await db.query(
+      `SELECT id, owner_id, title
+       FROM models
+       WHERE (file_hash = $1 OR preview_hash = $1) AND owner_id <> $2
+       LIMIT 1`,
+      [rawHash, uploaderId],
+    );
+    hashMatch = (res.rows[0] as CandidateModelRow | undefined) ?? null;
+  } catch {
+    if (supabase) {
+      try {
+        const { data } = await supabase
+          .from("models")
+          .select("id, owner_id, title")
+          .or(`file_hash.eq.${rawHash},preview_hash.eq.${rawHash}`)
+          .neq("owner_id", uploaderId)
+          .limit(1);
+        hashMatch = (data?.[0] as CandidateModelRow | undefined) ?? null;
+      } catch {
+        // Ignore DB lookup errors cleanly
+      }
+    }
+  }
+
+  if (hashMatch) {
+    return {
+      matchedBy: "file_hash",
+      originalModelId: String(hashMatch.id),
+      originalOwnerId: String(hashMatch.owner_id),
+      originalTitle: hashMatch.title ? String(hashMatch.title) : undefined,
+    };
+  }
+
+  // Check 2: Layer 1 metadata watermark & Layer 2 vertex steganography
+  const verification = await verifyGlbWatermark(glbBuffer, undefined, {
+    preferForeignOwnerId: uploaderId,
+  });
+
+  if (verification.isValidMetadata && verification.extractedMetadata) {
+    const metaModelId = String(
+      verification.extractedMetadata.modelId || "",
+    ).trim();
+    const metaOwnerId = String(
+      verification.extractedMetadata.ownerId || "",
+    ).trim();
+    const dbRow = metaModelId ? await findModelOwnership(metaModelId) : null;
+    const effectiveOwnerId = dbRow?.owner_id
+      ? String(dbRow.owner_id)
+      : metaOwnerId;
+
+    if (effectiveOwnerId && effectiveOwnerId !== uploaderId) {
+      return {
+        matchedBy: "metadata",
+        originalModelId: metaModelId,
+        originalOwnerId: effectiveOwnerId,
+        originalTitle: dbRow?.title ? String(dbRow.title) : undefined,
+        purchaseId:
+          typeof verification.extractedMetadata.purchaseId === "string"
+            ? verification.extractedMetadata.purchaseId
+            : undefined,
+        vertexBitMatchRatio: verification.vertexBitMatchRatio,
+      };
+    }
+    return null;
+  }
+
+  const recoveredMeta = verification.extractedMetadata as Record<
+    string,
+    any
+  > | null;
+
+  if (verification.isValidVertexWatermark && recoveredMeta?.recoveredModelId) {
+    const recoveredModelId = String(recoveredMeta.recoveredModelId).trim();
+    const recoveredOwnerId = String(
+      recoveredMeta.recoveredOwnerId || "",
+    ).trim();
+    if (recoveredOwnerId && recoveredOwnerId !== uploaderId) {
+      return {
+        matchedBy: "vertex_watermark",
+        originalModelId: recoveredModelId,
+        originalOwnerId: recoveredOwnerId,
+        originalTitle:
+          typeof recoveredMeta.recoveredTitle === "string"
+            ? recoveredMeta.recoveredTitle
+            : undefined,
+        vertexBitMatchRatio: verification.vertexBitMatchRatio,
+      };
+    }
+  }
+
+  return null;
 }

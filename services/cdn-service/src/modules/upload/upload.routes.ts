@@ -11,7 +11,10 @@ import { supabase } from '../../config/supabase';
 import { getStorage, type StorageAdapter } from '../../storage';
 import { assetKey } from '../../storage/keys';
 import { validateGlbFile, computeFileSha256 } from '../../utils/glbValidator';
-import { embedLicenseAndWatermark } from '../../utils/glbWatermark';
+import {
+  detectForeignPlatformAsset,
+  embedLicenseAndWatermark,
+} from '../../utils/glbWatermark';
 import { requireAuth, requireSeller } from '../../middlewares/auth.middleware';
 import { AppError } from '../../middlewares/error.middleware';
 import { limitedDiskStorage } from './limitedDiskStorage';
@@ -179,8 +182,31 @@ uploadRouter.post(
       const modelId = crypto.randomUUID();
       const ownerId = req.user!.id;
 
-      // Embed platform origin license & vertex steganography watermark (purchaseId: 'original')
+      // Reject re-uploads of other creators' models or previews BEFORE writing anything to storage
       const rawGlbBuffer = await fsp.readFile(modelFile.path);
+      const foreignMainMatch = await detectForeignPlatformAsset(rawGlbBuffer, ownerId);
+      if (foreignMainMatch) {
+        throw new AppError(
+          409,
+          'WATERMARK_CONFLICT',
+          'Upload rejected: this 3D model already belongs to another creator on Lixyte (detected via platform watermark) and cannot be re-uploaded.',
+        );
+      }
+
+      let rawPreviewBuffer: Buffer | null = null;
+      if (previewFile) {
+        rawPreviewBuffer = await fsp.readFile(previewFile.path);
+        const foreignPreviewMatch = await detectForeignPlatformAsset(rawPreviewBuffer, ownerId);
+        if (foreignPreviewMatch) {
+          throw new AppError(
+            409,
+            'WATERMARK_CONFLICT',
+            'Upload rejected: the preview GLB already belongs to another creator on Lixyte (detected via platform watermark) and cannot be re-uploaded.',
+          );
+        }
+      }
+
+      // Embed platform origin license & vertex steganography watermark (purchaseId: 'original' / 'preview')
       let finalFileSize = modelFile.size;
       try {
         const { buffer: watermarkedBuffer } = await embedLicenseAndWatermark(rawGlbBuffer, {
@@ -191,6 +217,16 @@ uploadRouter.post(
         });
         await fsp.writeFile(modelFile.path, watermarkedBuffer);
         finalFileSize = watermarkedBuffer.length;
+
+        if (previewFile && rawPreviewBuffer) {
+          const { buffer: watermarkedPreview } = await embedLicenseAndWatermark(rawPreviewBuffer, {
+            modelId,
+            ownerId,
+            license: normalizedLicense,
+            purchaseId: 'preview',
+          });
+          await fsp.writeFile(previewFile.path, watermarkedPreview);
+        }
       } catch (wmErr: any) {
         if (wmErr instanceof AppError) throw wmErr;
         throw new AppError(400, 'INVALID_GLB', wmErr?.message || 'Failed to parse and watermark GLB structure');

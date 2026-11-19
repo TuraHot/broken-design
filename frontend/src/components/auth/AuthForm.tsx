@@ -1,15 +1,15 @@
 'use client';
 
-// Email-first sign-in: enter an email, we look it up, then ask for its password (known email) or register (new email),
-// and finally verify with a 6-digit one-time code (OTP).
-// UI only: the lookup is mocked (lib/auth.ts), no code is sent and nothing is sent to core-api yet.
+// Email-first sign-in: enter an email, we check if it exists in the database,
+// then ask for its password (known email) or register with display name (new email).
+// Connected to Core API (/api/auth/check-email, /api/auth/login, /api/auth/register).
 import Link from 'next/link';
 import { FormEvent, useState } from 'react';
-import { AlertCircle, Eye, EyeOff } from 'lucide-react';
-import { checkEmail, login, register } from '@/lib/auth';
-import { EMAIL_RE, FIELD, Field } from './Field';
 import { useRouter } from 'next/navigation';
-
+import { Eye, EyeOff } from 'lucide-react';
+import { checkEmail, login, register } from '@/lib/auth';
+import { SESSION_UPDATED_EVENT } from '@/lib/session';
+import { EMAIL_RE, FIELD, Field } from './Field';
 
 type Step = 'email' | 'login' | 'signup';
 
@@ -31,19 +31,6 @@ function validate(step: Step, v: Values): Errors {
   if (!v.password) errors.password = step === 'login' ? 'Enter your password.' : 'Choose a password.';
   else if (step === 'signup' && v.password.length < 8) errors.password = 'Use at least 8 characters.';
   return errors;
-}
-
-
-// Brand mark, so it is inline SVG rather than a lucide icon.
-function GoogleMark() {
-  return (
-    <svg aria-hidden viewBox="0 0 18 18" className="h-[18px] w-[18px]">
-      <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62Z" />
-      <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18Z" />
-      <path fill="#FBBC05" d="M3.97 10.72A5.4 5.4 0 0 1 3.68 9c0-.6.1-1.18.29-1.72V4.95H.96A9 9 0 0 0 0 9c0 1.45.35 2.83.96 4.05l3.01-2.33Z" />
-      <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58A9 9 0 0 0 9 0 9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58Z" />
-    </svg>
-  );
 }
 
 const COPY = {
@@ -68,16 +55,13 @@ const PRIMARY =
   'mt-1 h-10 w-full rounded-lg bg-white text-[15px] font-medium text-black transition-colors hover:bg-white/85 disabled:opacity-60';
 
 export default function AuthForm() {
+  const router = useRouter();
   const [step, setStep] = useState<Step>('email');
-  const [values, setValues] = useState<Values>({ email: '', name: '', password: ''});
-  const [flow, setFlow] = useState<'login' | 'signup'>('login');
+  const [values, setValues] = useState<Values>({ email: '', name: '', password: '' });
   const [errors, setErrors] = useState<Errors>({});
   const [showPassword, setShowPassword] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [checking, setChecking] = useState(false);
-  const [googleTried, setGoogleTried] = useState(false);
-  const [done, setDone] = useState(false);
-  const router = useRouter();
 
   const copy = COPY[step];
 
@@ -87,19 +71,10 @@ export default function AuthForm() {
     if (submitted) setErrors(validate(step, next));
   };
 
-  // Digits only.
-  // const updateCode = (e: React.ChangeEvent<HTMLInputElement>) => {
-  //   const next = { ...values, code: e.target.value.replace(/\D/g, '') };
-  //   setValues(next);
-  //   if (submitted) setErrors(validate(step, next));
-  // }; 
-
   const goTo = (next: Step) => {
     setStep(next);
     setErrors({});
     setSubmitted(false);
-    setDone(false);
-    setGoogleTried(false);
     setShowPassword(false);
     if (next === 'email') setValues((v) => ({ ...v, password: '' }));
   };
@@ -110,54 +85,49 @@ export default function AuthForm() {
     const found = validate(step, values);
     setErrors(found);
     setSubmitted(true);
-    setGoogleTried(false);
     if (Object.keys(found).length > 0) return;
 
     if (step === 'email') {
-      setChecking(true);
       try {
+        setChecking(true);
         const exists = await checkEmail(values.email);
         goTo(exists ? 'login' : 'signup');
-      } catch (error) {
-        setErrors({
-          email:
-            error instanceof Error && error.message !== 'Failed to fetch'
-              ? error.message
-              : 'Cannot reach the server. Please try again.',
-        });
+      } catch (err: any) {
+        setErrors({ email: err?.message || 'Unable to verify email address.' });
       } finally {
         setChecking(false);
       }
       return;
     }
+
     if (step === 'login' || step === 'signup') {
-  try {
-    setChecking(true);
+      try {
+        setChecking(true);
+        const result =
+          step === 'login'
+            ? await login(values.email, values.password)
+            : await register(values.email, values.password, values.name);
 
-    const result =
-      step === 'login'
-        ? await login(values.email, values.password)
-        : await register(values.email, values.password, values.name);
+        // Store tokens for authentication across the app
+        localStorage.setItem('token', result.token);
+        localStorage.setItem('accessToken', result.token);
+        if (result.user) {
+          localStorage.setItem('user', JSON.stringify(result.user));
+        }
+        window.dispatchEvent(new CustomEvent(SESSION_UPDATED_EVENT));
 
-    // เก็บ Token สำหรับใช้ยืนยันตัวตนใน Request ถัดไป
-    localStorage.setItem('accessToken', result.token);
-
-router.push('/gallery');
-    return;
-  } catch (error) {
-    setErrors({
-      password:
-        error instanceof Error
-          ? error.message
-          : 'Authentication failed. Please try again.',
-    });
-  } finally {
-    setChecking(false);
-  }
-
-  return;
-}
-    setDone(true);
+        router.push('/gallery');
+      } catch (error: any) {
+        setErrors({
+          password:
+            error instanceof Error
+              ? error.message
+              : 'Authentication failed. Please try again.',
+        });
+      } finally {
+        setChecking(false);
+      }
+    }
   };
 
   const fieldClass = (key: keyof Values) =>
@@ -193,42 +163,17 @@ router.push('/gallery');
     </Field>
   );
 
-  const statusText = googleTried
-    ? "Google sign-in isn't connected yet. Nothing was sent."
-    : done
-      ? flow === 'login'
-        ? "Sign-in isn't connected yet. Your details were not sent anywhere."
-        : "Registration isn't connected yet. Your details were not sent anywhere."
-        : '';
-
   return (
     <div className="w-full max-w-[420px]">
       <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70">[ Account ]</p>
-      <h1 className="mt-4 whitespace-nowrap font-display text-[clamp(12px,calc((100vw_-_32px)/23),18px)] uppercase leading-[1.05] text-white">{copy.title}</h1>
+      <h1 className="mt-4 whitespace-nowrap font-display text-[clamp(12px,calc((100vw_-_32px)/23),18px)] uppercase leading-[1.05] text-white">
+        {copy.title}
+      </h1>
       <p className="mt-3 text-[15px] leading-relaxed text-white/65">{copy.lead}</p>
 
       <div className="mt-8 rounded-lg border border-white/10 bg-white/5 p-5 sm:p-6">
-        {step === 'email' && (
-          <>
-            <button
-              type="button"
-              onClick={() => setGoogleTried(true)}
-              className="flex h-10 w-full items-center justify-center gap-2.5 rounded-lg border border-white/15 bg-white/5 text-[15px] text-white transition-colors hover:border-white/40"
-            >
-              <GoogleMark />
-              Continue with Google
-            </button>
-
-            <div aria-hidden className="mt-5 flex items-center gap-3 font-mono text-[11px] uppercase tracking-[0.16em] text-white/40">
-              <span className="h-px flex-1 bg-white/10" />
-              or
-              <span className="h-px flex-1 bg-white/10" />
-            </div>
-          </>
-        )}
-
         {step !== 'email' && (
-          <div className="flex items-center justify-between gap-3 rounded-lg border border-white/10 px-3 py-2 text-sm">
+          <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-white/10 px-3 py-2 text-sm">
             <span className="truncate text-white">{values.email.trim()}</span>
             <button
               type="button"
@@ -240,7 +185,7 @@ router.push('/gallery');
           </div>
         )}
 
-        <form onSubmit={onSubmit} noValidate className={`${step === 'email' ? 'mt-5' : 'mt-4'} grid gap-4`}>
+        <form onSubmit={onSubmit} noValidate className="grid gap-4">
           {step === 'email' && (
             <Field id="email" label="Email" error={errors.email}>
               <input
@@ -278,7 +223,6 @@ router.push('/gallery');
 
           {(step === 'login' || step === 'signup') && passwordField}
 
-
           {step === 'login' && (
             <div className="-mt-2 text-right">
               <Link href="/forgot-password" className="text-sm text-white/65 underline-offset-4 transition-colors hover:text-white hover:underline">
@@ -288,24 +232,25 @@ router.push('/gallery');
           )}
 
           <button type="submit" disabled={checking} className={PRIMARY}>
-  {checking
-    ? step === 'email'
-      ? 'Checking…'
-      : 'Please wait…'
-    : copy.submit}
-</button>
-
-          
-
-          <div role="status" aria-live="polite">
-            {statusText && (
-              <p className="flex items-start gap-1.5 text-sm text-amber">
-                <AlertCircle aria-hidden className="mt-0.5 h-4 w-4 shrink-0" />
-                {statusText}
-              </p>
-            )}
-          </div>
+            {checking
+              ? step === 'email'
+                ? 'Checking…'
+                : 'Please wait…'
+              : copy.submit}
+          </button>
         </form>
+
+        <div className="mt-5 border-t border-white/10 pt-4 text-center">
+          <p className="text-sm text-white/65">
+            Don&apos;t have an account?{' '}
+            <Link
+              href="/register"
+              className="text-white underline-offset-4 transition-colors hover:underline hover:text-hud"
+            >
+              Create an account
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   );

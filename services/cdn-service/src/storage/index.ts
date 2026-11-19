@@ -4,17 +4,24 @@ import { SupabaseStorage } from './supabase.storage';
 import { env } from '../config/env';
 import { supabase } from '../config/supabase';
 
-let storageInstance: StorageAdapter | null = null;
+const storageInstances = new Map<string, StorageAdapter>();
 
-export function getStorage(): StorageAdapter {
-  if (!storageInstance) {
+export function getStorage(bucketName?: string): StorageAdapter {
+  const bucket = bucketName || env.supabaseStorageBucket || 'models';
+  let instance = storageInstances.get(bucket);
+  if (!instance) {
     if (env.storageProvider === 'supabase' && supabase) {
-      storageInstance = new SupabaseStorage();
+      instance = new SupabaseStorage(bucket);
     } else {
-      storageInstance = new LocalDiskStorage();
+      instance = new LocalDiskStorage(bucket);
     }
+    storageInstances.set(bucket, instance);
   }
-  return storageInstance;
+  return instance;
+}
+
+export function getAvatarStorage(): StorageAdapter {
+  return getStorage(env.supabaseAvatarBucket);
 }
 
 export * from './storage.interface';

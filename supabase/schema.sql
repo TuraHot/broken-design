@@ -1,4 +1,4 @@
--- Broken Design — Comprehensive PostgreSQL Schema (Supabase)
+-- Lixyte — Comprehensive PostgreSQL Schema (Supabase)
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- 1. Enums (เพิ่ม 'admin' สำหรับบทบาทแอดมิน)
@@ -14,9 +14,12 @@ CREATE TABLE IF NOT EXISTS users (
     display_name VARCHAR(100) NOT NULL,
     role user_role NOT NULL DEFAULT 'user',
     is_seller BOOLEAN NOT NULL DEFAULT FALSE,
+    avatar_hash CHAR(64),
     suspended_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_hash CHAR(64);
 
 -- 3. Models Table (เพิ่ม hidden_at สำหรับแอดมินซ่อนโมเดล)
 CREATE TABLE IF NOT EXISTS models (
@@ -43,17 +46,29 @@ CREATE INDEX IF NOT EXISTS idx_models_tags ON models USING GIN (tags);
 CREATE INDEX IF NOT EXISTS idx_models_owner ON models (owner_id);
 CREATE INDEX IF NOT EXISTS idx_models_active ON models (created_at DESC) WHERE deleted_at IS NULL AND hidden_at IS NULL;
 
--- 4. Purchases Table
+-- 4. Purchases Table (Single-Item Purchase + License & Watermark Tracking)
 CREATE TABLE IF NOT EXISTS purchases (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     model_id UUID NOT NULL REFERENCES models(id) ON DELETE RESTRICT,
     status purchase_status NOT NULL DEFAULT 'pending',
+    amount_cents INTEGER NOT NULL DEFAULT 0,
+    currency VARCHAR(10) NOT NULL DEFAULT 'USD',
+    license_type VARCHAR(50) NOT NULL DEFAULT 'COMMERCIAL',
+    watermark_hash VARCHAR(128),
+    paid_at TIMESTAMPTZ,
     provider_session_id VARCHAR(255) UNIQUE,
     embed_key VARCHAR(64) UNIQUE NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (user_id, model_id)
 );
+
+-- Safe migration for existing databases
+ALTER TABLE purchases ADD COLUMN IF NOT EXISTS amount_cents INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE purchases ADD COLUMN IF NOT EXISTS currency VARCHAR(10) NOT NULL DEFAULT 'USD';
+ALTER TABLE purchases ADD COLUMN IF NOT EXISTS license_type VARCHAR(50) NOT NULL DEFAULT 'COMMERCIAL';
+ALTER TABLE purchases ADD COLUMN IF NOT EXISTS watermark_hash VARCHAR(128);
+ALTER TABLE purchases ADD COLUMN IF NOT EXISTS paid_at TIMESTAMPTZ;
 
 CREATE INDEX IF NOT EXISTS idx_purchases_embed_key ON purchases (embed_key);
 
@@ -76,8 +91,42 @@ CREATE TABLE IF NOT EXISTS comments (
 
 CREATE INDEX IF NOT EXISTS idx_comments_model_id ON comments (model_id);
 
+-- 6.1 Complaints Table (คำร้องเรียนจากผู้ใช้ — แอดมินดูและปิดเรื่องที่ /admin/complaints)
+CREATE TABLE IF NOT EXISTS complaints (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    reporter_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    category VARCHAR(20) NOT NULL CHECK (category IN ('model', 'account', 'purchase', 'other')),
+    model_id UUID REFERENCES models(id) ON DELETE SET NULL,
+    message TEXT NOT NULL CHECK (char_length(message) BETWEEN 10 AND 2000),
+    status VARCHAR(20) NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'in_review', 'resolved', 'dismissed')),
+    admin_note TEXT,
+    handled_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    handled_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_complaints_status ON complaints (status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_complaints_reporter ON complaints (reporter_id, created_at DESC);
+
+-- 6.2 Creator Withdrawals Table (เงินที่เว็บถือไว้ให้ครีเอเตอร์ + คำนวณส่วนต่างค่าธรรมเนียมแพลตฟอร์มก่อนถอน)
+CREATE TABLE IF NOT EXISTS creator_withdrawals (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    seller_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    gross_amount_cents INTEGER NOT NULL CHECK (gross_amount_cents > 0),
+    platform_fee_cents INTEGER NOT NULL CHECK (platform_fee_cents >= 0),
+    net_amount_cents INTEGER NOT NULL CHECK (net_amount_cents >= 0),
+    fee_rate_bps INTEGER NOT NULL DEFAULT 700,
+    currency VARCHAR(10) NOT NULL DEFAULT 'USD',
+    payout_method VARCHAR(50) NOT NULL DEFAULT 'promptpay',
+    payout_account VARCHAR(255) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'paid', 'rejected')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    processed_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_creator_withdrawals_seller ON creator_withdrawals (seller_id, created_at DESC);
+
 -- 7. Seed Initial Accounts (Admin must be set in DB, cannot register via UI)
--- Password for both initial accounts: Admin@BrokenDesign2026!
 INSERT INTO users (email, password_hash, display_name, role, is_seller)
 VALUES (
     'admin@brokendesign.com',
@@ -91,9 +140,128 @@ SET role = 'admin', suspended_at = NULL;
 INSERT INTO users (email, password_hash, display_name, role, is_seller)
 VALUES (
     'creator@brokendesign.com',
-    '$2b$10$NTrckoyeBuWvh0BdeqForOSS1zaDO/W4olcjACKVrtUbSBp9dshgS',
+    '$2b$10$jQ6UMGcwnEje.2C3/QLsjuz6b8vLWFRPuJCxsWmGvnQlcZ/UJyWqq',
     'Demo Creator',
     'creator',
     true
 ) ON CONFLICT (email) DO UPDATE
-SET role = 'creator', is_seller = true, suspended_at = NULL;
+SET password_hash = EXCLUDED.password_hash, role = 'creator', is_seller = true, suspended_at = NULL;
+
+-- 8. Supabase Storage Bucket ('models') & RLS Policies
+-- Stored object keys follow `<model_id>/{model,preview,poster}.<sha256>.<ext>` (with flat legacy key fallback).
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('models', 'models', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+DO $$ BEGIN
+    CREATE POLICY "Public Read Access for models bucket"
+    ON storage.objects FOR SELECT
+    USING (bucket_id = 'models');
+EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+DO $$ BEGIN
+    CREATE POLICY "Allow Uploads to models bucket"
+    ON storage.objects FOR INSERT
+    WITH CHECK (bucket_id = 'models');
+EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+DO $$ BEGIN
+    CREATE POLICY "Allow Updates on models bucket"
+    ON storage.objects FOR UPDATE
+    USING (bucket_id = 'models')
+    WITH CHECK (bucket_id = 'models');
+EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+DO $$ BEGIN
+    CREATE POLICY "Allow Deletes from models bucket"
+    ON storage.objects FOR DELETE
+    USING (bucket_id = 'models');
+EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+-- 8.1 Supabase Storage Bucket ('profile_logo') & RLS Policies
+-- Stored object keys follow `<user_id>/avatar.<sha256>.webp`.
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('profile_logo', 'profile_logo', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+DO $$ BEGIN
+    CREATE POLICY "Public Read Access for profile_logo bucket"
+    ON storage.objects FOR SELECT
+    USING (bucket_id = 'profile_logo');
+EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+DO $$ BEGIN
+    CREATE POLICY "Allow Uploads to profile_logo bucket"
+    ON storage.objects FOR INSERT
+    WITH CHECK (bucket_id = 'profile_logo');
+EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+DO $$ BEGIN
+    CREATE POLICY "Allow Updates on profile_logo bucket"
+    ON storage.objects FOR UPDATE
+    USING (bucket_id = 'profile_logo')
+    WITH CHECK (bucket_id = 'profile_logo');
+EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+DO $$ BEGIN
+    CREATE POLICY "Allow Deletes from profile_logo bucket"
+    ON storage.objects FOR DELETE
+    USING (bucket_id = 'profile_logo');
+EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+-- 9. Model license changes by an admin (history) and notifications to users (owner inbox)
+CREATE TABLE IF NOT EXISTS model_license_changes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    model_id UUID NOT NULL REFERENCES models(id) ON DELETE CASCADE,
+    admin_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    old_license license_type NOT NULL,
+    new_license license_type NOT NULL,
+    reason TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_license_changes_model ON model_license_changes (model_id, created_at DESC);
+-- Supabase serves public tables through its REST API: RLS on with no policy closes that door. core-api uses the
+-- table owner role (DATABASE_URL), which is not affected, so nothing else changes.
+ALTER TABLE model_license_changes ENABLE ROW LEVEL SECURITY;
+
+CREATE TABLE IF NOT EXISTS notifications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    kind VARCHAR(50) NOT NULL,
+    model_id UUID REFERENCES models(id) ON DELETE SET NULL,
+    data JSONB NOT NULL DEFAULT '{}',
+    read_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications (user_id, read_at, created_at DESC);
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+
+-- 10. Timed suspensions with a reason, and their history
+-- suspended_until NULL = suspended until an admin restores the account. core-api lifts expired ones every minute
+-- (modules/admin/suspensionSweeper.ts), so every existing suspended_at check keeps working.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended_until TIMESTAMPTZ;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS suspension_reason TEXT;
+
+CREATE TABLE IF NOT EXISTS user_suspensions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    admin_id UUID REFERENCES users(id) ON DELETE SET NULL, -- NULL = lifted automatically when the time ran out
+    action VARCHAR(10) NOT NULL CHECK (action IN ('suspend', 'restore', 'expire')),
+    reason TEXT,
+    until TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_user_suspensions_user ON user_suspensions (user_id, created_at DESC);
+ALTER TABLE user_suspensions ENABLE ROW LEVEL SECURITY;
+
+-- 11. Hide / restore of a model by an admin (history). Hiding also creates a notification for the owner.
+CREATE TABLE IF NOT EXISTS model_visibility_changes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    model_id UUID NOT NULL REFERENCES models(id) ON DELETE CASCADE,
+    admin_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    action VARCHAR(10) NOT NULL CHECK (action IN ('hide', 'restore')),
+    reason TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_visibility_changes_model ON model_visibility_changes (model_id, created_at DESC);
+ALTER TABLE model_visibility_changes ENABLE ROW LEVEL SECURITY;

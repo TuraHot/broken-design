@@ -42,6 +42,7 @@ test('POST /api/models/:id/checkout - rejects unauthenticated requests', async (
 test('POST /api/models/:id/checkout - returns 404 when model not found', async () => {
   const originalQuery = db.query.bind(db);
   (db as any).query = async (sql: string) => {
+    if (sql.includes('SELECT suspended_at FROM users')) return { rowCount: 1, rows: [{ suspended_at: null }] };
     if (sql.includes('FROM models WHERE id = $1')) {
       return { rowCount: 0, rows: [] };
     }
@@ -67,6 +68,7 @@ test('POST /api/models/:id/checkout - returns 404 when model not found', async (
 test('POST /api/models/:id/checkout - rejects purchasing own model', async () => {
   const originalQuery = db.query.bind(db);
   (db as any).query = async (sql: string) => {
+    if (sql.includes('SELECT suspended_at FROM users')) return { rowCount: 1, rows: [{ suspended_at: null }] };
     if (sql.includes('FROM models WHERE id = $1')) {
       return {
         rowCount: 1,
@@ -95,6 +97,7 @@ test('POST /api/models/:id/checkout - rejects purchasing own model', async () =>
 test('POST /api/models/:id/checkout - rejects purchasing free model', async () => {
   const originalQuery = db.query.bind(db);
   (db as any).query = async (sql: string) => {
+    if (sql.includes('SELECT suspended_at FROM users')) return { rowCount: 1, rows: [{ suspended_at: null }] };
     if (sql.includes('FROM models WHERE id = $1')) {
       return {
         rowCount: 1,
@@ -125,6 +128,7 @@ test('POST /api/models/:id/checkout - creates pending purchase with price from d
   let insertedData: any = null;
 
   (db as any).query = async (sql: string, params: any[]) => {
+    if (sql.includes('SELECT suspended_at FROM users')) return { rowCount: 1, rows: [{ suspended_at: null }] };
     if (sql.includes('FROM models WHERE id = $1')) {
       return {
         rowCount: 1,
@@ -151,7 +155,7 @@ test('POST /api/models/:id/checkout - creates pending purchase with price from d
     assert.equal(res.status, 200);
     const body = await res.json();
     assert.equal(body.purchaseId, 'purchase-123');
-    assert.equal(body.checkoutUrl, '/pay/mock/purchase-123');
+    assert.equal(body.checkoutUrl, '/checkout/purchase-123');
     assert.equal(body.provider, 'mock');
     assert.equal(insertedData.userId, 'buyer-1');
     assert.equal(insertedData.modelId, 'm-paid');
@@ -164,6 +168,7 @@ test('POST /api/models/:id/checkout - creates pending purchase with price from d
 test('POST /api/models/:id/checkout - prevents duplicate purchase if already paid', async () => {
   const originalQuery = db.query.bind(db);
   (db as any).query = async (sql: string) => {
+    if (sql.includes('SELECT suspended_at FROM users')) return { rowCount: 1, rows: [{ suspended_at: null }] };
     if (sql.includes('FROM models WHERE id = $1')) {
       return {
         rowCount: 1,
@@ -195,6 +200,7 @@ test('POST /api/models/:id/checkout - prevents duplicate purchase if already pai
 test('POST /api/purchases/:id/confirm-mock - confirms payment and changes status to paid', async () => {
   const originalQuery = db.query.bind(db);
   (db as any).query = async (sql: string, params: any[]) => {
+    if (sql.includes('SELECT suspended_at FROM users')) return { rowCount: 1, rows: [{ suspended_at: null }] };
     if (sql.includes('UPDATE purchases') && sql.includes("status = 'paid'")) {
       return {
         rowCount: 1,
@@ -224,6 +230,7 @@ test('POST /api/purchases/:id/confirm-mock - confirms payment and changes status
 test('POST /api/purchases/:id/confirm-mock - prevents duplicate confirmation (cannot get new key)', async () => {
   const originalQuery = db.query.bind(db);
   (db as any).query = async (sql: string) => {
+    if (sql.includes('SELECT suspended_at FROM users')) return { rowCount: 1, rows: [{ suspended_at: null }] };
     if (sql.includes('UPDATE purchases')) {
       // 0 rows updated because status wasn't pending
       return { rowCount: 0, rows: [] };
@@ -273,6 +280,7 @@ test('POST /api/purchases/:id/confirm-mock - rejects when PAYMENT_PROVIDER is no
 test('GET /api/me/purchases - lists only paid purchases with embed_key', async () => {
   const originalQuery = db.query.bind(db);
   (db as any).query = async (sql: string) => {
+    if (sql.includes('SELECT suspended_at FROM users')) return { rowCount: 1, rows: [{ suspended_at: null }] };
     if (sql.includes('FROM purchases p') && sql.includes("p.status = 'paid'")) {
       return {
         rowCount: 1,
@@ -314,6 +322,7 @@ test('POST /api/purchases/:id/regenerate-key - generates a new key and invalidat
   let updatedKey: string | null = null;
 
   (db as any).query = async (sql: string, params: any[]) => {
+    if (sql.includes('SELECT suspended_at FROM users')) return { rowCount: 1, rows: [{ suspended_at: null }] };
     if (sql.includes('UPDATE purchases') && sql.includes('SET embed_key = $1')) {
       updatedKey = params[0];
       return {
@@ -342,3 +351,56 @@ test('POST /api/purchases/:id/regenerate-key - generates a new key and invalidat
   }
 });
 
+// ─── a suspended user cannot buy or change keys, even with a token that is still valid ───
+async function withUser(
+  userRow: { suspended_at: string | null } | null,
+  run: (base: string, writes: string[]) => Promise<void>,
+) {
+  const originalQuery = db.query.bind(db);
+  const writes: string[] = [];
+  (db as any).query = async (sql: string) => {
+    if (sql.includes('SELECT suspended_at FROM users')) {
+      return userRow ? { rowCount: 1, rows: [userRow] } : { rowCount: 0, rows: [] };
+    }
+    if (/INSERT INTO purchases|UPDATE purchases/.test(sql)) writes.push(sql);
+    if (sql.includes('FROM purchases p') && sql.includes("p.status = 'paid'")) return { rowCount: 0, rows: [] };
+    return { rowCount: 0, rows: [] };
+  };
+  const server = app.listen(0);
+  const port = (server.address() as any).port;
+  try {
+    await run(`http://localhost:${port}/api`, writes);
+  } finally {
+    server.close();
+    db.query = originalQuery;
+  }
+}
+
+const SUSPENDED = { suspended_at: '2026-11-18T00:00:00.000Z' };
+
+test('payments - a suspended user is refused on checkout, confirm, pay and key change, and nothing is written', async () => {
+  await withUser(SUSPENDED, async (base, writes) => {
+    const headers = { Authorization: `Bearer ${makeToken()}` };
+    for (const path of ['/models/m-1/checkout', '/purchases/p-1/confirm-mock', '/models/m-1/pay-mock', '/purchases/p-1/regenerate-key']) {
+      const res = await fetch(`${base}${path}`, { method: 'POST', headers });
+      assert.equal(res.status, 403, path);
+      assert.equal((await res.json()).error.code, 'ACCOUNT_SUSPENDED', path);
+    }
+    assert.equal(writes.length, 0);
+  });
+});
+
+test('payments - a token whose user no longer exists is refused with 401', async () => {
+  await withUser(null, async (base, writes) => {
+    const res = await fetch(`${base}/models/m-1/checkout`, { method: 'POST', headers: { Authorization: `Bearer ${makeToken()}` } });
+    assert.equal(res.status, 401);
+    assert.equal(writes.length, 0);
+  });
+});
+
+test('payments - a suspended user can still read their purchases (read only)', async () => {
+  await withUser(SUSPENDED, async (base) => {
+    const res = await fetch(`${base}/me/purchases`, { headers: { Authorization: `Bearer ${makeToken()}` } });
+    assert.equal(res.status, 200);
+  });
+});

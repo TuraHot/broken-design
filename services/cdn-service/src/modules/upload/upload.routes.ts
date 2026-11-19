@@ -1,36 +1,38 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import crypto from 'crypto';
 import multer from 'multer';
+import sharp from 'sharp';
 import path from 'path';
 import fs from 'fs';
 import fsp from 'fs/promises';
 import { env } from '../../config/env';
 import { db } from '../../config/db';
-import { getStorage } from '../../storage';
+import { supabase } from '../../config/supabase';
+import { getStorage, type StorageAdapter } from '../../storage';
+import { assetKey } from '../../storage/keys';
 import { validateGlbFile, computeFileSha256 } from '../../utils/glbValidator';
+import { embedLicenseAndWatermark } from '../../utils/glbWatermark';
 import { requireAuth, requireSeller } from '../../middlewares/auth.middleware';
 import { AppError } from '../../middlewares/error.middleware';
+import { limitedDiskStorage } from './limitedDiskStorage';
 
 export const uploadRouter = Router();
 
 // Ensure temporary upload directory exists
 fs.mkdirSync(path.resolve(env.tmpUploadDir), { recursive: true });
 
-const storageEngine = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    cb(null, path.resolve(env.tmpUploadDir));
+// Each field has its own size limit, enforced while the file is still arriving (see limitedDiskStorage.ts).
+const storageEngine = limitedDiskStorage(
+  env.tmpUploadDir,
+  {
+    file: { bytes: env.maxModelSizeBytes, label: 'Model file' },
+    preview: { bytes: env.maxPreviewSizeBytes, label: 'Preview file' },
+    poster: { bytes: env.maxPosterSizeBytes, label: 'Poster file' },
   },
-  filename: (_req, file, cb) => {
-    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    cb(null, `${uniqueSuffix}-${file.originalname}`);
-  },
-});
+  { bytes: env.maxModelSizeBytes, label: 'File' },
+);
 
-const upload = multer({
-  storage: storageEngine,
-  limits: {
-    fileSize: env.maxModelSizeBytes, // 50MB maximum
-  },
-});
+const upload = multer({ storage: storageEngine });
 
 const uploadFields = upload.fields([
   { name: 'file', maxCount: 1 },
@@ -56,6 +58,8 @@ uploadRouter.post(
   uploadFields,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
+    const uploadedKeys: string[] = [];
+    let storage: StorageAdapter | null = null;
 
     try {
       // 0. Verify seller account status in database (ensure account is active and not suspended)
@@ -119,7 +123,7 @@ uploadRouter.post(
         throw new AppError(
           400,
           'PREVIEW_REQUIRED',
-          'Paid models require a lightweight preview GLB file (under 5 MB) for public rotation'
+          'Paid models require a preview GLB file (under 5 MB) for public rotation'
         );
       }
 
@@ -138,14 +142,8 @@ uploadRouter.post(
         throw new AppError(400, 'INVALID_GLB', validation.reason || 'File is not a valid Binary glTF (GLB v2)');
       }
 
-      const storage = getStorage();
-
-      // Store main model by content hash
-      const fileHash = await computeFileSha256(modelFile.path);
-      await storage.put(`${fileHash}.glb`, modelFile.path);
-
-      // 3. Process preview file (if provided or required for paid model)
-      let previewHash: string | null = null;
+      // 2b. Check the preview and poster BEFORE anything is stored, so a bad one cannot leave the main file
+      // behind in permanent storage (storage is content-addressed and shared, so it is never deleted on error).
       if (previewFile) {
         if (previewFile.size > env.maxPreviewSizeBytes) {
           throw new AppError(413, 'FILE_TOO_LARGE', `Preview file exceeds limit of ${env.maxPreviewSizeBytes} bytes`);
@@ -154,12 +152,8 @@ uploadRouter.post(
         if (!previewValidation.valid) {
           throw new AppError(400, 'INVALID_GLB', 'Preview file is not a valid GLB (glTF v2)');
         }
-        previewHash = await computeFileSha256(previewFile.path);
-        await storage.put(`${previewHash}.glb`, previewFile.path);
       }
 
-      // 4. Process poster image (optional)
-      let posterHash: string | null = null;
       const posterFile = files?.['poster']?.[0];
       if (posterFile) {
         if (posterFile.size > env.maxPosterSizeBytes) {
@@ -170,8 +164,62 @@ uploadRouter.post(
         if (!allowedMime.includes(posterFile.mimetype) && !['.webp', '.png', '.jpg', '.jpeg'].includes(ext)) {
           throw new AppError(400, 'INVALID_POSTER', 'Poster must be a valid image file (.webp, .png, or .jpg)');
         }
+        try {
+          const webpBuffer = await sharp(posterFile.path).webp({ quality: 82 }).toBuffer();
+          await fsp.writeFile(posterFile.path, webpBuffer);
+        } catch {
+          throw new AppError(
+            400,
+            'INVALID_POSTER',
+            'Poster could not be processed as a valid image (.webp, .png, or .jpg)'
+          );
+        }
+      }
+
+      const modelId = crypto.randomUUID();
+      const ownerId = req.user!.id;
+
+      // Embed platform origin license & vertex steganography watermark (purchaseId: 'original')
+      const rawGlbBuffer = await fsp.readFile(modelFile.path);
+      let finalFileSize = modelFile.size;
+      try {
+        const { buffer: watermarkedBuffer } = await embedLicenseAndWatermark(rawGlbBuffer, {
+          modelId,
+          ownerId,
+          license: normalizedLicense,
+          purchaseId: 'original',
+        });
+        await fsp.writeFile(modelFile.path, watermarkedBuffer);
+        finalFileSize = watermarkedBuffer.length;
+      } catch (wmErr: any) {
+        if (wmErr instanceof AppError) throw wmErr;
+        throw new AppError(400, 'INVALID_GLB', wmErr?.message || 'Failed to parse and watermark GLB structure');
+      }
+
+      storage = getStorage();
+
+      // Store main model under <model_id>/model.<hash>.glb
+      const fileHash = await computeFileSha256(modelFile.path);
+      const mainKey = assetKey(modelId, 'model', fileHash);
+      await storage.put(mainKey, modelFile.path);
+      uploadedKeys.push(mainKey);
+
+      // 3. Store the preview file (already checked above)
+      let previewHash: string | null = null;
+      if (previewFile) {
+        previewHash = await computeFileSha256(previewFile.path);
+        const previewKey = assetKey(modelId, 'preview', previewHash);
+        await storage.put(previewKey, previewFile.path);
+        uploadedKeys.push(previewKey);
+      }
+
+      // 4. Store the poster image (already validated & converted to WebP above)
+      let posterHash: string | null = null;
+      if (posterFile) {
         posterHash = await computeFileSha256(posterFile.path);
-        await storage.put(`${posterHash}.webp`, posterFile.path);
+        const posterKey = assetKey(modelId, 'poster', posterHash);
+        await storage.put(posterKey, posterFile.path);
+        uploadedKeys.push(posterKey);
       }
 
       // 5. Sanitize Tags
@@ -190,38 +238,67 @@ uploadRouter.post(
       }
       parsedTags = Array.from(new Set(parsedTags));
 
-      const ownerId = req.user!.id;
       const parsedCurrency = String(currency || 'USD').trim().toUpperCase().slice(0, 3);
 
-      // 6. Insert record into database
-      const result = await db.query(
-        `INSERT INTO models (
-          owner_id, title, description, tags, license,
-          file_hash, file_size, preview_hash, poster_hash,
-          price_cents, currency
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-        RETURNING *`,
-        [
-          ownerId,
-          title.trim(),
-          description.trim(),
-          parsedTags,
-          normalizedLicense,
-          fileHash,
-          modelFile.size,
-          previewHash,
-          posterHash,
-          parsedPrice,
-          parsedCurrency,
-        ]
-      );
+      // 6. Insert record into database (with Supabase REST fallback)
+      let insertedModel: any;
+      try {
+        const result = await db.query(
+          `INSERT INTO models (
+            id, owner_id, title, description, tags, license,
+            file_hash, file_size, preview_hash, poster_hash,
+            price_cents, currency
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+          RETURNING *`,
+          [
+            modelId,
+            ownerId,
+            title.trim(),
+            description.trim(),
+            parsedTags,
+            normalizedLicense,
+            fileHash,
+            finalFileSize,
+            previewHash,
+            posterHash,
+            parsedPrice,
+            parsedCurrency,
+          ]
+        );
+        insertedModel = result.rows[0];
+      } catch (dbErr) {
+        if (!supabase) throw dbErr;
+        const { data, error } = await supabase
+          .from('models')
+          .insert({
+            id: modelId,
+            owner_id: ownerId,
+            title: title.trim(),
+            description: description.trim(),
+            tags: parsedTags,
+            license: normalizedLicense,
+            file_hash: fileHash,
+            file_size: finalFileSize,
+            preview_hash: previewHash,
+            poster_hash: posterHash,
+            price_cents: parsedPrice,
+            currency: parsedCurrency,
+          })
+          .select()
+          .single();
+        if (error) throw dbErr;
+        insertedModel = data;
+      }
 
       res.status(201).json({
         message: 'Model uploaded successfully',
-        model: result.rows[0],
+        model: insertedModel,
       });
     } catch (err) {
       await cleanupFiles(files);
+      if (storage && uploadedKeys.length > 0) {
+        await Promise.all(uploadedKeys.map((key) => storage!.delete(key).catch(() => undefined)));
+      }
       next(err);
     }
   }

@@ -15,6 +15,7 @@ interface ModelRow {
   id: string;
   owner_id: string;
   creator: string;
+  creator_avatar_hash?: string | null;
   title: string;
   description: string | null;
   tags: string[];
@@ -39,6 +40,9 @@ function formatModelResponse(row: ModelRow) {
     id: row.id,
     ownerId: row.owner_id,
     creator: row.creator,
+    creatorAvatarUrl: row.creator_avatar_hash?.trim()
+      ? `${env.cdnServiceUrl}/cdn/users/${row.owner_id}/avatar.webp?v=${row.creator_avatar_hash.trim().slice(0, 12)}`
+      : undefined,
     title: row.title,
     description: row.description ?? '',
     tags: row.tags ?? [],
@@ -105,44 +109,46 @@ modelsRouter.get('/', async (req, res, next) => {
 
     const whereClause = `WHERE ${conditions.join(' AND ')}`;
 
-    const countResult = await db.query<{ total: string }>(
-      `SELECT COUNT(*)::text AS total
-       FROM models m
-       JOIN users u ON u.id = m.owner_id
-       ${whereClause}`,
-      params,
-    );
-    const total = Number.parseInt(countResult.rows[0]?.total ?? '0', 10);
-
     const offset = (page - 1) * pageSize;
     const listParams = [...params, pageSize, offset];
 
-    const listResult = await db.query<ModelRow>(
-      `SELECT
-         m.id,
-         m.owner_id,
-         u.display_name AS creator,
-         m.title,
-         m.description,
-         m.tags,
-         m.license,
-         m.file_hash,
-         m.file_size,
-         m.preview_hash,
-         m.poster_hash,
-         m.price_cents,
-         m.currency,
-         m.view_count,
-         m.download_count,
-         (SELECT COUNT(*) FROM likes l WHERE l.model_id = m.id) AS like_count,
-         m.created_at
-       FROM models m
-       JOIN users u ON u.id = m.owner_id
-       ${whereClause}
-       ORDER BY m.created_at DESC
-       LIMIT $${listParams.length - 1} OFFSET $${listParams.length}`,
-      listParams,
-    );
+    const [countResult, listResult] = await Promise.all([
+      db.query<{ total: string }>(
+        `SELECT COUNT(*)::text AS total
+         FROM models m
+         JOIN users u ON u.id = m.owner_id
+         ${whereClause}`,
+        params,
+      ),
+      db.query<ModelRow>(
+        `SELECT
+           m.id,
+           m.owner_id,
+           u.display_name AS creator,
+           u.avatar_hash AS creator_avatar_hash,
+           m.title,
+           m.description,
+           m.tags,
+           m.license,
+           m.file_hash,
+           m.file_size,
+           m.preview_hash,
+           m.poster_hash,
+           m.price_cents,
+           m.currency,
+           m.view_count,
+           m.download_count,
+           (SELECT COUNT(*) FROM likes l WHERE l.model_id = m.id) AS like_count,
+           m.created_at
+         FROM models m
+         JOIN users u ON u.id = m.owner_id
+         ${whereClause}
+         ORDER BY m.created_at DESC
+         LIMIT $${listParams.length - 1} OFFSET $${listParams.length}`,
+        listParams,
+      ),
+    ]);
+    const total = Number.parseInt(countResult.rows[0]?.total ?? '0', 10);
 
     res.json({
       items: listResult.rows.map(formatModelResponse),
@@ -168,6 +174,7 @@ modelsRouter.get('/:id', async (req, res, next) => {
          m.id,
          m.owner_id,
          u.display_name AS creator,
+         u.avatar_hash AS creator_avatar_hash,
          m.title,
          m.description,
          m.tags,

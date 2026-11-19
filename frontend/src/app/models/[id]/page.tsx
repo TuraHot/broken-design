@@ -1,14 +1,17 @@
-// Model detail — preview, description, how to embed it, owner and license rules. Buying and downloading are not connected yet.
+// Model detail — 3D preview from CDN, description, embed snippets, owner, license rules, and download/buy actions.
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { Box, Download, Heart } from 'lucide-react';
+import { Download } from 'lucide-react';
 import ModelCard from '@/components/gallery/ModelCard';
 import EmbedSnippets from '@/components/model/EmbedSnippets';
 import LicenseRules from '@/components/model/LicenseRules';
 import ModelActions from '@/components/model/ModelActions';
-import { fetchModel, fetchMoreFromCreator } from '@/lib/api';
-import { creatorHandle, initials } from '@/lib/creators';
+import ModelLikeButton from '@/components/model/ModelLikeButton';
+import ModelPreview from '@/components/model/ModelPreview';
+import UserAvatar from '@/components/ui/UserAvatar';
+import { fetchCoreApiModels, fetchModel, fetchMoreFromCreator } from '@/lib/api';
+import { creatorHandle } from '@/lib/creators';
 import { formatCount, formatPrice } from '@/lib/format';
 
 type Props = { params: Promise<{ id: string }> };
@@ -22,7 +25,8 @@ const CARD = 'rounded-lg border border-white/10 bg-white/5 p-5';
 const LABEL = 'font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70';
 
 export default async function ModelDetailPage({ params }: Props) {
-  const model = await fetchModel((await params).id);
+  const { id } = await params;
+  const [model] = await Promise.all([fetchModel(id), fetchCoreApiModels()]);
   if (!model) notFound();
 
   const more = await fetchMoreFromCreator(model);
@@ -41,14 +45,7 @@ export default async function ModelDetailPage({ params }: Props) {
       </nav>
 
       <div className="mt-6 grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] lg:items-start">
-        {/* Stand-in until the 3D viewer is wired to the CDN. */}
-        <div
-          aria-hidden
-          className="flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.06] text-white/40"
-        >
-          <Box className="h-8 w-8" />
-          <span className="text-sm">3D preview</span>
-        </div>
+        <ModelPreview id={model.id} title={model.title} paid={!free} posterUrl={model.posterUrl} />
 
         <aside className="lg:sticky lg:top-24 lg:col-start-2 lg:row-span-3 lg:row-start-1">
           <div className={`${CARD} space-y-5`}>
@@ -70,15 +67,15 @@ export default async function ModelDetailPage({ params }: Props) {
               </div>
             </div>
 
-            <ModelActions free={free} priceLabel={formatPrice(model.priceCents)} />
+            <ModelActions
+              modelId={model.id}
+              title={model.title}
+              free={free}
+              priceLabel={formatPrice(model.priceCents)}
+            />
 
             <div className="flex items-center gap-3 border-t border-white/10 pt-5">
-              <span
-                aria-hidden
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-hud/30 font-mono text-sm text-hud"
-              >
-                {initials(model.creator)}
-              </span>
+              <UserAvatar name={model.creator} avatarUrl={model.creatorAvatarUrl} size="md" />
               <div className="min-w-0">
                 <Link
                   href={`/creators/${creatorHandle(model.creator)}`}
@@ -90,12 +87,8 @@ export default async function ModelDetailPage({ params }: Props) {
               </div>
             </div>
 
-            <dl className="flex flex-wrap gap-x-5 gap-y-2 border-t border-white/10 pt-5 font-mono text-[12px] text-white/65">
-              <div className="flex items-center gap-1.5">
-                <Heart aria-hidden className="h-4 w-4" />
-                <dt className="sr-only">Likes</dt>
-                <dd>{formatCount(model.likeCount)}</dd>
-              </div>
+            <dl className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-white/10 pt-5 font-mono text-[12px] text-white/65">
+              <ModelLikeButton modelId={model.id} initialCount={model.likeCount} />
               <div className="flex items-center gap-1.5">
                 <Download aria-hidden className="h-4 w-4" />
                 <dt className="sr-only">Downloads</dt>

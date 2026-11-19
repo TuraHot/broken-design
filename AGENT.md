@@ -1,0 +1,276 @@
+# AGENT.md — Lixyte (Broken Design) Engineering Specification, Agent Runbook & Development Roadmap
+
+> **MANDATORY RULE FOR ALL AI AGENTS (กฎบังคับสำหรับ AI Agent ทุกตัว — Antigravity, Gemini, Claude, Cursor, Copilot, Codex, Windsurf):**
+> ก่อนเริ่มแก้ไขโค้ด สร้างไฟล์ หรือรันคำสั่งใดๆ ในโปรเจกต์นี้ **Agent ทุกตัวต้องอ่านและปฏิบัติตามข้อกำหนดในไฟล์ `AGENT.md` นี้ทุกครั้ง** เพื่อให้เข้าใจสถาปัตยกรรม กฎเหล็กด้านความปลอดภัย (Security Invariants) สถานะงานปัจจุบัน และเส้นทางการพัฒนา (Development Roadmap) ของโปรเจกต์ไปในทิศทางเดียวกัน
+
+---
+
+## 1. ภาพรวมระบบและเป้าหมาย (Product Vision & Overview)
+
+**Lixyte (Broken Design)** คือแพลตฟอร์ม **"Google Fonts สำหรับโลก 3 มิติ"** — คลังจัดเก็บ ค้นหา ซื้อขายรายชิ้น และสตรีมไฟล์โมเดล 3 มิติมาตรฐาน `.glb` (Binary glTF 2.0) ข้ามโดเมนผ่าน CDN:
+- **นักพัฒนาเว็บ (Web Developer / Buyer):** ค้นหาโมเดลใน Gallery, ปรับแต่งใน Playground, คัดลอกโค้ด `<vm-model>` หรือ `<iframe>` ไปแปะบนเว็บตัวเองเพื่อสตรีมจาก CDN ของเราโดยไม่ต้องโฮสต์ไฟล์เอง หรือกดดาวน์โหลดไฟล์ `.glb` ที่ฝังลายน้ำดิจิทัลและใบอนุญาตเฉพาะผู้ซื้อ
+- **ครีเอเตอร์ (Creator / Seller):** เปิดโหมดคนขาย (`is_seller = true`) ในบัญชีเดิมเพื่ออัปโหลดไฟล์ `.glb` (ฟรีหรือตั้งราคาขาย), จับภาพหน้าปก (`poster.webp`) อัตโนมัติจาก `<model-viewer>.toBlob()` และดูยอดขายในแดชบอร์ดคนขาย
+- **แอดมิน (Admin):** ดูแลระบบผ่านแดชบอร์ดแอดมิน (ซ่อน/คืนโมเดล, ระงับ/คืนบัญชีผู้ใช้, ดูรายการสั่งซื้อทั้งระบบ) โดยตั้งสิทธิ์ในฐานข้อมูลเท่านั้น สมัครเองไม่ได้ และห้ามซื้อ/ขายโมเดล
+
+---
+
+## 2. สถาปัตยกรรม Microservices (System Architecture)
+
+| เซอร์วิส / โฟลเดอร์ | พอร์ต | เทคโนโลยีหลัก | หน้าที่รับผิดชอบ |
+| :--- | :---: | :--- | :--- |
+| **`frontend/`** | `3000` | Next.js 15 (App Router), React 19, Tailwind CSS 3, `@google/model-viewer` v4 | หน้า Gallery, หน้ารายละเอียด `/models/[id]`, หน้าอัปโหลด `/upload`, หน้า Iframe `/embed/[id]`, สคริปต์ `public/embed.js` (`<vm-model>`), หน้าจ่ายจำลอง `/pay/mock/[id]`, แดชบอร์ด `/me`, `/seller`, `/admin/*` |
+| **`services/core-api/`** | `4000` | Express 5, TypeScript, PostgreSQL (`pg`), JWT, `bcrypt`, `zod` | ระบบสมาชิก (`/api/auth/*`), แคตตาล็อกและการค้นหา (`/api/models/*`), ระบบซื้อรายชิ้นและ `embed_key` (`/api/models/:id/checkout`, `/api/me/purchases`), ระบบคนขาย (`/api/seller/*`), ระบบแอดมิน (`/api/admin/*`) |
+| **`services/cdn-service/`** | `4001` | Express 5, TypeScript, `multer`, `@gltf-transform/core`, `@supabase/supabase-js`, `express-rate-limit` | รับอัปโหลดไฟล์ `.glb`/`poster.webp` (`POST /api/models`), ตรวจ Magic Bytes (`glTF` v2), ฝังและตรวจสอบลายน้ำ 2 ชั้น (`glbWatermark.ts`), จัดเก็บแบบ Content-Addressable (`sha256`), และสตรีมไฟล์ผ่าน `/cdn/models/*` (HTTP Range `206`/`416`, ETag/`304`, CORS, Cache, Rate Limit) |
+| **`supabase/`** | `5432` | Supabase PostgreSQL & Supabase Storage | ฐานข้อมูลหลัก (`users`, `models`, `purchases`, `likes`, `comments`) และ Cloud Object Storage (`models` bucket) |
+
+---
+
+## 3. กฎเหล็กทางธุรกิจและความปลอดภัย (Core Invariants & Access Rules)
+
+Agent ทุกตัว **ห้ามละเมิด** กฎต่อไปนี้ในทุกกรณี:
+
+### 3.1 ตารางสิทธิ์การเข้าถึงโมเดล (Access Control Matrix)
+
+| สถานะโมเดล / ประเภท | แสดงใน Gallery | สตรีมผ่าน `/preview.glb` หรือ `/:hash.glb` | สตรีมไฟล์เต็มผ่าน `/file.glb?key=` | ดาวน์โหลดผ่าน `/download` |
+| :--- | :--- | :--- | :--- | :--- |
+| **โมเดลฟรี (`price_cents = 0`)** | แสดงทุกคน | ทุกคน (ส่งไฟล์เต็ม) | ทุกคน (ไม่ต้องใช้ `key`) | ทุกคน (ไม่ต้องล็อกอิน) |
+| **โมเดลเสียเงิน (`price_cents > 0`)** | แสดงทุกคน | ทุกคน (ส่งเฉพาะไฟล์ `preview_hash` เท่านั้น **ห้ามส่ง `file_hash` เด็ดขาด**) | เฉพาะผู้มี `embed_key` ที่สถานะ `paid` และตรงกับ `model_id` | ต้องล็อกอิน (`Bearer JWT`) + ซื้อแล้ว (`status = 'paid'`) หรือเป็นเจ้าของโมเดล |
+| **โมเดลถูกลบ (`deleted_at IS NOT NULL`)** | ไม่แสดง (`404`) | ปิดกั้น (`404 MODEL_NOT_FOUND`) | **ผู้ซื้อเดิมยังสตรีมได้** (Soft Delete) | **ผู้ซื้อเดิม/เจ้าของยังดาวน์โหลดได้** |
+| **โมเดลถูกซ่อน (`hidden_at IS NOT NULL`)** | ไม่แสดง | **ปิดกั้นทันที (`403 MODEL_UNAVAILABLE`)** | **ปิดกั้นทันที (`403`) แม้ซื้อแล้ว** | **ปิดกั้นทันที (`403`) แม้ซื้อแล้ว** |
+| **เจ้าของถูกระงับ (`owner.suspended_at IS NOT NULL`)** | ไม่แสดง | **ปิดกั้นทันที (`403 MODEL_UNAVAILABLE`)** | **ปิดกั้นทันที (`403`) แม้ซื้อแล้ว** | **ปิดกั้นทันที (`403`) แม้ซื้อแล้ว** |
+
+### 3.2 กฎความปลอดภัยสำคัญ (Security Rules)
+1. **ตรวจสิทธิ์ที่ Backend เสมอ:** ห้ามตรวจบทบาท (`is_seller`, `role === 'admin'`, `suspended_at`) แค่ฝั่ง Frontend หรือเชื่อเฉพาะ payload ใน JWT สำหรับการกระทำสำคัญ ต้องเช็กสถานะล่าสุดจากฐานข้อมูลเสมอ
+2. **Constant-Time `embed_key` Verification:** การเปรียบเทียบ `embed_key` ต้องใช้ `verifyEmbedKeyConstantTime` (`crypto.timingSafeEqual`) และเมื่อผู้ซื้อกด Regenerate Key (`POST /api/purchases/:id/regenerate-key`) คีย์เก่าต้องใช้งานไม่ได้ทันที
+3. **GLB Magic Bytes & Content-Addressable Storage:**
+   - ตรวจ 12 ไบต์แรกของไฟล์ `.glb` เสมอ (`magic === 0x46546C67` (`"glTF"`), `version === 2`, และ `totalLength === file.size`)
+   - จำกัดขนาดไฟล์: Main `.glb` ≤ `50 MB`, Preview `.glb` ≤ `5 MB`, Poster `.webp/.png/.jpg` ≤ `1 MB`
+   - โมเดลเสียเงิน (`price_cents > 0`) **บังคับ** ต้องแนบไฟล์ `preview` เสมอ
+   - จัดเก็บไฟล์ใน Storage Bucket `models` แบบแยกโฟลเดอร์ตาม `model_id` โดยตั้งชื่อด้วย `sha256`: `<model_id>/model.<hash>.glb`, `<model_id>/preview.<hash>.glb`, และ `<model_id>/poster.<hash>.webp` (พร้อมคงการอ่าน Fallback จาก `<hash>.glb` / `<hash>.webp` เดิมเพื่อไม่ให้กระทบไฟล์เก่า) และห้ามนำชื่อไฟล์จากผู้ใช้มาเป็น path
+   - รูปภาพหน้าปก (`poster`) ที่อัปโหลดเข้ามา (`.webp`, `.png`, `.jpg`) จะถูกแปลงเป็น `.webp` ที่บีบอัดแล้วโดยอัตโนมัติก่อนคำนวณ `sha256` และจัดเก็บ
+4. **Multi-Layer GLB Watermarking (`glbWatermark.ts`):**
+   - ทุกไฟล์ `.glb` ที่อัปโหลดผ่าน `POST /api/models` ต้องผ่าน `embedLicenseAndWatermark` เพื่อฝังลายน้ำต้นฉบับ (`purchaseId: 'original'`) ก่อนบันทึกลง Storage
+   - เมื่อผู้ซื้อที่ชำระเงินแล้ว (`status = 'paid'`) ดาวน์โหลดไฟล์ผ่าน `GET /cdn/models/:id/download` ระบบต้องฝัง `purchaseId` และ `license_type` ของผู้ซื้อลงในไฟล์ `.glb` (ทั้งใน `asset.extras` และพิกัด `POSITION` 64 จุดแรก) พร้อมบันทึก `watermark_hash` ลงตาราง `purchases`
+5. **Mock Payment Guard:** ระบบจ่ายเงินจำลองทำงานเฉพาะเมื่อ `PAYMENT_PROVIDER=mock` เท่านั้น ห้ามเปิดใน Production
+6. **Standard Error Format:** ทุก API และ CDN ต้องตอบ Error ในรูปแบบเดียวกันเสมอ และ Error ของ CDN ต้องตั้ง `Cache-Control: no-store`:
+   ```json
+   {
+     "error": {
+       "code": "ERROR_CODE",
+       "message": "Human-readable description"
+     }
+   }
+   ```
+
+---
+
+## 4. สเปกของแต่ละเซอร์วิสและ API Contract
+
+### 4.1 CDN Service (`services/cdn-service/` — พอร์ต `4001`)
+- **`POST /api/models`** (`requireAuth`, `requireSeller`, `multipart/form-data`):
+  - Fields: `file` (required `.glb`), `preview` (required ถ้า `price_cents > 0`), `poster` (optional image), `title`, `description`, `tags`, `license` (`CC0` | `CC-BY` | `CC-BY-NC` | `COMMERCIAL`), `price_cents`, `currency`
+  - ตรวจไฟล์ด้วย `validateGlbFile` → ฝังลายน้ำต้นฉบับด้วย `embedLicenseAndWatermark` (`purchaseId: 'original'`) → แปลง `poster` (`.png`/`.jpg`/`.webp`) เป็น `.webp` ด้วย `sharp` → คำนวณ `sha256` → บันทึกลง Storage ใต้ `<model_id>/{model,preview,poster}.<hash>.<ext>` (`LocalDiskStorage` / `SupabaseStorage`) และฐานข้อมูล (พร้อมลบไฟล์ที่อัปโหลดออกอัตโนมัติหากบันทึกฐานข้อมูลไม่สำเร็จ)
+- **`GET /cdn/models/:id/:hash.glb`**:
+  - สตรีมไฟล์ตาม Content Hash (อนุญาตเฉพาะไฟล์ของโมเดลฟรี หรือ `preview_hash` ของโมเดลเสียเงิน หากขอ `file_hash` ของโมเดลเสียเงินจะตอบ `401 KEY_REQUIRED`)
+  - Headers: `Cache-Control: public, max-age=31536000, immutable`, `Accept-Ranges: bytes`, `ETag: "<hash>"`, `Cross-Origin-Resource-Policy: cross-origin`
+- **`GET /cdn/models/:id/preview.glb`**:
+  - สตรีมไฟล์ตัวอย่างสาธารณะ (โมเดลฟรีส่ง `file_hash`, โมเดลเสียเงินส่ง `preview_hash`)
+  - Headers: `Cache-Control: public, max-age=300` (5 นาที เพื่อให้การซ่อนโมเดลหรือระงับบัญชีมีผลเร็ว)
+- **`GET /cdn/models/:id/file.glb?key=YOUR_EMBED_KEY`**:
+  - สตรีมไฟล์เต็มของโมเดล (โมเดลเสียเงินต้องส่ง `key` ที่ถูกต้องและสถานะ `paid`)
+  - Headers: `Cache-Control: private, no-store`
+  - มี Rate Limit ป้องกันการสุ่มคีย์ผิดซ้ำๆ (`keyFailureLimiter`)
+- **`GET /cdn/models/:id/download`**:
+  - ดาวน์โหลดไฟล์จริง (`Content-Disposition: attachment; filename="..."; filename*=UTF-8''...`)
+  - โมเดลเสียเงินต้องส่ง `Authorization: Bearer <token>` ของผู้ซื้อ (`status = 'paid'`) หรือเจ้าของโมเดล
+  - สำหรับผู้ซื้อที่ชำระเงินแล้ว จะฝัง `purchaseId` + `license_type` ลงในไฟล์ `.glb` และอัปเดต `purchases.watermark_hash` ก่อนส่งไฟล์กลับ
+  - เพิ่มค่า `download_count + 1` เมื่อสตรีมเริ่มต้นจากไบต์ที่ 0 (ไม่นับซ้ำเมื่อ Resume Range chunk)
+- **`GET /cdn/models/:id/poster.webp`**:
+  - สตรีมภาพปก (`image/webp`, `Cache-Control: public, max-age=300`)
+- **`POST /cdn/verify-watermark` (รวมถึง `/verify-watermark` และ `/api/verify-watermark`)**:
+  - รับไฟล์ `.glb` (`multipart/form-data` หรือ `model/gltf-binary`) พร้อม `expectedModelId` (optional)
+  - ตรวจสอบทั้ง Layer 1 (`asset.extras` HMAC signature) และ Layer 2 (Vertex Steganography 64 จุดแรก) แล้วคืนค่า `{ isValidMetadata, isValidVertexWatermark, extractedMetadata, vertexBitMatchRatio }`
+- **HTTP Range & ETag:** ทุก `/cdn/*` route รองรับ `HEAD`, `If-None-Match` (`304`), `If-Range`, และ `Range: bytes=start-end` / `start-` / `-suffix` (`206 Partial Content` หรือ `416 Range Not Satisfiable`)
+- **Supabase Dual-Mode Support:**
+  - `db.ts`, `cdn.service.ts`, และ `upload.routes.ts` รองรับทั้งการคิวรีผ่าน PostgreSQL Pool (`DATABASE_URL`) และสลับไปใช้ `@supabase/supabase-js` (`SUPABASE_URL` + `SUPABASE_KEY`) อัตโนมัติหาก Pool เชื่อมต่อไม่ได้
+  - `openStream()` รองรับการดึงไฟล์ทั้งจาก `LocalDiskStorage` และ `SupabaseStorage` พร้อม Fallback อัตโนมัติ
+
+### 4.2 Core API (`services/core-api/` — พอร์ต `4000`)
+- **Auth (`/api/auth`):**
+  - `POST /api/auth/check-email` — ตรวจสอบว่าอีเมลมีบัญชีในระบบแล้วหรือไม่ (`{ exists: boolean }`)
+  - `POST /api/auth/register` — สมัครสมาชิก (`bcrypt` + ออก JWT)
+  - `POST /api/auth/login` — ล็อกอิน (บล็อกผู้ใช้ที่ `suspended_at IS NOT NULL` ด้วย `403 ACCOUNT_SUSPENDED` โดยข้อความบอกเหตุผลและวันหมดเวลา เพราะผู้ถูกระงับเข้ามาอ่านใบเตือนในเว็บไม่ได้ ถ้า `suspended_until` ผ่านแล้วจะปลดและให้ล็อกอินต่อ)
+- **Models (`/api/models`):**
+  - `GET /api/models?q=&tag=&license=&price=free|paid&page=` — ค้นหา กรอง แบ่งหน้า (กรอง `hidden_at IS NULL AND deleted_at IS NULL AND u.suspended_at IS NULL`)
+  - `GET /api/models/:id` — รายละเอียดโมเดล (ไม่ส่ง `fileUrl` ของโมเดลเสียเงิน)
+  - `PATCH /api/models/:id` — แก้ไขรายละเอียด/ราคา/สัญญาอนุญาต *(ยังเป็น TODO stub — รอดำเนินการ)*
+  - `DELETE /api/models/:id` — Soft Delete (`deleted_at = NOW()`, เฉพาะเจ้าของหรือแอดมิน)
+- **Payments (`/api`):**
+  - **บัญชีที่ถูกระงับซื้อหรือแก้คีย์ไม่ได้:** `checkout`, `confirm-mock`, `pay-mock` และ `regenerate-key` ใช้ middleware `requireNotSuspended` (`auth.middleware.ts`) ที่ถามฐานข้อมูลทุกครั้ง (token อยู่ได้ 1 วัน) ตอบ `403 ACCOUNT_SUSPENDED` / `401` ถ้าไม่พบบัญชี และไม่ปล่อยผ่านเมื่อฐานข้อมูลผิดพลาด ห้ามใส่กับ `/api/me/notifications` เพราะผู้ถูกระงับต้องอ่านเหตุผลได้
+  - `POST /api/models/:id/checkout` — สร้างรายการสั่งซื้อรายชิ้น (`status = 'pending'`), ล็อก `amount_cents`, `currency`, `license_type` จากตาราง `models`, และสุ่ม `embed_key` 48 ตัวอักษร hex (`crypto.randomBytes(24)`)
+  - `POST /api/purchases/:id/confirm-mock` (และ `/api/models/:id/pay-mock`) — ยืนยันจ่ายเงินจำลอง (`status = 'paid'`, `paid_at = NOW()`) เมื่อ `PAYMENT_PROVIDER=mock`
+  - `GET /api/me/purchases` — ดึงรายการโมเดลที่ซื้อแล้วพร้อม `embed_key`, `amount_cents`, `currency`, `license_type`, `watermark_hash`, `paid_at`
+  - `POST /api/purchases/:id/regenerate-key` — สร้าง `embed_key` ใหม่แทนที่รหัสเดิมทันที
+- **Seller (`/api/seller`):**
+  - `POST /api/seller/enable` — เปิดโหมดคนขาย (`is_seller = true`)
+  - `GET /api/seller/status` — ตรวจสถานะคนขาย
+  - `GET /api/seller/models` — รายการโมเดลของคนขาย
+  - `GET /api/seller/sales` — สรุปรายได้และประวัติการขาย
+- **Admin (`/api/admin`):** *(ทุก Route ตรวจ `role === 'admin'` และ `suspended_at IS NULL` จากฐานข้อมูลจริงผ่าน `requireActiveAdmin`)*
+  - `GET /api/admin/overview` — สรุปยอดรวมระบบ, สถิติ 7 วันล่าสุด, สัดส่วน Free/Paid & License, Top 5 โมเดล, รายการซื้อและผู้ใช้ล่าสุด, คำร้องเรียนที่เปิดอยู่
+  - `GET /api/admin/users` — รายชื่อผู้ใช้ (ค้นหาด้วย `q` + แบ่งหน้า `page`, `pageSize`)
+  - `PATCH /api/admin/users/:id/suspend` — ระงับหรือคืนสิทธิ์บัญชีผู้ใช้ (`{ suspended, reason?, until? }`: ระงับต้องมี `reason` 10–1000 ตัวอักษร และ `until` เป็นเวลาในอนาคตไม่เกิน 365 วัน (ไม่ส่ง = ระงับจนกว่าแอดมินจะปลด); ปลดระงับ `reason` ไม่บังคับและห้ามมี `until`; ห้ามระงับตัวเอง และ **ห้ามระงับบัญชีแอดมิน** (`403 CANNOT_SUSPEND_ADMIN` เงื่อนไขอยู่ใน SQL ด้วย แอดมินสองคนจะได้ไม่ระงับกันจนไม่มีใครปลดได้ แต่แอดมินที่เคยถูกระงับไว้ก่อนยังปลดได้)) อัปเดตผู้ใช้ + บันทึกประวัติ (`user_suspensions`) + ส่งใบเตือน (`notifications`) ใน SQL statement เดียว
+  - `GET /api/admin/users/:id/suspensions` และ `GET /api/admin/models/:id/history` — ประวัติการระงับ/ปลด/หมดเวลา และประวัติของโมเดล (แก้ license, ซ่อน/คืนสถานะ) ใครทำ เมื่อไร เหตุผล ล่าสุด 50 รายการ อ่านอย่างเดียว; `GET /api/admin/users` ส่ง `suspendedUntil` และ `suspensionReason` ด้วย
+  - **Suspension sweeper** (`modules/admin/suspensionSweeper.ts`) — core-api ปลด `suspended_at` ของผู้ที่ `suspended_until <= NOW()` ทุก 60 วินาที (และตอนเริ่มระบบ) พร้อมบันทึกประวัติ `expire` และส่งใบเตือน ทำให้จุดที่เช็ก `suspended_at` ทั้งหมด (core-api, cdn-service) ทำงานต่อได้โดยไม่ต้องแก้ ปลดช้าได้ไม่เกิน ~1 นาที
+  - `GET /api/admin/models` — รายการโมเดลทั้งหมดรวมโมเดลที่ซ่อนและถูกลบ
+  - `PATCH /api/admin/models/:id/hide` — ซ่อนหรือแสดงผลโมเดลคืน (`{ hidden, reason? }`: **ซ่อนต้องมี `reason` 10–1000 ตัวอักษร** เพราะซ่อนแล้วโมเดลหายจากแกลเลอรีและ CDN ปิดกั้นทุกคนรวมถึงผู้ซื้อ; คืนสถานะ `reason` ไม่บังคับ) อัปเดตโมเดล + บันทึกประวัติ (`model_visibility_changes`) + ส่งใบเตือนเจ้าของ (`model_hidden` / `model_restored`) ใน SQL statement เดียว ซ่อนโมเดลที่ซ่อนอยู่แล้ว (หรือคืนสถานะโมเดลที่แสดงอยู่) ไม่เขียนอะไรและตอบสถานะปัจจุบัน
+  - `PATCH /api/admin/models/:id/license` — แอดมินแก้ license ของโมเดล (`{ license, reason }` เหตุผล 10–1000 ตัวอักษร ห้ามเลือก license เดิม) แก้ + บันทึกประวัติ (`model_license_changes`) + ส่งใบเตือนให้เจ้าของ (`notifications`) ใน SQL statement เดียว ผู้ซื้อเดิมยังคง `purchases.license_type` ที่ซื้อไว้
+  - `GET /api/me/notifications`, `PATCH /api/me/notifications/:id/read`, `PATCH /api/me/notifications/read-all` — กล่องใบเตือนของเจ้าของ (ทุก query กรอง `user_id` ของผู้เรียกเสมอ)
+  - `GET /api/admin/purchases` — รายการสั่งซื้อทั้งหมดพร้อมข้อมูลผู้ซื้อ, โมเดล และ `watermark_hash` (ไม่ส่ง `embed_key`) กรองได้ด้วย `?status=paid|pending`, `?from=` และ `?to=` (`YYYY-MM-DD` รวมวันสุดท้าย ตามเวลา UTC) ร่วมกับ `q`
+  - `GET /api/admin/purchases/:id` — รายละเอียดการซื้อรายการเดียว (ผู้ซื้อ, โมเดล + เจ้าของ + license ปัจจุบัน, ยอดและ license ที่ล็อกตอนซื้อ, เวลา, `provider_session_id`, `watermark_hash`) อ่านอย่างเดียว ไม่ส่ง `embed_key`
+  - `GET /api/admin/complaints` — รายการคำร้องเรียน (กรอง `?status=` ได้, เรียง `open` และ `in_review` ขึ้นก่อน)
+  - `PATCH /api/admin/complaints/:id` — เปลี่ยนสถานะคำร้องเรียน (`open`, `in_review`, `resolved`, `dismissed`) พร้อมบันทึก `admin_note`
+- **Complaints (`/api/complaints`):**
+  - `POST /api/complaints` — ผู้ใช้ที่ล็อกอินส่งคำร้องเรียน (`category`: `model|account|purchase|other`, `modelId?`, `message` 10–2000 ตัวอักษร; จำกัดไม่เกิน 5 ครั้ง/ชั่วโมง ต่อผู้ใช้)
+
+### 4.3 Frontend & Embed Contract (`frontend/` — พอร์ต `3000`)
+- **Web Component (`public/embed.js`):**
+  ```html
+  <script type="module" src="http://localhost:3000/embed.js"></script>
+  <vm-model model-id="UUID" cdn-base="http://localhost:4001" key="OPTIONAL_KEY" auto-rotate camera-controls></vm-model>
+  ```
+  - รองรับ attributes: `model-id`, `key`, `cdn-base`, `auto-rotate`, `camera-controls`, `background`, `exposure`, `shadow-intensity`, `poster`, `loading` (ค่าเริ่มต้น `lazy`)
+  - **Graceful Fallback:** หาก `key` ผิดหรือถูก Regenerate จะสลับไปโหลด `/preview.glb` อัตโนมัติและแสดงป้าย `"ต้องซื้อเพื่อใช้งาน · แสดงไฟล์ตัวอย่าง (Preview)"` โดยไม่ crash
+- **Iframe Embed (`/embed/[id]?key=...`):**
+  - ตั้งค่า `Content-Security-Policy: frame-ancestors *;` ใน `next.config.ts` (ส่วนหน้าอื่นตั้ง `frame-ancestors 'self';`)
+  - ใช้คอมโพเนนต์ `EmbedIframeViewer.tsx` สตรีมจาก CDN พร้อมระบบสลับไป `preview.glb` เมื่อ `key` ไม่ถูกต้อง
+- **Model Detail (`/models/[id]`):**
+  - ใช้ `ModelPreview.tsx` สตรีมตัวอย่าง 3D จาก CDN พร้อมช่องทดสอบ `embed_key`
+  - ใช้ `ModelActions.tsx` ดาวน์โหลดไฟล์ผ่าน `fetch('/cdn/models/:id/download')` พร้อมแนบ `Authorization: Bearer <token>` แล้วแปลงเป็น `Blob` (เพราะ `<a href>` ธรรมดาส่ง Header ไม่ได้)
+  - ใช้ `EmbedSnippets.tsx` สร้างโค้ด `<vm-model>` และ `<iframe>`
+
+---
+
+## 5. โครงสร้างฐานข้อมูล (`supabase/schema.sql`)
+
+- **`users`**: `id (UUID)`, `email (UNIQUE)`, `password_hash`, `display_name`, `role ('user'|'creator'|'admin')`, `is_seller (BOOLEAN)`, `suspended_at (TIMESTAMPTZ)`, `suspended_until (TIMESTAMPTZ, ว่าง = ไม่มีกำหนด)`, `suspension_reason (TEXT)`, `created_at`
+- **`models`**: `id (UUID)`, `owner_id (FK users)`, `title`, `description`, `tags (TEXT[] GIN)`, `license ('CC0'|'CC-BY'|'CC-BY-NC'|'COMMERCIAL')`, `file_hash (CHAR(64))`, `file_size (BIGINT)`, `preview_hash (CHAR(64))`, `poster_hash (CHAR(64))`, `price_cents (INT)`, `currency (CHAR(3))`, `view_count`, `download_count`, `hidden_at`, `deleted_at`, `created_at`
+- **`purchases`**: `id (UUID)`, `user_id (FK users)`, `model_id (FK models)`, `status ('pending'|'paid')`, `amount_cents (INT)`, `currency (VARCHAR(10))`, `license_type (VARCHAR(50))`, `watermark_hash (VARCHAR(128))`, `paid_at (TIMESTAMPTZ)`, `provider_session_id`, `embed_key (VARCHAR(64) UNIQUE)`, `created_at`, `UNIQUE(user_id, model_id)`
+- **ตารางที่เพิ่มจากส่วนที่ 9 ของ `schema.sql` (`notifications`, `user_suspensions`, `model_license_changes`, `model_visibility_changes`):** ต้องสั่ง `ENABLE ROW LEVEL SECURITY` ทุกตาราง (ไม่ต้องมี policy) เพราะ Supabase เปิดตารางใน schema `public` ผ่าน REST API ผู้ที่มี anon key จะอ่าน/แก้แถวได้ตรง ๆ ถ้าไม่เปิด core-api ต่อผ่าน `DATABASE_URL` ด้วย role เจ้าของตารางซึ่งไม่ติด RLS จึงไม่กระทบ มีเทสต์ `src/scripts/schema.test.ts` กันตารางใหม่ที่ลืมเปิด (ตารางเดิม เช่น `users`, ยังไม่ได้เปิด RLS: ต้องตรวจก่อนเพราะ cdn-service อ่านผ่าน REST client)
+- **`likes`** & **`comments`**: ตารางสำหรับระบบถูกใจและคอมเมนต์
+- **`complaints`**: `id (UUID)`, `reporter_id (FK users)`, `category ('model'|'account'|'purchase'|'other')`, `model_id (FK models, ON DELETE SET NULL)`, `message (TEXT 10..2000)`, `status ('open'|'in_review'|'resolved'|'dismissed')`, `admin_note`, `handled_by (FK users)`, `handled_at (TIMESTAMPTZ)`, `created_at`
+- **Multi-Layer GLB Watermarking (`services/cdn-service/src/utils/glbWatermark.ts`):**
+  - **Layer 1 (Metadata Signature):** ฝัง `{ platform: 'Lixyte', modelId, ownerId, license, purchaseId, signature, issuedAt }` (HMAC-SHA256 ด้วย `WATERMARK_SECRET`) ลงใน `asset.extras` และ `asset.copyright`
+  - **Layer 2 (Vertex Steganography):** ฝังบิต 64 บิตแรกของ `signature` ลงในทศนิยมหลักที่ 4 ของพิกัดแกน X (`Math.round(x * 10000)`) ของจุดยอด 64 จุดแรกใน `POSITION` accessor ของ Mesh แรก
+  - **`POST /cdn/verify-watermark` (หรือ `/verify-watermark`):** รับไฟล์ `.glb` เพื่อตรวจสอบทั้ง `isValidMetadata` และ `isValidVertexWatermark` (`vertexBitMatchRatio`) แม้ `asset.extras` ถูกลบออกจากการ Export ใหม่
+
+**บัญชี Seed เริ่มต้น:**
+- Admin: `admin@brokendesign.com` / `Admin@BrokenDesign2026!`
+- Creator: `creator@brokendesign.com` / `Creator@BrokenDesign2026!` (หรือ `Admin@BrokenDesign2026!` ใน `schema.sql`)
+- โมเดลตัวอย่างบน Supabase (`ioqslrzmwsjogxsojwne`): ID `7524b129-938b-41c9-b66c-977a809e1c89` (`Lixyte Crystal Cube`)
+
+---
+
+## 6. เส้นทางการพัฒนาของโปรเจกต์ (Development Roadmap & Agent Action Plan)
+
+ส่วนนี้กำหนดแผนที่นำทาง (Roadmap) สำหรับ AI Agent ทุกตัว เพื่อให้สามารถรับงานต่อและพัฒนาฟีเจอร์ถัดไปได้อย่างเป็นระบบโดยไม่ชนกัน:
+- **ติดตามสถานะรายหน้า/รายไฟล์แบบละเอียดและผู้รับผิดชอบ:** ดู [`docs/TASKS.md`](./docs/TASKS.md)
+- **กฎการออกแบบ UI สำหรับงานฝั่ง Frontend:** อ่าน [`docs/DESIGN_SYSTEM.md`](./docs/DESIGN_SYSTEM.md) ก่อนแก้ไขหน้าเว็บทุกครั้ง
+- **รายการแก้ไขด้านความปลอดภัยก่อนเปิดใช้งานจริง (Pre-launch Security Hardening):** ดู [`docs/ARCHITECTURE.md` §5](./docs/ARCHITECTURE.md#5-known-issues-to-fix-before-launch)
+
+### 6.0 สรุปความคืบหน้าโครงการปัจจุบัน (Current Project Progress Summary — ภาพรวม ~96%)
+
+| ระบบ / โมดูล | ความคืบหน้า | สถานะและผลการทดสอบ | สิ่งที่ทำเสร็จแล้วและงานที่คงเหลือ |
+| :--- | :---: | :--- | :--- |
+| **Database & Cloud Storage** (`supabase/schema.sql` + Supabase Bucket `models`) | **100%** | ✅ พร้อมใช้งาน | ครบทุกตาราง (`users`, `models`, `purchases`, `likes`, `comments`, `complaints`), คอลัมน์ Single-item purchase & watermark, Seed accounts/model และอัปโหลดไฟล์ `.glb` ใน `storage_data/` ขึ้น Supabase bucket `models` เรียบร้อยแล้ว |
+| **CDN Service, Upload & Watermarking** (`services/cdn-service`) | **100%** | ✅ **23/23 tests** | `POST /api/models`, `GET /cdn/models/:id/:hash.glb`, `/preview.glb`, `/file.glb?key=`, `/download`, `/poster.webp`, `POST /cdn/verify-watermark`, HTTP Range (`206`/`416`), ETag (`304`), Rate Limit, Constant-time `embed_key` check, Dual-layer GLB Watermarking (Metadata HMAC + 64-vertex steganography) |
+| **Core API — Auth & CORS** (`services/core-api/src/modules/auth`, `config/cors.ts`) | **100%** | ✅ **6/6 tests** | `POST /api/auth/check-email`, `POST /api/auth/register`, `POST /api/auth/login` (**2/2**), และ CORS `localhost`/`127.0.0.1` handling (**4/4**) |
+| **Core API — Models** (`services/core-api/src/modules/models`) | **90%** | ✅ ใช้งานได้ (ขาด `PATCH`) | `GET /api/models` (search, tag, license, price, pagination), `GET /api/models/:id` (ซ่อน `fileUrl` สำหรับโมเดลเสียเงิน), `DELETE /api/models/:id` (Soft delete) \| **คงเหลือ:** `PATCH /api/models/:id` (แก้ไขชื่อ/รายละเอียด/ราคา/สัญญาอนุญาต — ยังเป็น TODO stub) |
+| **Core API — Payments** (`services/core-api/src/modules/payments`) | **100%** | ✅ **15/15 tests** | `POST /api/models/:id/checkout`, `POST /api/purchases/:id/confirm-mock`, `POST /api/models/:id/pay-mock`, `GET /api/me/purchases`, `GET /api/purchases/:id`, `POST /api/purchases/:id/regenerate-key` |
+| **Core API — Seller** (`services/core-api/src/modules/seller`) | **100%** | ✅ **5/5 tests** | `POST /api/seller/enable`, `GET /api/seller/status`, `GET /api/seller/models`, `GET /api/seller/sales` |
+| **Core API — Admin & Complaints** (`services/core-api/src/modules/admin`, `complaints`) | **100%** | ✅ **49/49 tests** | `/api/admin/*` ครบทั้ง 12 endpoints (`overview`, `users`, `users/:id/suspend`, `users/:id/suspensions`, `models`, `models/:id/hide`, `models/:id/license`, `models/:id/history`, `purchases`, `purchases/:id`, `complaints`, `complaints/:id`) ผ่าน **38/38** (รวมเทสต์ sweeper 2 ข้อ) + `POST /api/complaints` (rate limit 5/hr) ผ่าน **5/5** + `/api/me/notifications` ผ่าน **6/6** *(รวม Core API ทั้งหมด **83/83 tests**)* |
+| **Frontend — Public Pages, Error Pages (`403`/`404`/`500`), Auth, Upload & Embed** (`frontend`) | **100%** | ✅ **4/4 tests** | หน้าแรก (`/`), `/gallery` (ค้นหา/กรอง/แบ่งหน้า), `/models/[id]`, `/creator`, `/creators/[handle]`, `/upload`, `/login`, `/embed/[id]`, `public/embed.js` (`<vm-model>`), เมนูบัญชี (`AccountMenu.tsx`), หน้า `403`, `not-found.tsx` (404), และ `error.tsx` (500) |
+| **Frontend — Admin Dashboard & Report Modal** (`frontend/src/app/admin/*`) | **100%** | ✅ พร้อมใช้งาน | `/admin`, `/admin/models`, `/admin/users`, `/admin/purchases`, `/admin/complaints` พร้อม Modal แจ้งปัญหา (`ReportForm.tsx`) ในเมนูผู้ใช้และ Footer *(เหลือเชื่อมปุ่ม Report ใน `/models/[id]` ให้เรียก `useReport().openReport()`)* |
+| **Frontend — Buyer & Seller Dashboards** (`frontend/src/app/me`, `seller`) | **100%** | ✅ พร้อมใช้งาน | `/me` (รายการที่ซื้อ, `embed_key`, Regenerate Key, ดาวน์โหลด `.glb` ฝังลายน้ำ, เปิดโหมดคนขาย) และ `/seller` (สรุปรายได้, ยอดขาย, โมเดลของฉัน, Soft Delete) เชื่อม API จริงครบ |
+| **Frontend — Mock Checkout & Optional Pages** (`frontend`) | **🚧** | 🚧 รอพัฒนา | ยังขาด `/pay/mock/[id]` (หน้าจำลองชำระเงิน) และหน้าเสริม `/verify` ตรวจลายน้ำ (`/docs`, `/licenses` และหน้ากฎหมายร่าง 5 หน้า — `/terms`, `/privacy`, `/seller-terms`, `/refunds`, `/dmca` — ทำแล้ว) |
+
+> **หมายเหตุเพิ่มเติม:** โมดูล `interactions.routes.ts` (Like/Comment) และหน้า `/forgot-password` ปัจจุบันยังเป็น Stub/UI-only ตามลำดับ (อยู่นอก Scope หลักของระบบซื้อขายรายชิ้นและ CDN v1)
+
+---
+
+### Phase 1: โครงสร้างพื้นฐาน, ระบบ CDN, ลายน้ำ 3 มิติ, การซื้อรายชิ้น และระบบแอดมิน (Completed ✅)
+1. **Database Schema & Core Middlewares (แฮม & เจี๊ยบ):**
+   - `supabase/schema.sql` (ตาราง `users`, `models`, `purchases`, `likes`, `comments`, `complaints` และ Seed)
+   - `auth.middleware.ts` (`requireAuth`, `requireSeller`, `requireAdmin`), `error.middleware.ts` (`AppError`), และ `config/cors.ts` (`4/4 tests`)
+2. **Upload, Dual Storage & GLB Validation (แฮม & นนท์):**
+   - `LocalDiskStorage` และ `SupabaseStorage` (`models` bucket) พร้อมระบบ Fallback อัตโนมัติ
+   - `glbValidator.ts` ตรวจ Magic Bytes (`glTF` v2) และคำนวณ `sha256`
+   - หน้า `/upload` พร้อมระบบสร้างภาพปก `poster.webp` อัตโนมัติจาก `<model-viewer>.toBlob()`
+3. **CDN Streaming, Access Control & Multi-Layer GLB Watermarking (นนท์):**
+   - `cdn.routes.ts`, `cdn.service.ts`, `range.ts`, `glbWatermark.ts`, `cdn.test.ts` (ผ่าน **23/23 tests**)
+   - รองรับ HTTP Range (`206`/`416`), ETag (`304`), Rate Limit, Constant-Time `embed_key` check
+   - ฝังลายน้ำ 2 ชั้น (Metadata HMAC + 64-point Vertex Steganography) ทั้งตอนอัปโหลด (`purchaseId: 'original'`) และตอนผู้ซื้อดาวน์โหลด (`purchaseId` + `license_type` พร้อมบันทึก `watermark_hash`)
+   - Endpoint `POST /cdn/verify-watermark` สำหรับพิสูจน์ความเป็นเจ้าของไฟล์ `.glb`
+4. **Auth, Catalog Models, Payments, Seller, Admin & Complaints Backend (ต้า, เป้ก, ภีม & เจี๊ยบ):**
+   - `auth.routes.ts` (`register`, `login`, `check-email` พร้อมบล็อกบัญชีที่ถูกระงับ + `auth.test.ts` **2/2**)
+   - `models.routes.ts` (`GET /api/models` ค้นหา/กรอง/แบ่งหน้า, `GET /api/models/:id` ซ่อนลิงก์ไฟล์เต็มของโมเดลเสียเงิน, และ `DELETE /api/models/:id` Soft Delete)
+   - `payments.routes.ts` (**12/12**) และ `seller.routes.ts` (**5/5**)
+   - `admin.routes.ts` (ทั้ง 8 endpoints พร้อม `requireActiveAdmin` ตรวจจาก DB + `admin.test.ts` **20/20**) และ `complaints.routes.ts` (`POST /api/complaints` + `complaints.test.ts` **5/5**) — *รวม Core API ผ่านครบ **48/48 tests***
+5. **Frontend Public Pages, Error Pages, Auth, Admin Dashboard & Cross-Origin Embed (เจี๊ยบ, เป้ก, ต้า & นนท์):**
+   - หน้า `/`, `/gallery`, `/models/[id]`, `/creators/[handle]`, `/embed/[id]`, และ `public/embed.js` (`<vm-model>`) เชื่อมต่อกับ Core API (`CORE_API_URL` / `INTERNAL_CORE_API_URL` ใน Docker) และ CDN Service เรียบร้อย
+   - หน้า `/login` (`AuthForm.tsx` & `lib/auth.ts`) เชื่อมต่อ API `check-email`, `login`, `register` เข้าสู่ Core API และเก็บ `token` ลงใน `localStorage` พร้อม `AccountMenu.tsx`
+   - หน้าแดชบอร์ดแอดมินทั้ง 5 หน้า (`/admin`, `/admin/models`, `/admin/users`, `/admin/purchases`, `/admin/complaints`) และ Popup แจ้งปัญหา (`ReportForm.tsx`) เชื่อมต่อ API จริงเรียบร้อย (Merged PR #15)
+   - หน้า Error ระบบทั่วทั้งเว็บ (`app/403/page.tsx`, `app/not-found.tsx`, `app/error.tsx`) เรียบร้อย (Merged `origin/Pek`)
+   - หน้า Buyer Dashboard (`/me`) และ Seller Dashboard (`/seller`) พร้อมฟังก์ชันใน `lib/api.ts` และ `lib/types.ts` เชื่อมต่อ Core API & CDN เรียบร้อย (Merged `origin/ham`)
+
+---
+
+### Phase 2: แก้ไขโมเดล, หน้าจ่ายเงินจำลอง และการปรับปรุงความปลอดภัย (Current Priority 🚧)
+
+เมื่อผู้ใช้งานสั่งให้พัฒนาต่อในส่วนที่เหลือ Agent ต้องยึดแนวทางและลำดับความสำคัญดังนี้:
+
+1. **งานที่ 1 — พัฒนา `PATCH /api/models/:id` และการปรับปรุงความปลอดภัย Backend (`services/core-api/` — แฮม & ต้า):**
+   - **Models Edit (`services/core-api/src/modules/models/models.routes.ts`):** พัฒนา `PATCH /api/models/:id` (จากเดิมที่เป็น TODO stub) ให้เจ้าของโมเดลหรือแอดมินแก้ไข `title`, `description`, `tags`, `license`, `price_cents`
+   - **Security Hardening (`docs/ARCHITECTURE.md` §5):** แก้ `requireAdmin` / `requireSeller` ใน `auth.middleware.ts` ให้ตรวจ DB เสมอ, เอา `DEV_CREATOR_TOKEN` ออกจาก `frontend/src/app/upload/page.tsx`, และเพิ่ม rate limit บน `/api/auth/*`
+
+2. **งานที่ 2 — เชื่อมต่อ Mock Checkout และปรับแต่งส่วนที่เหลือ (`frontend/` — ภีม, แฮม & นนท์):**
+   - **Mock Checkout (`/pay/mock/[id]`):** หน้าจำลองการชำระเงินที่เรียก `POST /api/purchases/:id/confirm-mock` (ตอนนี้ checkout redirect มาหน้านี้แล้วยัง 404 อยู่)
+   - **Seller Edit Page (`/seller/models/[id]`):** หน้าแก้ไขข้อมูล/ราคาโมเดล (คู่กับ `PATCH /api/models/:id`)
+   - **Report Button (`/models/[id]`):** เพิ่มปุ่ม Report ที่เรียก `useReport().openReport()` (เปิด Popup แจ้งปัญหาพร้อมกรอกลิงก์โมเดลอัตโนมัติ)
+
+---
+
+### Phase 3: การต่อยอดหลังเวอร์ชันแรก (Post-v1 Future Roadmap 🚀)
+1. **Watermark Inspector UI (`/verify` หรือในหน้า Admin/Creator):** หน้าเว็บสำหรับอัปโหลดไฟล์ `.glb` ต้องสงสัยเพื่อเรียก `POST /cdn/verify-watermark` และแสดงผลลัพธ์ `isValidMetadata`, `isValidVertexWatermark`, `vertexBitMatchRatio`, และ `purchaseId` ของผู้ซื้อที่นำไฟล์ไปเผยแพร่
+2. **Real Stripe Checkout Integration:** เปิดใช้งาน Stripe Checkout Session และ `POST /api/webhooks/stripe` ที่ตรวจสอบ `stripe-signature` แบบ Idempotent เมื่อ `PAYMENT_PROVIDER=stripe`
+3. **Automated 3D Optimization & Domain Lock:** บีบอัดโมเดลอัตโนมัติด้วย Draco / Meshopt ตอนอัปโหลด และเพิ่มตัวเลือกผูก `embed_key` กับรายชื่อโดเมนที่อนุญาต (Allowed Origins)
+
+---
+
+## 7. แนวทางปฏิบัติและคำสั่งตรวจสอบสำหรับ Agent (Agent Workflow & Verification)
+
+### 7.1 ข้อควรระวังในการรันคำสั่งบน Windows PowerShell และ Docker
+- หากรันคำสั่งบน Windows PowerShell ที่ติดนโยบาย `ExecutionPolicy` ของสคริปต์ `.ps1` ให้เรียกใช้ **`npx.cmd`** และ **`npm.cmd`** แทน `npx` และ `npm`
+- อ่านไฟล์ที่เกี่ยวข้องให้ครบถ้วนก่อนแก้ไขทุกครั้ง และรักษาสไตล์การเขียนโค้ด (TypeScript strictness, `AppError`, Dual-mode DB query + Supabase fallback) ให้สอดคล้องกับโค้ดเดิม
+- `docker-compose.yml` โหลดไฟล์ `.env` / `.env.local` ทับ `.env.example` อัตโนมัติ และส่ง `INTERNAL_CORE_API_URL=http://core-api:4000` ให้ Next.js Server Component ใน Container `frontend`
+- สำหรับการรันใน Docker บน Windows ค่า `DATABASE_URL` ต้องใช้ **Supabase IPv4 Session Pooler** (`aws-0-<region>.pooler.supabase.com:5432`) เนื่องจาก Direct Host (`db.<project>.supabase.co`) เป็น IPv6-only ซึ่งเครือข่าย Docker Bridge เริ่มต้นไม่รองรับ
+- ค่า `JWT_SECRET` ใน `services/core-api/.env` และ `services/cdn-service/.env` ต้องตรงกันเสมอ
+
+### 7.2 คำสั่งตรวจสอบบังคับก่อนจบงานทุกครั้ง (Mandatory Verification Checklist)
+
+```bash
+# 1. ตรวจ Type-check และรัน Unit Tests ของ CDN Service (ต้องผ่านครบ 23/23 tests)
+cd services/cdn-service
+npx.cmd tsc --noEmit -p .
+npm.cmd test
+
+# 2. ตรวจ Type-check และรัน Unit Tests ของ Core API (ต้องผ่านครบ 83/83 tests)
+cd services/core-api
+npx.cmd tsc --noEmit -p .
+npm.cmd test
+
+# 3. ตรวจ Type-check และรัน Unit Tests ของ Frontend (ต้องผ่านครบ 4/4 tests)
+cd frontend
+npx.cmd tsc --noEmit -p .
+npm.cmd test
+```

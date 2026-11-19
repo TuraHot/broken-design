@@ -1,12 +1,31 @@
-// [ภีม] ระบบซื้อจำลองและจัดการ embed_key
+// [ภีม] ระบบซื้อรายชิ้น (Single-Item Purchase) — รองรับ Stripe PromptPay QR และ Mock + embed_key
 import { Router } from 'express';
 import crypto from 'crypto';
-import { requireAuth } from '../../middlewares/auth.middleware';
+import Stripe from 'stripe';
+import { requireAuth, requireNotSuspended } from '../../middlewares/auth.middleware';
 import { db } from '../../config/db';
 import { env } from '../../config/env';
 import { AppError } from '../../middlewares/error.middleware';
 
 export const paymentsRouter = Router();
+
+let stripeClient: Stripe | null = null;
+function getStripe(): Stripe {
+  if (!env.stripeSecretKey) {
+    throw new AppError(500, 'STRIPE_NOT_CONFIGURED', 'STRIPE_SECRET_KEY is not configured');
+  }
+  if (!stripeClient) {
+    stripeClient = new Stripe(env.stripeSecretKey);
+  }
+  return stripeClient;
+}
+
+function toThbSatang(amountCents: number, currency: string): number {
+  const cur = (currency || 'USD').toUpperCase();
+  // Stripe PromptPay requires THB in satang (minimum 1000 satang = 10 THB)
+  const satang = cur === 'THB' ? amountCents : Math.round(amountCents * 35);
+  return Math.max(1000, satang);
+}
 
 // ─── Helper ────────────────────────────────────────────────────────────────────
 
@@ -27,14 +46,14 @@ function requireMockProvider(
 }
 
 // ─── 1. POST /api/models/:id/checkout ───────────────────────────────────────
-// สร้างคำสั่งซื้อ (pending) ราคาดึงจากฐานข้อมูลจริง — กันซื้อซ้ำ
-paymentsRouter.post('/models/:id/checkout', requireAuth, async (req, res) => {
+// สร้างคำสั่งซื้อรายชิ้น (pending) ล็อกราคา สกุลเงิน และประเภท License จากฐานข้อมูลจริง — กันซื้อซ้ำ
+paymentsRouter.post('/models/:id/checkout', requireAuth, requireNotSuspended, async (req, res) => {
   const userId = req.user!.id;
   const modelId = req.params.id;
 
-  // ดึงราคาจากฐานข้อมูลจริง
+  // ดึงราคาและประเภท License จากฐานข้อมูลจริง
   const modelRow = await db.query(
-    `SELECT id, title, price_cents, currency, deleted_at, hidden_at, owner_id
+    `SELECT id, title, price_cents, currency, license, deleted_at, hidden_at, owner_id
      FROM models WHERE id = $1`,
     [modelId],
   );
@@ -68,56 +87,47 @@ paymentsRouter.post('/models/:id/checkout', requireAuth, async (req, res) => {
       throw new AppError(409, 'ALREADY_PURCHASED', 'You have already purchased this model');
     }
     // ถ้ายัง pending อยู่ → ส่ง checkout url เดิมกลับไป
-    if (env.paymentProvider === 'mock') {
-      res.json({
-        purchaseId: purchase.id,
-        checkoutUrl: `/pay/mock/${purchase.id}`,
-        provider: 'mock',
-      });
-      return;
-    }
-  }
-
-  // สร้างคำสั่งซื้อใหม่ status=pending
-  const embedKey = generateEmbedKey();
-  const result = await db.query(
-    `INSERT INTO purchases (user_id, model_id, status, embed_key)
-     VALUES ($1, $2, 'pending', $3)
-     RETURNING id`,
-    [userId, modelId, embedKey],
-  );
-  const purchaseId = result.rows[0].id;
-
-  if (env.paymentProvider === 'mock') {
     res.json({
-      purchaseId,
-      checkoutUrl: `/pay/mock/${purchaseId}`,
-      provider: 'mock',
+      purchaseId: purchase.id,
+      checkoutUrl: `/checkout/${purchase.id}`,
+      provider: env.paymentProvider,
     });
     return;
   }
 
-  // TODO: Stripe checkout session — เฟสถัดไป
+  // สร้างคำสั่งซื้อใหม่ status=pending พร้อมล็อก amount_cents, currency, license_type
+  const embedKey = generateEmbedKey();
+  const amountCents = Number(model.price_cents) || 0;
+  const currency = String(model.currency || 'USD').trim();
+  const licenseType = String(model.license || 'COMMERCIAL').trim();
+
+  const result = await db.query(
+    `INSERT INTO purchases (user_id, model_id, status, embed_key, amount_cents, currency, license_type)
+     VALUES ($1, $2, 'pending', $3, $4, $5, $6)
+     RETURNING id`,
+    [userId, modelId, embedKey, amountCents, currency, licenseType],
+  );
+  const purchaseId = result.rows[0].id;
+
   res.json({
     purchaseId,
-    checkoutUrl: null,
-    provider: 'stripe',
-    message: 'Stripe integration is not available yet',
+    checkoutUrl: `/checkout/${purchaseId}`,
+    provider: env.paymentProvider,
   });
 });
 
 // ─── 2. POST /api/purchases/:id/confirm-mock ────────────────────────────────
-// กดจ่ายจำลอง → เปลี่ยน status เป็น paid, embed_key พร้อมใช้ทันที
+// กดจ่ายจำลอง → เปลี่ยน status เป็น paid, บันทึก paid_at = NOW(), embed_key พร้อมใช้ทันที
 // เปิดได้เฉพาะเมื่อ PAYMENT_PROVIDER=mock
-paymentsRouter.post('/purchases/:id/confirm-mock', requireAuth, requireMockProvider, async (req, res) => {
+paymentsRouter.post('/purchases/:id/confirm-mock', requireAuth, requireMockProvider, requireNotSuspended, async (req, res) => {
   const userId = req.user!.id;
   const purchaseId = req.params.id;
 
   const result = await db.query(
     `UPDATE purchases
-     SET status = 'paid'
+     SET status = 'paid', paid_at = NOW()
      WHERE id = $1 AND user_id = $2 AND status = 'pending'
-     RETURNING id, model_id, embed_key`,
+     RETURNING id, model_id, embed_key, amount_cents, currency, license_type, paid_at`,
     [purchaseId, userId],
   );
 
@@ -139,23 +149,207 @@ paymentsRouter.post('/purchases/:id/confirm-mock', requireAuth, requireMockProvi
     purchaseId: purchase.id,
     modelId: purchase.model_id,
     embedKey: purchase.embed_key,
+    amountCents: purchase.amount_cents,
+    currency: purchase.currency,
+    licenseType: purchase.license_type,
+    paidAt: purchase.paid_at,
+  });
+});
+
+// ─── 2b. POST /api/models/:id/pay-mock (Alias by modelId for single-click mock pay) ─
+paymentsRouter.post('/models/:id/pay-mock', requireAuth, requireMockProvider, requireNotSuspended, async (req, res) => {
+  const userId = req.user!.id;
+  const modelId = req.params.id;
+
+  const result = await db.query(
+    `UPDATE purchases
+     SET status = 'paid', paid_at = NOW()
+     WHERE model_id = $1 AND user_id = $2 AND status = 'pending'
+     RETURNING id, model_id, embed_key, amount_cents, currency, license_type, paid_at`,
+    [modelId, userId],
+  );
+
+  if (result.rowCount === 0) {
+    const check = await db.query(
+      `SELECT id, model_id, embed_key, status, paid_at FROM purchases WHERE model_id = $1 AND user_id = $2`,
+      [modelId, userId],
+    );
+    if (check.rowCount! > 0 && check.rows[0].status === 'paid') {
+      const paidRow = check.rows[0];
+      res.json({
+        message: 'Payment already confirmed',
+        purchaseId: paidRow.id,
+        modelId: paidRow.model_id,
+        embedKey: paidRow.embed_key,
+        paidAt: paidRow.paid_at,
+      });
+      return;
+    }
+    throw new AppError(404, 'PURCHASE_NOT_FOUND', 'Pending purchase not found for this model');
+  }
+
+  const purchase = result.rows[0];
+  res.json({
+    message: 'Payment confirmed (mock)',
+    purchaseId: purchase.id,
+    modelId: purchase.model_id,
+    embedKey: purchase.embed_key,
+    amountCents: purchase.amount_cents,
+    currency: purchase.currency,
+    licenseType: purchase.license_type,
+    paidAt: purchase.paid_at,
+  });
+});
+
+// ─── 2c. POST /api/purchases/:id/qr ─────────────────────────────────────────
+// สร้าง QR Code สำหรับชำระเงิน (PromptPay ผ่าน Stripe เมื่อ PAYMENT_PROVIDER=stripe หรือ Mock QR)
+paymentsRouter.post('/purchases/:id/qr', requireAuth, async (req, res) => {
+  const userId = req.user!.id;
+  const purchaseId = req.params.id;
+
+  const result = await db.query(
+    `SELECT p.id, p.model_id, p.status, p.amount_cents, p.currency, p.provider_session_id,
+            m.title
+     FROM purchases p
+     JOIN models m ON m.id = p.model_id
+     WHERE p.id = $1 AND p.user_id = $2`,
+    [purchaseId, userId],
+  );
+
+  if (result.rowCount === 0) {
+    throw new AppError(404, 'PURCHASE_NOT_FOUND', 'Purchase not found');
+  }
+
+  const purchase = result.rows[0];
+  if (purchase.status === 'paid') {
+    throw new AppError(409, 'ALREADY_PAID', 'This purchase has already been paid');
+  }
+
+  if (env.paymentProvider !== 'stripe') {
+    res.json({
+      provider: 'mock',
+      purchaseId: purchase.id,
+      qrImageUrl: null,
+      amountSatang: toThbSatang(Number(purchase.amount_cents) || 0, purchase.currency),
+      currency: 'THB',
+      expiresAt: Math.floor(Date.now() / 1000) + 900,
+    });
+    return;
+  }
+
+  const stripe = getStripe();
+  let paymentIntent: Stripe.PaymentIntent;
+
+  if (purchase.provider_session_id && String(purchase.provider_session_id).startsWith('pi_')) {
+    const existingPi = await stripe.paymentIntents.retrieve(purchase.provider_session_id);
+    if (existingPi.status === 'succeeded') {
+      await db.query(
+        `UPDATE purchases SET status = 'paid', paid_at = NOW() WHERE id = $1 AND status = 'pending'`,
+        [purchase.id],
+      );
+      throw new AppError(409, 'ALREADY_PAID', 'This purchase has already been paid');
+    }
+    if (existingPi.status === 'requires_action' && existingPi.next_action?.promptpay_display_qr_code) {
+      paymentIntent = existingPi;
+    } else {
+      const amountSatang = toThbSatang(Number(purchase.amount_cents) || 0, purchase.currency);
+      paymentIntent = await stripe.paymentIntents.create({
+        amount: amountSatang,
+        currency: 'thb',
+        payment_method_types: ['promptpay'],
+        confirm: true,
+        payment_method_data: {
+          type: 'promptpay',
+          billing_details: { email: req.user!.email },
+        },
+        description: `Lixyte: ${purchase.title}`,
+        metadata: { purchaseId: purchase.id, modelId: purchase.model_id, userId },
+      });
+      await db.query(`UPDATE purchases SET provider_session_id = $1 WHERE id = $2`, [
+        paymentIntent.id,
+        purchase.id,
+      ]);
+    }
+  } else {
+    const amountSatang = toThbSatang(Number(purchase.amount_cents) || 0, purchase.currency);
+    paymentIntent = await stripe.paymentIntents.create({
+      amount: amountSatang,
+      currency: 'thb',
+      payment_method_types: ['promptpay'],
+      confirm: true,
+      payment_method_data: {
+        type: 'promptpay',
+        billing_details: { email: req.user!.email },
+      },
+      description: `Lixyte: ${purchase.title}`,
+      metadata: { purchaseId: purchase.id, modelId: purchase.model_id, userId },
+    });
+    await db.query(`UPDATE purchases SET provider_session_id = $1 WHERE id = $2`, [
+      paymentIntent.id,
+      purchase.id,
+    ]);
+  }
+
+  const qr = paymentIntent.next_action?.promptpay_display_qr_code;
+  res.json({
+    provider: 'stripe',
+    purchaseId: purchase.id,
+    paymentIntentId: paymentIntent.id,
+    qrImageUrl: qr?.image_url_png || qr?.image_url_svg || null,
+    hostedUrl: qr?.hosted_instructions_url || null,
+    qrData: qr?.data || null,
+    amountSatang: paymentIntent.amount,
+    currency: 'THB',
   });
 });
 
 // ─── 3. POST /api/webhooks/stripe ────────────────────────────────────────────
-// Stripe webhook — เฟสถัดไป
-paymentsRouter.post('/webhooks/stripe', async (_req, res) => {
+// Stripe webhook: ตรวจลายเซ็นแล้วอัปเดต purchase เป็น paid
+paymentsRouter.post('/webhooks/stripe', async (req, res) => {
+  const stripe = getStripe();
+  const sig = req.headers['stripe-signature'];
+
+  if (!env.stripeWebhookSecret || typeof sig !== 'string') {
+    throw new AppError(400, 'INVALID_WEBHOOK', 'Missing Stripe webhook signature or secret');
+  }
+
+  let event: Stripe.Event;
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, env.stripeWebhookSecret);
+  } catch (err: any) {
+    throw new AppError(400, 'INVALID_WEBHOOK_SIGNATURE', err?.message || 'Invalid signature');
+  }
+
+  if (event.type === 'payment_intent.succeeded') {
+    const pi = event.data.object as Stripe.PaymentIntent;
+    await db.query(
+      `UPDATE purchases
+       SET status = 'paid', paid_at = NOW()
+       WHERE provider_session_id = $1 AND status = 'pending'`,
+      [pi.id],
+    );
+  } else if (event.type === 'checkout.session.completed') {
+    const session = event.data.object as Stripe.Checkout.Session;
+    await db.query(
+      `UPDATE purchases
+       SET status = 'paid', paid_at = NOW()
+       WHERE (provider_session_id = $1 OR id = $2) AND status = 'pending'`,
+      [session.id, session.metadata?.purchaseId || null],
+    );
+  }
+
   res.json({ received: true });
 });
 
 // ─── 4. GET /api/me/purchases ────────────────────────────────────────────────
-// รายการที่ซื้อแล้ว (เฉพาะ status=paid) พร้อม embed_key
+// รายการที่ซื้อแล้ว (เฉพาะ status=paid) พร้อม embed_key, license_type, paid_at, watermark_hash
 paymentsRouter.get('/me/purchases', requireAuth, async (req, res) => {
   const userId = req.user!.id;
 
   const result = await db.query(
-    `SELECT p.id, p.model_id, p.embed_key, p.created_at,
-            m.title, m.price_cents, m.currency
+    `SELECT p.id, p.model_id, p.embed_key, p.amount_cents, p.currency AS purchase_currency,
+            p.license_type, p.watermark_hash, p.paid_at, p.created_at,
+            m.title, m.price_cents, m.currency, m.license
      FROM purchases p
      JOIN models m ON m.id = p.model_id
      WHERE p.user_id = $1 AND p.status = 'paid'
@@ -168,17 +362,21 @@ paymentsRouter.get('/me/purchases', requireAuth, async (req, res) => {
       id: r.id,
       modelId: r.model_id,
       title: r.title,
-      priceCents: r.price_cents,
-      currency: r.currency,
+      priceCents: r.amount_cents ?? r.price_cents,
+      amountCents: r.amount_cents ?? r.price_cents,
+      currency: r.purchase_currency ?? r.currency,
+      licenseType: r.license_type ?? r.license ?? 'COMMERCIAL',
+      watermarkHash: r.watermark_hash ?? null,
       embedKey: r.embed_key,
-      purchasedAt: r.created_at,
+      paidAt: r.paid_at ?? r.created_at,
+      purchasedAt: r.paid_at ?? r.created_at,
     })),
   });
 });
 
 // ─── 5. POST /api/purchases/:id/regenerate-key ──────────────────────────────
 // ขอ embed_key ใหม่ → รหัสเก่าใช้ไม่ได้ทันที
-paymentsRouter.post('/purchases/:id/regenerate-key', requireAuth, async (req, res) => {
+paymentsRouter.post('/purchases/:id/regenerate-key', requireAuth, requireNotSuspended, async (req, res) => {
   const userId = req.user!.id;
   const purchaseId = req.params.id;
   const newKey = generateEmbedKey();
@@ -203,16 +401,19 @@ paymentsRouter.post('/purchases/:id/regenerate-key', requireAuth, async (req, re
 });
 
 // ─── 6. GET /api/purchases/:id ──────────────────────────────────────────────
-// ดึงข้อมูลคำสั่งซื้อ (สำหรับหน้าจ่ายเงินจำลอง)
+// ดึงข้อมูลคำสั่งซื้อ (สำหรับหน้าชำระเงิน QR)
 paymentsRouter.get('/purchases/:id', requireAuth, async (req, res) => {
   const userId = req.user!.id;
   const purchaseId = req.params.id;
 
   const result = await db.query(
-    `SELECT p.id, p.model_id, p.status, p.created_at,
-            m.title, m.price_cents, m.currency
+    `SELECT p.id, p.model_id, p.status, p.amount_cents, p.currency AS purchase_currency,
+            p.license_type, p.watermark_hash, p.paid_at, p.created_at, p.provider_session_id,
+            m.title, m.price_cents, m.currency, m.license,
+            u.display_name AS seller_name
      FROM purchases p
      JOIN models m ON m.id = p.model_id
+     LEFT JOIN users u ON u.id = m.owner_id
      WHERE p.id = $1 AND p.user_id = $2`,
     [purchaseId, userId],
   );
@@ -222,13 +423,51 @@ paymentsRouter.get('/purchases/:id', requireAuth, async (req, res) => {
   }
 
   const r = result.rows[0];
+  let status = r.status;
+  let paidAt = r.paid_at ?? null;
+
+  // Sync status from Stripe PaymentIntent if still pending
+  if (
+    status === 'pending' &&
+    env.paymentProvider === 'stripe' &&
+    env.stripeSecretKey &&
+    r.provider_session_id &&
+    String(r.provider_session_id).startsWith('pi_')
+  ) {
+    try {
+      const pi = await getStripe().paymentIntents.retrieve(r.provider_session_id);
+      if (pi.status === 'succeeded') {
+        const upd = await db.query(
+          `UPDATE purchases SET status = 'paid', paid_at = NOW()
+           WHERE id = $1 AND status = 'pending'
+           RETURNING status, paid_at`,
+          [r.id],
+        );
+        if (upd.rowCount! > 0) {
+          status = upd.rows[0].status;
+          paidAt = upd.rows[0].paid_at;
+        } else {
+          status = 'paid';
+        }
+      }
+    } catch {
+      // Ignore transient Stripe poll errors
+    }
+  }
+
   res.json({
     id: r.id,
     modelId: r.model_id,
     title: r.title,
-    priceCents: r.price_cents,
-    currency: r.currency,
-    status: r.status,
+    sellerName: r.seller_name ?? 'Creator',
+    priceCents: r.amount_cents ?? r.price_cents,
+    amountCents: r.amount_cents ?? r.price_cents,
+    currency: r.purchase_currency ?? r.currency,
+    licenseType: r.license_type ?? r.license ?? 'COMMERCIAL',
+    watermarkHash: r.watermark_hash ?? null,
+    status,
+    provider: env.paymentProvider,
+    paidAt,
     createdAt: r.created_at,
   });
 });

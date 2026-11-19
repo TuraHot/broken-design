@@ -1,8 +1,11 @@
 'use client';
 
 // "How to use": copy-ready embed code (web component or iframe) with a short numbered guide.
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { Check, Copy } from 'lucide-react';
+import { Check, Copy, Lock } from 'lucide-react';
+import { CDN_SERVICE_URL } from '@/lib/api';
+import { readSession } from '@/lib/session';
 
 type Kind = 'component' | 'iframe';
 
@@ -14,17 +17,42 @@ const TABS: { id: Kind; label: string }[] = [
 export default function EmbedSnippets({ id, paid }: { id: string; paid: boolean }) {
   const [kind, setKind] = useState<Kind>('component');
   const [copied, setCopied] = useState(false);
-  // The origin is only known in the browser; until then the code shows a relative path.
-  const [origin, setOrigin] = useState('');
-  useEffect(() => setOrigin(window.location.origin), []);
+  // Default to localhost:3000 so snippets never copy with an empty/relative origin before hydration.
+  const [origin, setOrigin] = useState('http://localhost:3000');
+  const [ready, setReady] = useState(false);
+  const [signedIn, setSignedIn] = useState(false);
 
+  useEffect(() => {
+    setOrigin(window.location.origin);
+    const syncSession = () => {
+      setSignedIn(readSession() !== null);
+      setReady(true);
+    };
+    syncSession();
+    window.addEventListener('storage', syncSession);
+    return () => window.removeEventListener('storage', syncSession);
+  }, []);
+
+  const canUseEmbed = ready && signedIn;
   const key = paid ? ' key="YOUR_EMBED_KEY"' : '';
   const code =
     kind === 'component'
-      ? `<script src="${origin}/embed.js"></script>\n<vm-model model-id="${id}"${key}></vm-model>`
-      : `<iframe\n  src="${origin}/embed/${id}${paid ? '?key=YOUR_EMBED_KEY' : ''}"\n  width="600"\n  height="400"\n  loading="lazy"\n></iframe>`;
+      ? `<script type="module" src="${origin}/embed.js"></script>\n<vm-model model-id="${id}" cdn-base="${CDN_SERVICE_URL}"${key} auto-rotate camera-controls></vm-model>`
+      : `<iframe\n  src="${origin}/embed/${id}${paid ? '?key=YOUR_EMBED_KEY' : ''}"\n  width="600"\n  height="400"\n  loading="lazy"\n  allow="fullscreen"\n  style="border:0"\n></iframe>`;
+
+  const selectKind = (next: Kind) => {
+    if (!readSession()) {
+      setSignedIn(false);
+      return;
+    }
+    setKind(next);
+  };
 
   const copy = async () => {
+    if (!readSession()) {
+      setSignedIn(false);
+      return;
+    }
     try {
       await navigator.clipboard.writeText(code);
       setCopied(true);
@@ -56,9 +84,10 @@ export default function EmbedSnippets({ id, paid }: { id: string; paid: boolean 
               key={t.id}
               role="tab"
               type="button"
+              disabled={!canUseEmbed}
               aria-selected={kind === t.id}
-              onClick={() => setKind(t.id)}
-              className={`rounded border px-2 py-1 font-mono text-[11px] transition-colors ${
+              onClick={() => selectKind(t.id)}
+              className={`rounded border px-2 py-1 font-mono text-[11px] transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
                 kind === t.id ? 'border-white/50 text-white' : 'border-white/15 text-white/65 hover:text-white'
               }`}
             >
@@ -68,16 +97,41 @@ export default function EmbedSnippets({ id, paid }: { id: string; paid: boolean 
         </div>
         <button
           type="button"
+          disabled={!canUseEmbed}
           onClick={copy}
-          className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm text-white/65 transition-colors hover:text-white"
+          className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm text-white/65 transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-45"
         >
           {copied ? <Check aria-hidden className="h-4 w-4 text-hud" /> : <Copy aria-hidden className="h-4 w-4" />}
           {copied ? 'Copied' : 'Copy'}
         </button>
       </div>
-      <pre className="mt-2 max-w-full overflow-x-auto rounded-lg border border-white/10 bg-black px-4 py-3 font-mono text-[12.5px] leading-relaxed text-white/80">
-        <code>{code}</code>
-      </pre>
+      <div className="relative mt-2">
+        <pre
+          aria-hidden={!canUseEmbed}
+          className={`max-w-full overflow-x-auto rounded-lg border border-white/10 bg-black px-4 py-3 font-mono text-[12.5px] leading-relaxed text-white/80 transition ${
+            !canUseEmbed ? 'pointer-events-none min-h-[120px] select-none blur-[4px]' : ''
+          }`}
+        >
+          <code>{code}</code>
+        </pre>
+        {ready && !signedIn && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-lg border border-white/10 bg-black/75 p-4 text-center backdrop-blur-[2px]">
+            <div className="inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-hud">
+              <Lock aria-hidden className="h-3.5 w-3.5" />
+              Login required
+            </div>
+            <p className="max-w-xs text-xs text-white/75">
+              Please log in to switch between &lt;vm-model&gt; / iframe and copy embed code.
+            </p>
+            <Link
+              href="/login"
+              className="mt-1 inline-flex h-8 items-center rounded-lg bg-white px-3.5 text-xs font-medium text-black transition-colors hover:bg-white/85"
+            >
+              Log in
+            </Link>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

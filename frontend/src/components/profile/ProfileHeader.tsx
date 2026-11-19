@@ -1,18 +1,20 @@
 // Creator profile header: cover, photo, name, bio and stats. Read-only; the cover and photo are placeholders until
 // creators can upload their own.
-import { initials } from '@/lib/creators';
+import Link from 'next/link';
+import UserAvatar from '@/components/ui/UserAvatar';
 import { formatCount } from '@/lib/format';
 
 interface Props {
   name: string;
   handle: string;
+  avatarUrl?: string | null;
   bio: string;
   modelCount: number;
   downloads: number;
   likes: number;
 }
 
-export default function ProfileHeader({ name, handle, bio, modelCount, downloads, likes }: Props) {
+export default function ProfileHeader({ name, handle, avatarUrl, bio, modelCount, downloads, likes }: Props) {
   return (
     <header>
       <div className="relative h-32 overflow-hidden rounded-lg border border-white/10 bg-black sm:h-44">
@@ -34,15 +36,16 @@ export default function ProfileHeader({ name, handle, bio, modelCount, downloads
 
       <div className="flex flex-wrap items-end gap-x-4 gap-y-3 px-1 sm:px-4">
         <div className="-mt-10 shrink-0 sm:-mt-12">
-          <div className="grid h-20 w-20 place-items-center rounded-full border border-hud/50 bg-black sm:h-24 sm:w-24">
-            <span aria-hidden className="font-mono text-2xl text-hud">
-              {initials(name)}
-            </span>
-          </div>
+          <UserAvatar name={name} avatarUrl={avatarUrl} size="xl" />
         </div>
 
         <div className="min-w-0 flex-1 pt-3">
-          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70">[ Creator ]</p>
+          <Link
+            href="/creator"
+            className="inline-block font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70 transition-colors hover:text-hud"
+          >
+            [ Creator ]
+          </Link>
           <h1 className="mt-1 font-display text-[clamp(22px,3vw,32px)] uppercase leading-[1.05] text-white">{name}</h1>
           <p className="mt-1 text-sm text-white/65">@{handle}</p>
         </div>

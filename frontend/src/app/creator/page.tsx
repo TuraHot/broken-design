@@ -1,9 +1,9 @@
 // Creator landing — what you can do as a creator, with an interactive 3D model preview and a Get started button.
 // Content only: nothing here calls an API (auth and upload are not connected yet).
 import type { Metadata } from 'next';
-import Link from 'next/link';
-import { ArrowRight, CodeXml, Coins, LayoutDashboard, Scale, Upload, Zap, type LucideIcon } from 'lucide-react';
+import { CodeXml, Coins, LayoutDashboard, Scale, Upload, Zap, type LucideIcon } from 'lucide-react';
 import SectionHeading from '@/components/landing/SectionHeading';
+import CreatorActions from '@/components/creator/CreatorActions';
 import CreatorModel from '@/components/creator/CreatorModel';
 
 export const metadata: Metadata = { title: 'Creators — Lixyte' };
@@ -48,9 +48,6 @@ const STEPS = [
   { n: '02', title: 'Upload', body: 'Add your .glb with a title, tags, a license and a price.' },
   { n: '03', title: 'Share', body: 'Copy the embed code and paste it on your site. That is it.' },
 ];
-
-const GET_STARTED =
-  'inline-flex items-center gap-2 rounded-lg bg-white px-3.5 py-1.5 text-[15px] font-medium text-black transition-colors hover:bg-white/85';
 
 export default function CreatorPage() {
   return (
@@ -115,18 +112,7 @@ export default function CreatorPage() {
             Upload a model once and anyone can put it on their website with a single line of code. You choose the
             license and the price; we handle storage and fast delivery.
           </p>
-          <div className="mt-7 flex flex-wrap items-center gap-3">
-            <Link href="/login" className={GET_STARTED}>
-              Get started
-              <ArrowRight aria-hidden className="h-4 w-4" />
-            </Link>
-            <a
-              href="#how-it-works"
-              className="border border-white px-3 py-2 font-mono text-[10.5px] uppercase tracking-[0.18em] text-white transition-colors hover:bg-white hover:text-black"
-            >
-              See how it works
-            </a>
-          </div>
+          <CreatorActions />
           <pre className="mt-8 max-w-full overflow-x-auto rounded-lg border border-white/10 bg-[#0d0d0d] px-4 py-3 font-mono text-[12.5px] text-white/65">
             <code>{'<vm-model model-id="your-model"></vm-model>'}</code>
           </pre>

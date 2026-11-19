@@ -2,9 +2,23 @@
 import { Router } from 'express';
 import { requireAuth } from '../../middlewares/auth.middleware';
 import { db } from '../../config/db';
+import { env } from '../../config/env';
 import { AppError } from '../../middlewares/error.middleware';
 
 export const sellerRouter = Router();
+
+export function calculateWithdrawalBreakdown(grossAmountCents: number, feeRateBps = env.platformFeeBps) {
+  const safeGross = Math.max(0, Math.round(grossAmountCents));
+  const platformFeeCents = Math.round((safeGross * feeRateBps) / 10000);
+  const netAmountCents = Math.max(0, safeGross - platformFeeCents);
+  return {
+    grossAmountCents: safeGross,
+    platformFeeCents,
+    netAmountCents,
+    feeRateBps,
+    feeRatePercent: feeRateBps / 100,
+  };
+}
 
 // ─── Middleware: ตรวจว่าเป็นคนขายแล้ว ──────────────────────────────────────
 function requireSeller(
@@ -30,14 +44,24 @@ sellerRouter.post('/enable', requireAuth, async (req, res) => {
   const userId = req.user!.id;
 
   const result = await db.query(
-    `UPDATE users SET is_seller = TRUE WHERE id = $1 AND is_seller = FALSE RETURNING id`,
+    `UPDATE users SET is_seller = TRUE
+     WHERE id = $1 AND is_seller = FALSE AND role <> 'admin' AND suspended_at IS NULL
+     RETURNING id`,
     [userId],
   );
 
   if (result.rowCount === 0) {
-    // อาจเป็นคนขายอยู่แล้ว
-    const check = await db.query(`SELECT is_seller FROM users WHERE id = $1`, [userId]);
-    if (check.rowCount! > 0 && check.rows[0].is_seller) {
+    // ไม่ได้อัปเดต: หาสาเหตุจาก DB (ไม่เชื่อ role ใน JWT)
+    const check = await db.query(`SELECT is_seller, role, suspended_at FROM users WHERE id = $1`, [userId]);
+    if (check.rowCount === 0) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
+    const row = check.rows[0];
+    if (row.role === 'admin') {
+      throw new AppError(403, 'ADMIN_CANNOT_SELL', 'Admin accounts cannot become sellers');
+    }
+    if (row.suspended_at !== null) {
+      throw new AppError(403, 'ACCOUNT_SUSPENDED', 'Your account has been suspended by an administrator');
+    }
+    if (row.is_seller) {
       res.json({ message: 'Seller mode is already enabled' });
       return;
     }
@@ -136,4 +160,148 @@ sellerRouter.get('/status', requireAuth, async (req, res) => {
   }
 
   res.json({ isSeller: result.rows[0].is_seller });
+});
+
+async function getSellerAvailableGrossCents(sellerId: string): Promise<number> {
+  const earnedRes = await db.query(
+    `SELECT COALESCE(SUM(COALESCE(NULLIF(p.amount_cents, 0), m.price_cents)), 0) AS gross_earned
+     FROM purchases p
+     JOIN models m ON m.id = p.model_id
+     WHERE m.owner_id = $1 AND p.status = 'paid'`,
+    [sellerId],
+  );
+  const withdrawnRes = await db.query(
+    `SELECT COALESCE(SUM(gross_amount_cents), 0) AS gross_withdrawn
+     FROM creator_withdrawals
+     WHERE seller_id = $1 AND status IN ('pending', 'approved', 'paid')`,
+    [sellerId],
+  );
+  const grossEarned = Number(earnedRes.rows[0]?.gross_earned ?? 0);
+  const grossWithdrawn = Number(withdrawnRes.rows[0]?.gross_withdrawn ?? 0);
+  return Math.max(0, grossEarned - grossWithdrawn);
+}
+
+// ─── 5. GET /api/seller/wallet ──────────────────────────────────────────────
+// ยอดเงินที่เว็บถือไว้ให้คนขาย + คำนวณส่วนต่างค่าธรรมเนียมแพลตฟอร์ม + ประวัติการถอน
+sellerRouter.get('/wallet', requireAuth, requireSeller, async (req, res) => {
+  const userId = req.user!.id;
+
+  const earnedRes = await db.query(
+    `SELECT COALESCE(SUM(COALESCE(NULLIF(p.amount_cents, 0), m.price_cents)), 0) AS gross_earned
+     FROM purchases p
+     JOIN models m ON m.id = p.model_id
+     WHERE m.owner_id = $1 AND p.status = 'paid'`,
+    [userId],
+  );
+  const withdrawnRes = await db.query(
+    `SELECT COALESCE(SUM(gross_amount_cents), 0) AS gross_withdrawn
+     FROM creator_withdrawals
+     WHERE seller_id = $1 AND status IN ('pending', 'approved', 'paid')`,
+    [userId],
+  );
+  const historyRes = await db.query(
+    `SELECT id, gross_amount_cents, platform_fee_cents, net_amount_cents, fee_rate_bps,
+            currency, payout_method, payout_account, status, created_at, processed_at
+     FROM creator_withdrawals
+     WHERE seller_id = $1
+     ORDER BY created_at DESC`,
+    [userId],
+  );
+
+  const grossEarnedCents = Number(earnedRes.rows[0]?.gross_earned ?? 0);
+  const withdrawnGrossCents = Number(withdrawnRes.rows[0]?.gross_withdrawn ?? 0);
+  const availableGrossCents = Math.max(0, grossEarnedCents - withdrawnGrossCents);
+  const breakdown = calculateWithdrawalBreakdown(availableGrossCents);
+
+  res.json({
+    wallet: {
+      grossEarnedCents,
+      withdrawnGrossCents,
+      availableGrossCents,
+      feeRateBps: breakdown.feeRateBps,
+      feeRatePercent: breakdown.feeRatePercent,
+      estimatedFeeCents: breakdown.platformFeeCents,
+      estimatedNetCents: breakdown.netAmountCents,
+    },
+    withdrawals: historyRes.rows.map((r) => ({
+      id: r.id,
+      grossAmountCents: r.gross_amount_cents,
+      platformFeeCents: r.platform_fee_cents,
+      netAmountCents: r.net_amount_cents,
+      feeRateBps: r.fee_rate_bps,
+      currency: r.currency,
+      payoutMethod: r.payout_method,
+      payoutAccount: r.payout_account,
+      status: r.status,
+      createdAt: r.created_at,
+      processedAt: r.processed_at,
+    })),
+  });
+});
+
+// ─── 6. POST /api/seller/withdraw ───────────────────────────────────────────
+// ขอถอนเงินจากยอดที่เว็บถือไว้ โดยหักส่วนต่างค่าธรรมเนียมแพลตฟอร์มก่อน
+sellerRouter.post('/withdraw', requireAuth, requireSeller, async (req, res) => {
+  const userId = req.user!.id;
+  const payoutMethod = String(req.body?.payoutMethod || 'promptpay').trim().toLowerCase();
+  const payoutAccount = String(req.body?.payoutAccount || '').trim();
+
+  if (!['promptpay', 'bank'].includes(payoutMethod)) {
+    throw new AppError(400, 'INVALID_PAYOUT_METHOD', 'Payout method must be promptpay or bank');
+  }
+  if (!payoutAccount || payoutAccount.length < 4) {
+    throw new AppError(400, 'INVALID_PAYOUT_ACCOUNT', 'Please enter a valid PromptPay ID or bank account');
+  }
+
+  const availableGrossCents = await getSellerAvailableGrossCents(userId);
+  if (availableGrossCents <= 0) {
+    throw new AppError(400, 'INSUFFICIENT_BALANCE', 'No available balance to withdraw');
+  }
+
+  const requestedCents =
+    req.body?.amountCents !== undefined && req.body?.amountCents !== null
+      ? Math.round(Number(req.body.amountCents))
+      : availableGrossCents;
+
+  if (!Number.isFinite(requestedCents) || requestedCents <= 0) {
+    throw new AppError(400, 'INVALID_AMOUNT', 'Withdrawal amount must be greater than 0');
+  }
+  if (requestedCents > availableGrossCents) {
+    throw new AppError(400, 'EXCEEDS_BALANCE', 'Withdrawal amount exceeds available platform balance');
+  }
+
+  const breakdown = calculateWithdrawalBreakdown(requestedCents);
+
+  const inserted = await db.query(
+    `INSERT INTO creator_withdrawals
+       (seller_id, gross_amount_cents, platform_fee_cents, net_amount_cents, fee_rate_bps, currency, payout_method, payout_account, status)
+     VALUES ($1, $2, $3, $4, $5, 'USD', $6, $7, 'pending')
+     RETURNING id, gross_amount_cents, platform_fee_cents, net_amount_cents, fee_rate_bps,
+               currency, payout_method, payout_account, status, created_at`,
+    [
+      userId,
+      breakdown.grossAmountCents,
+      breakdown.platformFeeCents,
+      breakdown.netAmountCents,
+      breakdown.feeRateBps,
+      payoutMethod,
+      payoutAccount,
+    ],
+  );
+
+  const r = inserted.rows[0];
+  res.status(201).json({
+    withdrawal: {
+      id: r.id,
+      grossAmountCents: r.gross_amount_cents,
+      platformFeeCents: r.platform_fee_cents,
+      netAmountCents: r.net_amount_cents,
+      feeRateBps: r.fee_rate_bps,
+      currency: r.currency,
+      payoutMethod: r.payout_method,
+      payoutAccount: r.payout_account,
+      status: r.status,
+      createdAt: r.created_at,
+    },
+  });
 });

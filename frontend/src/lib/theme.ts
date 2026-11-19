@@ -41,3 +41,23 @@ export function readCookie(cookieString: string, name: string): string | null {
   }
   return null;
 }
+
+/**
+ * JS for an inline <script> at the top of <head>: sets <html data-theme> before the first paint, so there is no flash.
+ * It is hand-written ES5 (it cannot import) and must give the same answers as resolveTheme; theme.test.mjs runs it
+ * against resolveTheme. Any failure leaves the theme dark.
+ */
+export function themeBootstrapScript(routes: readonly string[]): string {
+  return (
+    '(function(){var d=document.documentElement;try{' +
+    'var r=' + JSON.stringify(routes) + ';' +
+    'var p=location.pathname.split(/[?#]/)[0];while(p.length>1&&p.charAt(p.length-1)==="/"){p=p.slice(0,-1)}if(!p){p="/"}' +
+    'var t="dark";' +
+    'if(r.indexOf(p)>-1){var s=null,c=document.cookie.split(";");' +
+    'for(var i=0;i<c.length;i++){var e=c[i].indexOf("=");' +
+    'if(e>-1&&c[i].slice(0,e).trim()==="' + THEME_COOKIE + '"){s=c[i].slice(e+1).trim()}}' +
+    'if(s==="light"||s==="dark"){t=s}' +
+    'else if(typeof matchMedia==="function"&&matchMedia("(prefers-color-scheme: light)").matches){t="light"}}' +
+    'd.dataset.theme=t}catch(x){d.dataset.theme="dark"}})();'
+  );
+}

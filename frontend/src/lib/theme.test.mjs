@@ -1,7 +1,8 @@
 // Run: npm test  (Node's built-in runner; imports the TS source via type stripping)
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { isThemeReady, readCookie, resolveTheme } from './theme.ts';
+import vm from 'node:vm';
+import { isThemeReady, readCookie, resolveTheme, themeBootstrapScript } from './theme.ts';
 
 const routes = ['/', '/about'];
 
@@ -40,4 +41,40 @@ test('readCookie finds the named cookie only', () => {
   assert.equal(readCookie('a=1; theme=light; b=2', 'theme'), 'light');
   assert.equal(readCookie('', 'theme'), null);
   assert.equal(readCookie('xtheme=light', 'theme'), null);
+});
+
+// The pre-paint script is hand-written ES5 (it cannot import), so run it for real and check it agrees with resolveTheme.
+function runBootstrap(routes, { pathname, cookie = '', systemLight = false, noMatchMedia = false, cookieThrows = false }) {
+  const dataset = {};
+  const doc = { documentElement: { dataset } };
+  Object.defineProperty(doc, 'cookie', {
+    get() {
+      if (cookieThrows) throw new Error('blocked');
+      return cookie;
+    },
+  });
+  const ctx = { document: doc, location: { pathname } };
+  if (!noMatchMedia) ctx.matchMedia = () => ({ matches: systemLight });
+  vm.runInNewContext(themeBootstrapScript(routes), ctx);
+  return dataset.theme;
+}
+
+test('bootstrap script agrees with resolveTheme for every combination', () => {
+  for (const pathname of ['/', '/gallery', '/about/', '/about/x']) {
+    for (const saved of [null, 'light', 'dark', 'blue']) {
+      for (const systemLight of [true, false]) {
+        const cookie = saved === null ? 'a=1' : 'a=1; theme=' + saved;
+        assert.equal(
+          runBootstrap(routes, { pathname, cookie, systemLight }),
+          resolveTheme(pathname, saved, systemLight, routes),
+          pathname + ' ' + saved + ' ' + systemLight,
+        );
+      }
+    }
+  }
+});
+
+test('bootstrap script falls back to dark when matchMedia is missing or the cookie cannot be read', () => {
+  assert.equal(runBootstrap(routes, { pathname: '/', noMatchMedia: true }), 'dark');
+  assert.equal(runBootstrap(routes, { pathname: '/', cookieThrows: true }), 'dark');
 });

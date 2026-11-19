@@ -6,9 +6,11 @@ import Footer from '@/components/Footer';
 import Navbar from '@/components/Navbar';
 import ReportProvider from '@/components/report/ReportProvider';
 import NavigationProgress from '@/components/ui/NavigationProgress';
+import ThemeSync from '@/components/ThemeSync';
 import RealtimeNotificationToast from '@/components/notifications/RealtimeNotificationToast';
 import { LocaleProvider } from '@/lib/i18n/client';
 import { getLocale } from '@/lib/i18n/server';
+import { THEME_READY_ROUTES, themeBootstrapScript } from '@/lib/theme';
 import './globals.css';
 
 const chakra = Chakra_Petch({ subsets: ['latin', 'thai'], weight: ['400', '500', '600'], display: 'swap' });
@@ -22,10 +24,15 @@ export const metadata: Metadata = {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const locale = await getLocale();
   return (
-    <html lang={locale}>
+    <html lang={locale} suppressHydrationWarning>
+      <head>
+        {/* Sets data-theme before the first paint (no flash); see lib/theme.ts. */}
+        <script dangerouslySetInnerHTML={{ __html: themeBootstrapScript(THEME_READY_ROUTES) }} />
+      </head>
       <body className={`${chakra.className} ${michroma.variable} ${shareTechMono.variable}`}>
         <LocaleProvider locale={locale}>
           <NavigationProgress />
+          <ThemeSync />
           <RealtimeNotificationToast />
           <ReportProvider>
             <AdminOnlyRedirect />

@@ -20,11 +20,12 @@ import {
   Check,
   ChevronDown,
   Plus,
+  Store,
   X,
 } from 'lucide-react';
 import { CDN_SERVICE_URL, CORE_API_URL } from '@/lib/api';
 import { GALLERY_TAGS } from '@/lib/types';
-import { readToken } from '@/lib/session';
+import { readSession, readToken, SESSION_UPDATED_EVENT, type Session } from '@/lib/session';
 import CropPosterModal from '@/components/upload/CropPosterModal';
 
 // Supported licenses
@@ -39,11 +40,29 @@ const MAX_MODEL_SIZE = 50 * 1024 * 1024; // 50 MB
 const MAX_PREVIEW_SIZE = 5 * 1024 * 1024; // 5 MB
 const MAX_POSTER_SIZE = 1 * 1024 * 1024; // 1 MB
 
-// Default Creator token for local dev & testing (until Member 1 finishes login API)
-const DEV_CREATOR_TOKEN =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjAwMDAwMDAwLTAwMDAtMDAwMC0wMDAwLTAwMDAwMDAwMDAwMSIsImVtYWlsIjoiY3JlYXRvckBicm9rZW5kZXNpZ24uY29tIiwicm9sZSI6ImNyZWF0b3IiLCJpc19zZWxsZXIiOnRydWUsImlhdCI6MTc5NDEzNDkxMywiZXhwIjoxNzk2NzI2OTEzfQ.vNxWpDQCz6OQvjoigpuvV7FQOMxa8KgJxyI792gahS0';
-
 export default function UploadPage() {
+  const [authReady, setAuthReady] = useState(false);
+  const [session, setSession] = useState<Session | null>(null);
+
+  useEffect(() => {
+    const syncSession = () => {
+      setSession(readSession());
+      setAuthReady(true);
+    };
+    syncSession();
+    window.addEventListener('storage', syncSession);
+    window.addEventListener(SESSION_UPDATED_EVENT, syncSession);
+    return () => {
+      window.removeEventListener('storage', syncSession);
+      window.removeEventListener(SESSION_UPDATED_EVENT, syncSession);
+    };
+  }, []);
+
+  const canUpload = Boolean(
+    session?.user &&
+      (session.user.is_seller || session.user.role === 'creator' || session.user.role === 'admin'),
+  );
+
   // Model-viewer dynamic import for client-side WebGL
   const [modelViewerLoaded, setModelViewerLoaded] = useState(false);
   const viewerRef = useRef<any>(null);
@@ -273,6 +292,16 @@ export default function UploadPage() {
       return;
     }
 
+    const token = typeof window !== 'undefined' ? readToken() : null;
+    if (!token) {
+      setSubmitError('Please log in as a seller before uploading a 3D model.');
+      return;
+    }
+    if (!canUpload) {
+      setSubmitError('Seller mode must be enabled before uploading a 3D model.');
+      return;
+    }
+
     try {
       submittingRef.current = true;
       setIsSubmitting(true);
@@ -291,9 +320,6 @@ export default function UploadPage() {
       const priceCents = isPaid ? Math.round(parseFloat(priceUsd || '0') * 100) : 0;
       formData.append('price_cents', String(priceCents));
       formData.append('currency', 'USD');
-
-      // Retrieve auth token if available (or use DEV_CREATOR_TOKEN for testing)
-      const token = (typeof window !== 'undefined' ? readToken() : null) || DEV_CREATOR_TOKEN;
 
       const res = await fetch(`${CDN_SERVICE_URL}/api/models`, {
         method: 'POST',
@@ -353,8 +379,43 @@ export default function UploadPage() {
           </p>
         </div>
 
-        {/* Success Modal / Banner */}
-        {uploadSuccess ? (
+        {/* Auth & Seller Access Gates / Upload State */}
+        {!authReady ? (
+          <div className="rounded-lg border border-white/10 bg-white/5 p-8 text-center text-sm text-white/60">
+            Checking your creator session…
+          </div>
+        ) : !session ? (
+          <div className="mx-auto max-w-[800px] rounded-lg border border-white/10 bg-white/5 p-6 text-center">
+            <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70">[ Seller Access ]</p>
+            <h2 className="mt-4 font-display text-2xl uppercase tracking-wide text-white">Sign In to Upload</h2>
+            <p className="mt-3 text-[15px] leading-relaxed text-white/65">
+              You must be logged in to an active creator account to publish 3D models.
+            </p>
+            <Link
+              href="/login"
+              className="mt-6 inline-block rounded-lg bg-white px-5 py-2 text-sm font-medium text-black transition-colors hover:bg-white/85"
+            >
+              Log in to continue
+            </Link>
+          </div>
+        ) : !canUpload ? (
+          <div className="mx-auto max-w-[800px] rounded-lg border border-white/10 bg-white/5 p-6 text-center">
+            <Store className="mx-auto h-12 w-12 text-hud" />
+            <p className="mt-4 font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70">[ Seller Mode Inactive ]</p>
+            <h2 className="mt-2 font-display text-2xl uppercase tracking-wide text-white">
+              Activate Your Creator Store
+            </h2>
+            <p className="mt-3 text-[15px] leading-relaxed text-white/65">
+              Enable seller mode in your Seller Dashboard before uploading 3D models.
+            </p>
+            <Link
+              href="/seller"
+              className="mt-6 inline-block rounded-lg bg-white px-5 py-2 text-sm font-medium text-black transition-colors hover:bg-white/85"
+            >
+              Go to Seller Dashboard
+            </Link>
+          </div>
+        ) : uploadSuccess ? (
           <div className="rounded-2xl border border-emerald-500/30 bg-emerald-950/20 p-8 text-center backdrop-blur">
             <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-emerald-500/20 text-emerald-400">
               <CheckCircle2 className="h-8 w-8" />

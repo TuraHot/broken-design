@@ -45,10 +45,10 @@ export default async function HomePage() {
             </div>
 
             <p className="font-mono text-[11px] text-accent">/01</p>
-            <h1 className="mt-3 font-display text-[length:var(--hero-title-size)] uppercase leading-[0.92] text-ink">
+            <h1 className="mt-3 font-[family-name:var(--font-barlow)] text-[length:var(--hero-title-size)] uppercase leading-[0.92] text-ink">
               <span className="block">{t("home.hero.line1")}</span>
               <span className="block">{t("home.hero.line2")}</span>
-              <span className="block">{t("home.hero.line3")}</span>
+              <span className="hero-accent block">{t("home.hero.line3")}</span>
             </h1>
             <p className="mt-5 font-mono text-[12px] uppercase tracking-[0.06em] text-accent">
               {t("home.hero.tagline")}

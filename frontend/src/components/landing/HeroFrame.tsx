@@ -28,6 +28,13 @@ export default function HeroFrame() {
       style={GRID}
     >
       <LilyViewer />
+      {/* The dark bloom pass paints an opaque black canvas over the grid behind it, so the grid is drawn again on top
+          (lighten only: it never dims the lily). The light scene is transparent and needs no overlay. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 mix-blend-lighten [html[data-theme='light']_&]:hidden"
+        style={GRID}
+      />
       <div className="absolute left-3 top-3 bg-card px-2.5 py-1.5 font-mono text-[11px] leading-relaxed text-ink">
         <p>
           <span className="text-accent">&bull;</span> {text.chip}

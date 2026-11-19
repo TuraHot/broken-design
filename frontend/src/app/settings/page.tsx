@@ -1,21 +1,65 @@
 'use client';
 
-// /settings — the signed-in user's account details. Password change and account deletion need API endpoints
-// that do not exist yet, so they are shown as unavailable instead of as forms that would fail.
-import { useEffect, useState } from 'react';
+// /settings — the signed-in user's account details, display name, and profile logo/avatar management.
+import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { LogOut } from 'lucide-react';
-import AvatarUploader from '@/components/profile/AvatarUploader';
+import { AlertCircle, Check, Loader2, LogOut, Trash2, Upload } from 'lucide-react';
+import UserAvatar from '@/components/ui/UserAvatar';
+import { deleteMyAvatar, updateProfile, uploadMyAvatar } from '@/lib/auth';
 import { useT } from '@/lib/i18n/client';
-import { clearSession, readSession, SESSION_UPDATED_EVENT, type Session } from '@/lib/session';
+import {
+  clearSession,
+  readSession,
+  SESSION_UPDATED_EVENT,
+  updateSessionUser,
+  type Session,
+} from '@/lib/session';
 
 const CARD = 'rounded-lg border border-white/10 bg-white/5 p-5 sm:p-6';
 const LABEL = 'font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70';
+const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = new Set(['image/webp', 'image/png', 'image/jpeg']);
+const ALLOWED_IMAGE_EXTS = new Set(['webp', 'png', 'jpg', 'jpeg']);
+
+const PRESET_AVATARS = [
+  'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="g1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%25" stop-color="%238fd3ff"/><stop offset="100%25" stop-color="%231a243b"/></linearGradient></defs><rect width="100" height="100" fill="url(%23g1)"/><circle cx="50" cy="40" r="20" fill="%238fd3ff"/><path d="M20 85 C20 65 35 60 50 60 C65 60 80 65 80 85 Z" fill="%238fd3ff" opacity="0.8"/></svg>',
+  'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="g2" x1="0" y1="0" x2="1" y2="1"><stop offset="0%25" stop-color="%23b892ff"/><stop offset="100%25" stop-color="%232b1a4a"/></linearGradient></defs><rect width="100" height="100" fill="url(%23g2)"/><circle cx="50" cy="40" r="20" fill="%23b892ff"/><path d="M20 85 C20 65 35 60 50 60 C65 60 80 65 80 85 Z" fill="%23b892ff" opacity="0.8"/></svg>',
+  'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="g3" x1="0" y1="0" x2="1" y2="1"><stop offset="0%25" stop-color="%23ff9ec7"/><stop offset="100%25" stop-color="%234a1a2e"/></linearGradient></defs><rect width="100" height="100" fill="url(%23g3)"/><circle cx="50" cy="40" r="20" fill="%23ff9ec7"/><path d="M20 85 C20 65 35 60 50 60 C65 60 80 65 80 85 Z" fill="%23ff9ec7" opacity="0.8"/></svg>',
+  'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="g4" x1="0" y1="0" x2="1" y2="1"><stop offset="0%25" stop-color="%2334d399"/><stop offset="100%25" stop-color="%230f382a"/></linearGradient></defs><rect width="100" height="100" fill="url(%23g4)"/><circle cx="50" cy="40" r="20" fill="%2334d399"/><path d="M20 85 C20 65 35 60 50 60 C65 60 80 65 80 85 Z" fill="%2334d399" opacity="0.8"/></svg>',
+] as const;
+
+type AvatarMode = 'saved' | 'file' | 'preset' | 'remove';
+
+function svgDataUrlToPngBlob(svgDataUrl: string): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 256;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('Canvas 2D context is unavailable.'));
+        return;
+      }
+      ctx.drawImage(img, 0, 0, 256, 256);
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          reject(new Error('Could not encode preset avatar.'));
+          return;
+        }
+        resolve(blob);
+      }, 'image/png');
+    };
+    img.onerror = () => reject(new Error('Could not load preset avatar.'));
+    img.src = svgDataUrl;
+  });
+}
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="grid gap-1 py-3 sm:grid-cols-[160px_minmax(0,1fr)] sm:gap-4">
+    <div className="grid gap-1 py-3 sm:grid-cols-[160px_minmax(0,1fr)] sm:items-center sm:gap-4">
       <dt className="text-sm text-white/65">{label}</dt>
       <dd className="min-w-0 break-words text-sm text-white">{children}</dd>
     </div>
@@ -27,9 +71,34 @@ export default function SettingsPage() {
   const t = useT();
   const [ready, setReady] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
+  const [draftName, setDraftName] = useState('');
+  const [avatarMode, setAvatarMode] = useState<AvatarMode>('saved');
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
+  const [selectedPresetIndex, setSelectedPresetIndex] = useState<number | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const initializedUserIdRef = useRef<string | null>(null);
+  const savingRef = useRef(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const sync = () => setSession(readSession());
+    const sync = () => {
+      const next = readSession();
+      setSession(next);
+      const nextId = next?.user.id ?? null;
+      if (nextId !== initializedUserIdRef.current) {
+        initializedUserIdRef.current = nextId;
+        setDraftName(next?.user.display_name ?? '');
+        setAvatarMode('saved');
+        setPendingFile(null);
+        setSelectedPresetIndex(null);
+        setSaveSuccess(false);
+        setSaveError(null);
+      }
+    };
     sync();
     setReady(true);
     window.addEventListener('storage', sync);
@@ -39,6 +108,131 @@ export default function SettingsPage() {
       window.removeEventListener(SESSION_UPDATED_EVENT, sync);
     };
   }, []);
+
+  useEffect(() => {
+    if (!pendingFile) {
+      setFilePreviewUrl(null);
+      return;
+    }
+    const objectUrl = URL.createObjectURL(pendingFile);
+    setFilePreviewUrl(objectUrl);
+    return () => {
+      URL.revokeObjectURL(objectUrl);
+    };
+  }, [pendingFile]);
+
+  const savedAvatarUrl = session?.user.avatar_url ?? null;
+  const effectiveAvatarUrl =
+    avatarMode === 'file'
+      ? filePreviewUrl
+      : avatarMode === 'preset' && selectedPresetIndex !== null
+        ? PRESET_AVATARS[selectedPresetIndex]
+        : avatarMode === 'remove'
+          ? null
+          : savedAvatarUrl;
+
+  const nameDirty = Boolean(session && draftName.trim() !== (session.user.display_name || ''));
+  const avatarDirty =
+    avatarMode === 'file' ||
+    avatarMode === 'preset' ||
+    (avatarMode === 'remove' && Boolean(savedAvatarUrl));
+  const hasChanges = nameDirty || avatarDirty;
+
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (!file) return;
+
+    const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+    const validType = file.type ? ALLOWED_IMAGE_TYPES.has(file.type) : ALLOWED_IMAGE_EXTS.has(ext);
+    if (!validType) {
+      setSaveError(t('settings.invalidImage'));
+      setSaveSuccess(false);
+      return;
+    }
+    if (file.size > MAX_AVATAR_BYTES) {
+      setSaveError(t('settings.imageTooLarge'));
+      setSaveSuccess(false);
+      return;
+    }
+
+    setPendingFile(file);
+    setSelectedPresetIndex(null);
+    setAvatarMode('file');
+    setSaveError(null);
+    setSaveSuccess(false);
+  };
+
+  const handleSelectPreset = (index: number) => {
+    setAvatarMode('preset');
+    setSelectedPresetIndex(index);
+    setPendingFile(null);
+    setSaveError(null);
+    setSaveSuccess(false);
+  };
+
+  const handleRemoveAvatar = () => {
+    setAvatarMode(savedAvatarUrl ? 'remove' : 'saved');
+    setPendingFile(null);
+    setSelectedPresetIndex(null);
+    setSaveError(null);
+    setSaveSuccess(false);
+  };
+
+  const handleSaveProfile = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!session || savingRef.current || !hasChanges) return;
+
+    const trimmedName = draftName.trim();
+    if (!trimmedName) {
+      setSaveError(t('settings.nameRequired'));
+      setSaveSuccess(false);
+      return;
+    }
+    if (trimmedName.length > 100) {
+      setSaveError(t('settings.nameTooLong'));
+      setSaveSuccess(false);
+      return;
+    }
+
+    savingRef.current = true;
+    setSaving(true);
+    setSaveError(null);
+    setSaveSuccess(false);
+
+    try {
+      if (nameDirty) {
+        const updatedUser = await updateProfile(trimmedName, session.token);
+        updateSessionUser({ display_name: updatedUser.display_name });
+        setDraftName(updatedUser.display_name);
+      }
+
+      if (avatarDirty) {
+        if (avatarMode === 'file' && pendingFile) {
+          const nextAvatarUrl = await uploadMyAvatar(pendingFile, session.token, pendingFile.name);
+          updateSessionUser({ avatar_url: nextAvatarUrl });
+        } else if (avatarMode === 'preset' && selectedPresetIndex !== null) {
+          const blob = await svgDataUrlToPngBlob(PRESET_AVATARS[selectedPresetIndex]);
+          const nextAvatarUrl = await uploadMyAvatar(blob, session.token, 'preset-avatar.png');
+          updateSessionUser({ avatar_url: nextAvatarUrl });
+        } else if (avatarMode === 'remove') {
+          await deleteMyAvatar(session.token);
+          updateSessionUser({ avatar_url: null });
+        }
+      }
+
+      setAvatarMode('saved');
+      setPendingFile(null);
+      setSelectedPresetIndex(null);
+      setSession(readSession());
+      setSaveSuccess(true);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Failed to save profile.');
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
+  };
 
   const logOut = () => {
     clearSession();
@@ -63,22 +257,141 @@ export default function SettingsPage() {
         <div className="mt-8 grid grid-cols-[minmax(0,1fr)] gap-6">
           <section aria-labelledby="profile-title" className={CARD}>
             <h2 id="profile-title" className={LABEL}>{t('settings.profile')}</h2>
-            <div className="mt-4">
-              <AvatarUploader
-                name={session.user.display_name?.trim() || session.user.email}
-                avatarUrl={session.user.avatar_url}
-                size="lg"
-                onUpdated={(nextUrl) =>
-                  setSession((prev) => (prev ? { ...prev, user: { ...prev.user, avatar_url: nextUrl } } : prev))
-                }
-              />
-            </div>
-            <dl className="mt-4 divide-y divide-white/10">
-              <Row label={t('settings.displayName')}>{session.user.display_name || '—'}</Row>
-              <Row label={t('settings.email')}>{session.user.email}</Row>
-              <Row label={t('settings.accountType')}>{session.user.is_seller ? t('settings.buyerSeller') : t('settings.buyer')}</Row>
-            </dl>
-            <p className="mt-3 text-sm text-white/65">{t('settings.profileNote')}</p>
+
+            <form onSubmit={handleSaveProfile} noValidate className="mt-4 space-y-6">
+              <div>
+                <p className="text-sm text-white/65">{t('settings.avatar')}</p>
+                <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-start">
+                  <UserAvatar
+                    name={draftName.trim() || session.user.email}
+                    avatarUrl={effectiveAvatarUrl}
+                    size="lg"
+                  />
+
+                  <div className="min-w-0 flex-1 space-y-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={() => fileInputRef.current?.click()}
+                        className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 text-sm text-white transition-colors hover:border-white/40 hover:bg-white/10 disabled:opacity-50"
+                      >
+                        <Upload aria-hidden className="h-4 w-4" />
+                        <span>{t('settings.changeAvatar')}</span>
+                      </button>
+
+                      {effectiveAvatarUrl && (
+                        <button
+                          type="button"
+                          disabled={saving}
+                          onClick={handleRemoveAvatar}
+                          className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-white/10 px-3 text-sm text-red-300 transition-colors hover:border-red-500/30 hover:bg-red-500/10 disabled:opacity-50"
+                        >
+                          <Trash2 aria-hidden className="h-4 w-4" />
+                          <span>{t('settings.removeAvatar')}</span>
+                        </button>
+                      )}
+
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/webp,image/png,image/jpeg"
+                        onChange={handleFileChange}
+                        className="hidden"
+                      />
+                    </div>
+
+                    <p className="text-xs text-white/50">{t('settings.avatarHint')}</p>
+
+                    <div>
+                      <p className="text-xs text-white/50">{t('settings.presets')}</p>
+                      <div className="mt-2 flex items-center gap-2.5">
+                        {PRESET_AVATARS.map((preset, index) => {
+                          const active = avatarMode === 'preset' && selectedPresetIndex === index;
+                          return (
+                            <button
+                              key={index}
+                              type="button"
+                              disabled={saving}
+                              aria-label={`Preset ${index + 1}`}
+                              aria-pressed={active}
+                              onClick={() => handleSelectPreset(index)}
+                              className={`h-9 w-9 overflow-hidden rounded-full border-2 transition-all hover:scale-105 disabled:opacity-50 ${
+                                active ? 'border-hud ring-2 ring-hud/30' : 'border-white/20 hover:border-white/50'
+                              }`}
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={preset} alt="" className="h-full w-full object-cover" />
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <dl className="divide-y divide-white/10 border-t border-white/10">
+                <div className="grid gap-1 py-3 sm:grid-cols-[160px_minmax(0,1fr)] sm:items-center sm:gap-4">
+                  <dt className="text-sm text-white/65">
+                    <label htmlFor="settings-display-name">{t('settings.displayName')}</label>
+                  </dt>
+                  <dd className="min-w-0">
+                    <input
+                      id="settings-display-name"
+                      type="text"
+                      maxLength={100}
+                      disabled={saving}
+                      value={draftName}
+                      onChange={(e) => {
+                        setDraftName(e.target.value);
+                        setSaveError(null);
+                        setSaveSuccess(false);
+                      }}
+                      className="h-10 w-full max-w-sm rounded-lg border border-white/15 bg-black/40 px-3 text-sm text-white placeholder:text-white/40 focus:border-white/50 focus:outline-none disabled:opacity-60"
+                    />
+                  </dd>
+                </div>
+                <Row label={t('settings.email')}>{session.user.email}</Row>
+                <Row label={t('settings.accountType')}>{session.user.is_seller ? t('settings.buyerSeller') : t('settings.buyer')}</Row>
+              </dl>
+
+              <p className="text-sm text-white/65">{t('settings.profileNote')}</p>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="submit"
+                  disabled={saving || !hasChanges || !draftName.trim()}
+                  className="inline-flex h-10 items-center gap-2 rounded-lg bg-white px-4 text-sm font-medium text-black transition-colors hover:bg-white/85 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {saving ? (
+                    <>
+                      <Loader2 aria-hidden className="h-4 w-4 animate-spin motion-reduce:animate-none" />
+                      <span>{t('settings.saving')}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check aria-hidden className="h-4 w-4" />
+                      <span>{t('settings.saveProfile')}</span>
+                    </>
+                  )}
+                </button>
+
+                {saveSuccess && (
+                  <p role="status" className="inline-flex items-center gap-1.5 text-sm text-emerald-400">
+                    <Check aria-hidden className="h-4 w-4 shrink-0" />
+                    <span>{t('settings.profileSaved')}</span>
+                  </p>
+                )}
+
+                {saveError && (
+                  <p role="alert" className="inline-flex items-center gap-1.5 text-sm text-red-300">
+                    <AlertCircle aria-hidden className="h-4 w-4 shrink-0" />
+                    <span>{saveError}</span>
+                  </p>
+                )}
+              </div>
+            </form>
           </section>
 
           <section aria-labelledby="security-title" className={CARD}>

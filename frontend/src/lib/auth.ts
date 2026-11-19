@@ -1,5 +1,5 @@
 
-import { CORE_API_URL } from './api';
+import { CDN_SERVICE_URL, CORE_API_URL } from './api';
 
 // ข้อมูลผู้ใช้ที่ Backend ส่งกลับมา
 export interface AuthUser {
@@ -81,4 +81,62 @@ export async function register(
     password,
     displayName: displayName.trim(),
   });
+}
+
+// อัปเดตชื่อที่แสดงของบัญชีปัจจุบัน (PATCH /api/auth/profile)
+export async function updateProfile(
+  displayName: string,
+  token: string,
+): Promise<AuthUser> {
+  const response = await fetch(`${CORE_API_URL}/api/auth/profile`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ displayName: displayName.trim() }),
+  });
+
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(data?.error?.message || 'Failed to update profile.');
+  }
+
+  return data.user as AuthUser;
+}
+
+// อัปโหลดโลโก้/รูปโปรไฟล์ไปยัง cdn-service (Supabase bucket: profile_logo)
+export async function uploadMyAvatar(
+  file: Blob,
+  token: string,
+  filename = 'avatar.png',
+): Promise<string | null> {
+  const form = new FormData();
+  form.append('avatar', file, filename);
+
+  const response = await fetch(`${CDN_SERVICE_URL}/api/me/avatar`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(data?.error?.message || `Upload failed (${response.status})`);
+  }
+
+  return data?.avatarPath ? `${CDN_SERVICE_URL}${data.avatarPath}` : null;
+}
+
+// ลบรูปโปรไฟล์ออกจาก cdn-service และ Supabase bucket: profile_logo
+export async function deleteMyAvatar(token: string): Promise<void> {
+  const response = await fetch(`${CDN_SERVICE_URL}/api/me/avatar`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(data?.error?.message || `Failed to remove avatar (${response.status})`);
+  }
 }

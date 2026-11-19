@@ -41,6 +41,14 @@ const checkEmailSchema = z.object({
   email: z.string().trim().email().max(255),
 });
 
+const updateProfileSchema = z.object({
+  displayName: z
+    .string()
+    .trim()
+    .min(1, 'Display name cannot be empty')
+    .max(100, 'Display name must not exceed 100 characters'),
+});
+
 // POST /api/auth/check-email
 // ตรวจสอบว่า Email มีบัญชีอยู่ในระบบแล้วหรือไม่
 authRouter.post('/check-email', async (req, res) => {
@@ -203,6 +211,52 @@ authRouter.get('/me', requireAuth, async (req, res) => {
   }
 
   res.json({
+    user: {
+      id: user.id,
+      email: user.email,
+      display_name: user.display_name,
+      role: user.role,
+      is_seller: user.is_seller,
+      avatar_url: buildAvatarUrl(user.id, user.avatar_hash),
+    },
+  });
+});
+
+// PATCH /api/auth/profile — update display_name for the signed-in account
+// (User avatar binaries are managed separately by cdn-service in the `profile_logo` bucket.)
+authRouter.patch('/profile', requireAuth, async (req, res) => {
+  const parsed = updateProfileSchema.safeParse(req.body);
+  if (!parsed.success) {
+    throw new AppError(
+      400,
+      'INVALID_INPUT',
+      parsed.error.issues[0]?.message || 'Invalid profile update data',
+    );
+  }
+
+  const existing = await db.query(
+    `SELECT id, suspended_at FROM users WHERE id = $1`,
+    [req.user!.id],
+  );
+  const currentUser = existing.rows[0];
+  if (!currentUser) {
+    throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
+  }
+  if (currentUser.suspended_at) {
+    throw new AppError(403, 'ACCOUNT_SUSPENDED', 'This account has been suspended');
+  }
+
+  const updated = await db.query(
+    `UPDATE users
+     SET display_name = $1
+     WHERE id = $2
+     RETURNING id, email, display_name, role, is_seller, avatar_hash`,
+    [parsed.data.displayName, req.user!.id],
+  );
+  const user = updated.rows[0];
+
+  res.json({
+    message: 'Profile updated',
     user: {
       id: user.id,
       email: user.email,

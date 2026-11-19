@@ -1,8 +1,8 @@
 "use client";
 
 import { ChangeEvent, useRef, useState } from "react";
-import { AlertCircle, Camera, Loader2, Trash2 } from "lucide-react";
-import { CDN_SERVICE_URL } from "@/lib/api";
+import { AlertCircle, Camera, Loader2 } from "lucide-react";
+import { uploadMyAvatar } from "@/lib/auth";
 import { readSession, updateSessionUser } from "@/lib/session";
 import UserAvatar from "@/components/ui/UserAvatar";
 
@@ -53,25 +53,7 @@ export default function AvatarUploader({
       setBusy(true);
       setError(null);
 
-      const form = new FormData();
-      form.append("avatar", file);
-
-      const res = await fetch(`${CDN_SERVICE_URL}/api/me/avatar`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: form,
-      });
-
-      const data = await res.json().catch(() => null);
-      if (!res.ok) {
-        throw new Error(
-          data?.error?.message || `Upload failed (${res.status})`,
-        );
-      }
-
-      const nextUrl = data?.avatarPath
-        ? `${CDN_SERVICE_URL}${data.avatarPath}`
-        : null;
+      const nextUrl = await uploadMyAvatar(file, token, file.name);
       updateSessionUser({ avatar_url: nextUrl });
       onUpdated?.(nextUrl);
     } catch (err: any) {

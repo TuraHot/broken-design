@@ -9,6 +9,7 @@ import UserAvatar from '@/components/ui/UserAvatar';
 import { deleteMyAvatar, updateProfile, uploadMyAvatar } from '@/lib/auth';
 import { useT } from '@/lib/i18n/client';
 import { authErrorText } from '@/lib/i18n/auth-error';
+import type { MessageKey } from '@/lib/i18n/messages';
 import {
   clearSession,
   readSession,
@@ -79,7 +80,7 @@ export default function SettingsPage() {
   const [selectedPresetIndex, setSelectedPresetIndex] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<{ key: MessageKey } | { err: unknown } | null>(null);
 
   const initializedUserIdRef = useRef<string | null>(null);
   const savingRef = useRef(false);
@@ -147,12 +148,12 @@ export default function SettingsPage() {
     const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
     const validType = file.type ? ALLOWED_IMAGE_TYPES.has(file.type) : ALLOWED_IMAGE_EXTS.has(ext);
     if (!validType) {
-      setSaveError(t('settings.invalidImage'));
+      setSaveError({ key: 'settings.invalidImage' });
       setSaveSuccess(false);
       return;
     }
     if (file.size > MAX_AVATAR_BYTES) {
-      setSaveError(t('settings.imageTooLarge'));
+      setSaveError({ key: 'settings.imageTooLarge' });
       setSaveSuccess(false);
       return;
     }
@@ -186,12 +187,12 @@ export default function SettingsPage() {
 
     const trimmedName = draftName.trim();
     if (!trimmedName) {
-      setSaveError(t('settings.nameRequired'));
+      setSaveError({ key: 'settings.nameRequired' });
       setSaveSuccess(false);
       return;
     }
     if (trimmedName.length > 100) {
-      setSaveError(t('settings.nameTooLong'));
+      setSaveError({ key: 'settings.nameTooLong' });
       setSaveSuccess(false);
       return;
     }
@@ -228,7 +229,7 @@ export default function SettingsPage() {
       setSession(readSession());
       setSaveSuccess(true);
     } catch (err) {
-      setSaveError(authErrorText(err, t, 'settings.errSave'));
+      setSaveError({ err });
     } finally {
       savingRef.current = false;
       setSaving(false);
@@ -388,7 +389,7 @@ export default function SettingsPage() {
                 {saveError && (
                   <p role="alert" className="inline-flex items-center gap-1.5 text-sm text-red-300">
                     <AlertCircle aria-hidden className="h-4 w-4 shrink-0" />
-                    <span>{saveError}</span>
+                    <span>{'key' in saveError ? t(saveError.key) : authErrorText(saveError.err, t, 'settings.errSave')}</span>
                   </p>
                 )}
               </div>

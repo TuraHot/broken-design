@@ -116,10 +116,13 @@ export interface SellerWalletResponse {
 export interface SellerModelItem {
   id: string;
   title: string;
+  description?: string;
+  license?: License | string;
   priceCents: number;
   currency: string;
   viewCount: number;
   downloadCount: number;
+  posterUrl?: string | null;
   isHidden: boolean;
   isDeleted: boolean;
   createdAt: string;

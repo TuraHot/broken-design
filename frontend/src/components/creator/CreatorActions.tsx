@@ -4,7 +4,7 @@
 // signed-in buyers to /me, and signed-out visitors to /login.
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { ArrowRight, Store, User } from 'lucide-react';
+import { ArrowRight, User } from 'lucide-react';
 import { creatorHandle } from '@/lib/creators';
 import { readSession, type Session } from '@/lib/session';
 
@@ -33,16 +33,10 @@ export default function CreatorActions() {
   return (
     <div className="mt-7 flex flex-wrap items-center gap-3">
       {isCreator && handle ? (
-        <>
-          <Link href="/seller" className={PRIMARY_BTN}>
-            <Store aria-hidden className="h-4 w-4" />
-            Seller dashboard
-          </Link>
-          <Link href={`/creators/${handle}`} className={SECONDARY_BTN}>
-            <User aria-hidden className="h-4 w-4" />
-            Creator profile
-          </Link>
-        </>
+        <Link href={`/creators/${handle}`} className={PRIMARY_BTN}>
+          <User aria-hidden className="h-4 w-4" />
+          Creator profile
+        </Link>
       ) : user ? (
         <Link href="/me" className={PRIMARY_BTN}>
           Become a creator

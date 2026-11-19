@@ -53,6 +53,61 @@ async function cleanupFiles(files?: { [fieldname: string]: Express.Multer.File[]
   }
 }
 
+async function preparePosterToWebp(posterFile: Express.Multer.File): Promise<void> {
+  if (posterFile.size > env.maxPosterSizeBytes) {
+    throw new AppError(413, 'FILE_TOO_LARGE', `Poster file exceeds limit of ${env.maxPosterSizeBytes} bytes`);
+  }
+  const allowedMime = ['image/webp', 'image/png', 'image/jpeg'];
+  const ext = path.extname(posterFile.originalname).toLowerCase();
+  if (!allowedMime.includes(posterFile.mimetype) && !['.webp', '.png', '.jpg', '.jpeg'].includes(ext)) {
+    throw new AppError(400, 'INVALID_POSTER', 'Poster must be a valid image file (.webp, .png, or .jpg)');
+  }
+  try {
+    const webpBuffer = await sharp(posterFile.path).webp({ quality: 82 }).toBuffer();
+    await fsp.writeFile(posterFile.path, webpBuffer);
+  } catch {
+    throw new AppError(
+      400,
+      'INVALID_POSTER',
+      'Poster could not be processed as a valid image (.webp, .png, or .jpg)'
+    );
+  }
+}
+
+async function readAndCheckForeignGlb(
+  file: Express.Multer.File,
+  opts: { kind: 'model' | 'preview'; maxBytes: number; ownerId: string },
+): Promise<Buffer> {
+  const isPreview = opts.kind === 'preview';
+  if (file.size > opts.maxBytes) {
+    throw new AppError(
+      413,
+      'FILE_TOO_LARGE',
+      `${isPreview ? 'Preview' : 'Model'} file exceeds limit of ${opts.maxBytes} bytes`,
+    );
+  }
+  const validation = await validateGlbFile(file.path);
+  if (!validation.valid) {
+    throw new AppError(
+      400,
+      'INVALID_GLB',
+      isPreview ? 'Preview file is not a valid GLB (glTF v2)' : validation.reason || 'File is not a valid Binary glTF (GLB v2)',
+    );
+  }
+  const rawBuffer = await fsp.readFile(file.path);
+  const foreignMatch = await detectForeignPlatformAsset(rawBuffer, opts.ownerId);
+  if (foreignMatch) {
+    throw new AppError(
+      409,
+      'WATERMARK_CONFLICT',
+      isPreview
+        ? 'Upload rejected: the preview GLB already belongs to another creator on Lixyte (detected via platform watermark) and cannot be re-uploaded.'
+        : 'Upload rejected: this 3D model already belongs to another creator on Lixyte (detected via platform watermark) and cannot be re-uploaded.',
+    );
+  }
+  return rawBuffer;
+}
+
 // POST /api/models (Upload 3D Asset: file, preview?, poster?, metadata)
 uploadRouter.post(
   '/models',
@@ -130,80 +185,33 @@ uploadRouter.post(
         );
       }
 
-      // 2. Validate and inspect main GLB file
+      // 2. Validate, inspect, and enforce foreign-asset watermark checks BEFORE writing anything to storage
+      const modelId = crypto.randomUUID();
+      const ownerId = req.user!.id;
+
       const modelFile = files?.['file']?.[0];
       if (!modelFile) {
         throw new AppError(400, 'BAD_REQUEST', 'Main GLB file is required');
       }
 
-      if (modelFile.size > env.maxModelSizeBytes) {
-        throw new AppError(413, 'FILE_TOO_LARGE', `Model file exceeds maximum limit of ${env.maxModelSizeBytes} bytes`);
-      }
+      const rawGlbBuffer = await readAndCheckForeignGlb(modelFile, {
+        kind: 'model',
+        maxBytes: env.maxModelSizeBytes,
+        ownerId,
+      });
 
-      const validation = await validateGlbFile(modelFile.path);
-      if (!validation.valid) {
-        throw new AppError(400, 'INVALID_GLB', validation.reason || 'File is not a valid Binary glTF (GLB v2)');
-      }
-
-      // 2b. Check the preview and poster BEFORE anything is stored, so a bad one cannot leave the main file
-      // behind in permanent storage (storage is content-addressed and shared, so it is never deleted on error).
+      let rawPreviewBuffer: Buffer | null = null;
       if (previewFile) {
-        if (previewFile.size > env.maxPreviewSizeBytes) {
-          throw new AppError(413, 'FILE_TOO_LARGE', `Preview file exceeds limit of ${env.maxPreviewSizeBytes} bytes`);
-        }
-        const previewValidation = await validateGlbFile(previewFile.path);
-        if (!previewValidation.valid) {
-          throw new AppError(400, 'INVALID_GLB', 'Preview file is not a valid GLB (glTF v2)');
-        }
+        rawPreviewBuffer = await readAndCheckForeignGlb(previewFile, {
+          kind: 'preview',
+          maxBytes: env.maxPreviewSizeBytes,
+          ownerId,
+        });
       }
 
       const posterFile = files?.['poster']?.[0];
       if (posterFile) {
-        if (posterFile.size > env.maxPosterSizeBytes) {
-          throw new AppError(413, 'FILE_TOO_LARGE', `Poster file exceeds limit of ${env.maxPosterSizeBytes} bytes`);
-        }
-        const allowedMime = ['image/webp', 'image/png', 'image/jpeg'];
-        const ext = path.extname(posterFile.originalname).toLowerCase();
-        if (!allowedMime.includes(posterFile.mimetype) && !['.webp', '.png', '.jpg', '.jpeg'].includes(ext)) {
-          throw new AppError(400, 'INVALID_POSTER', 'Poster must be a valid image file (.webp, .png, or .jpg)');
-        }
-        try {
-          const webpBuffer = await sharp(posterFile.path).webp({ quality: 82 }).toBuffer();
-          await fsp.writeFile(posterFile.path, webpBuffer);
-        } catch {
-          throw new AppError(
-            400,
-            'INVALID_POSTER',
-            'Poster could not be processed as a valid image (.webp, .png, or .jpg)'
-          );
-        }
-      }
-
-      const modelId = crypto.randomUUID();
-      const ownerId = req.user!.id;
-
-      // Reject re-uploads of other creators' models or previews BEFORE writing anything to storage
-      const rawGlbBuffer = await fsp.readFile(modelFile.path);
-      const foreignMainMatch = await detectForeignPlatformAsset(rawGlbBuffer, ownerId);
-      if (foreignMainMatch) {
-        throw new AppError(
-          409,
-          'WATERMARK_CONFLICT',
-          'Upload rejected: this 3D model already belongs to another creator on Lixyte (detected via platform watermark) and cannot be re-uploaded.',
-        );
-      }
-
-      let rawPreviewBuffer: Buffer | null = null;
-      if (previewFile) {
-        rawPreviewBuffer = await fsp.readFile(previewFile.path);
-        const foreignPreviewMatch = await detectForeignPlatformAsset(rawPreviewBuffer, ownerId);
-        if (foreignPreviewMatch) {
-          throw new AppError(
-            409,
-            'WATERMARK_CONFLICT',
-            'Upload rejected: the preview GLB already belongs to another creator on Lixyte (detected via platform watermark) and cannot be re-uploaded.',
-          );
-        }
+        await preparePosterToWebp(posterFile);
       }
 
       // Embed platform origin license & vertex steganography watermark (purchaseId: 'original' / 'preview')
@@ -329,6 +337,172 @@ uploadRouter.post(
       res.status(201).json({
         message: 'Model uploaded successfully',
         model: insertedModel,
+      });
+    } catch (err) {
+      await cleanupFiles(files);
+      if (storage && uploadedKeys.length > 0) {
+        await Promise.all(uploadedKeys.map((key) => storage!.delete(key).catch(() => undefined)));
+      }
+      next(err);
+    }
+  }
+);
+
+// PATCH /api/models/:id/assets (Replace main GLB, preview GLB, and/or poster image)
+uploadRouter.patch(
+  '/models/:id/assets',
+  requireAuth,
+  requireSeller,
+  uploadFields,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
+    const uploadedKeys: string[] = [];
+    let storage: StorageAdapter | null = null;
+
+    try {
+      const modelId = String(req.params.id);
+      const userId = req.user!.id;
+      const userRole = req.user!.role;
+
+      try {
+        const userCheck = await db.query(
+          `SELECT id, role, is_seller, suspended_at FROM users WHERE id = $1`,
+          [userId]
+        );
+        if (userCheck.rows.length > 0 && userCheck.rows[0].suspended_at !== null) {
+          throw new AppError(403, 'ACCOUNT_SUSPENDED', 'Your account has been suspended by an administrator.');
+        }
+      } catch (err) {
+        if (err instanceof AppError) throw err;
+      }
+
+      const existingRes = await db.query(
+        `SELECT id, owner_id, license, file_hash, file_size, preview_hash, poster_hash, deleted_at
+         FROM models WHERE id = $1`,
+        [modelId]
+      );
+      if (existingRes.rowCount === 0 || existingRes.rows[0].deleted_at !== null) {
+        throw new AppError(404, 'MODEL_NOT_FOUND', 'Model not found');
+      }
+      const existing = existingRes.rows[0];
+      if (existing.owner_id !== userId && userRole !== 'admin') {
+        throw new AppError(403, 'FORBIDDEN', 'You do not have permission to edit this model');
+      }
+
+      const modelFile = files?.['file']?.[0];
+      const previewFile = files?.['preview']?.[0];
+      const posterFile = files?.['poster']?.[0];
+
+      if (!modelFile && !previewFile && !posterFile) {
+        throw new AppError(400, 'BAD_REQUEST', 'At least one asset file (file, preview, or poster) is required');
+      }
+
+      // Validate all replacement files & check foreign platform watermarks BEFORE storing anything
+      const rawGlbBuffer = modelFile
+        ? await readAndCheckForeignGlb(modelFile, {
+            kind: 'model',
+            maxBytes: env.maxModelSizeBytes,
+            ownerId: existing.owner_id,
+          })
+        : null;
+
+      const rawPreviewBuffer = previewFile
+        ? await readAndCheckForeignGlb(previewFile, {
+            kind: 'preview',
+            maxBytes: env.maxPreviewSizeBytes,
+            ownerId: existing.owner_id,
+          })
+        : null;
+
+      if (posterFile) {
+        await preparePosterToWebp(posterFile);
+      }
+
+      let nextFileHash: string = existing.file_hash;
+      let nextFileSize: number = Number(existing.file_size);
+      let nextPreviewHash: string | null = existing.preview_hash;
+      let nextPosterHash: string | null = existing.poster_hash;
+
+      try {
+        if (modelFile && rawGlbBuffer) {
+          const { buffer: watermarkedBuffer } = await embedLicenseAndWatermark(rawGlbBuffer, {
+            modelId,
+            ownerId: existing.owner_id,
+            license: existing.license,
+            purchaseId: 'original',
+          });
+          await fsp.writeFile(modelFile.path, watermarkedBuffer);
+          nextFileSize = watermarkedBuffer.length;
+        }
+
+        if (previewFile && rawPreviewBuffer) {
+          const { buffer: watermarkedPreview } = await embedLicenseAndWatermark(rawPreviewBuffer, {
+            modelId,
+            ownerId: existing.owner_id,
+            license: existing.license,
+            purchaseId: 'preview',
+          });
+          await fsp.writeFile(previewFile.path, watermarkedPreview);
+        }
+      } catch (wmErr: any) {
+        if (wmErr instanceof AppError) throw wmErr;
+        throw new AppError(400, 'INVALID_GLB', wmErr?.message || 'Failed to parse and watermark GLB structure');
+      }
+
+      storage = getStorage();
+
+      if (modelFile) {
+        nextFileHash = await computeFileSha256(modelFile.path);
+        const mainKey = assetKey(modelId, 'model', nextFileHash);
+        await storage.put(mainKey, modelFile.path);
+        uploadedKeys.push(mainKey);
+      }
+
+      if (previewFile) {
+        nextPreviewHash = await computeFileSha256(previewFile.path);
+        const previewKey = assetKey(modelId, 'preview', nextPreviewHash);
+        await storage.put(previewKey, previewFile.path);
+        uploadedKeys.push(previewKey);
+      }
+
+      if (posterFile) {
+        nextPosterHash = await computeFileSha256(posterFile.path);
+        const posterKey = assetKey(modelId, 'poster', nextPosterHash);
+        await storage.put(posterKey, posterFile.path);
+        uploadedKeys.push(posterKey);
+      }
+
+      try {
+        await db.query(
+          `UPDATE models
+           SET file_hash = $1, file_size = $2, preview_hash = $3, poster_hash = $4
+           WHERE id = $5`,
+          [nextFileHash, nextFileSize, nextPreviewHash, nextPosterHash, modelId]
+        );
+      } catch (dbErr) {
+        if (!supabase) throw dbErr;
+        const { error } = await supabase
+          .from('models')
+          .update({
+            file_hash: nextFileHash,
+            file_size: nextFileSize,
+            preview_hash: nextPreviewHash,
+            poster_hash: nextPosterHash,
+          })
+          .eq('id', modelId);
+        if (error) throw dbErr;
+      }
+
+      await cleanupFiles(files);
+      res.json({
+        message: 'Model assets updated successfully',
+        model: {
+          id: modelId,
+          fileHash: nextFileHash,
+          fileSize: nextFileSize,
+          previewHash: nextPreviewHash,
+          posterHash: nextPosterHash,
+        },
       });
     } catch (err) {
       await cleanupFiles(files);

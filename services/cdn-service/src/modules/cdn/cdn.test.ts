@@ -108,9 +108,33 @@ function resetDb() {
   if (sql.includes("FROM models WHERE id = $1")) {
     const m = models[params[0]];
     return {
-      rows: m ? [{ id: m.id, owner_id: m.owner_id, title: m.title }] : [],
+      rows: m
+        ? [
+            {
+              id: m.id,
+              owner_id: m.owner_id,
+              title: m.title,
+              license: m.license ?? "COMMERCIAL",
+              file_hash: m.file_hash,
+              file_size: m.file_size ?? FULL.length,
+              preview_hash: m.preview_hash,
+              poster_hash: m.poster_hash,
+              deleted_at: m.deleted_at ?? null,
+            },
+          ]
+        : [],
       rowCount: m ? 1 : 0,
     };
+  }
+  if (sql.includes("UPDATE models") && sql.includes("SET file_hash = $1")) {
+    const m = models[params[4]];
+    if (m) {
+      m.file_hash = params[0];
+      m.file_size = params[1];
+      m.preview_hash = params[2];
+      m.poster_hash = params[3];
+    }
+    return { rows: [], rowCount: m ? 1 : 0 };
   }
   if (sql.includes("FROM models ORDER BY created_at DESC")) {
     const rows = Object.values(models).map((m) => ({
@@ -885,6 +909,16 @@ test("upload guard: blocks unwatermarked legacy file or preview matching foreign
   assert.equal(await errCode(previewRes), "WATERMARK_CONFLICT");
 });
 
+async function readStoredAsset(key: string): Promise<Buffer> {
+  const local = new LocalDiskStorage();
+  const { stream } = await local.getStream(key);
+  const chunks: Buffer[] = [];
+  for await (const c of stream) {
+    chunks.push(Buffer.isBuffer(c) ? c : Buffer.from(c));
+  }
+  return Buffer.concat(chunks);
+}
+
 test("upload guard: allows original owner upload and embeds watermark into preview GLB", async () => {
   const mainGlb = await createSampleGlbBuffer(72);
   const previewGlb = await createSampleGlbBuffer(68);
@@ -901,17 +935,72 @@ test("upload guard: allows original owner upload and embeds watermark into previ
 
   // Verify the stored preview.glb itself carries Layer 1 metadata + Layer 2 vertex watermark
   const previewKey = assetKey(body.model.id, "preview", body.model.preview_hash);
-  const local = new LocalDiskStorage();
-  const { stream } = await local.getStream(previewKey);
-  const chunks: Buffer[] = [];
-  for await (const c of stream) {
-    chunks.push(Buffer.isBuffer(c) ? c : Buffer.from(c));
-  }
-  const storedPreview = Buffer.concat(chunks);
+  const storedPreview = await readStoredAsset(previewKey);
   const verifiedPreview = await verifyGlbWatermark(storedPreview, body.model.id);
   assert.equal(verifiedPreview.isValidMetadata, true);
   assert.equal(verifiedPreview.isValidVertexWatermark, true);
   assert.equal(verifiedPreview.vertexBitMatchRatio, 1);
   assert.equal((verifiedPreview.extractedMetadata as any)?.purchaseId, "preview");
   assert.equal((verifiedPreview.extractedMetadata as any)?.ownerId, OWNER);
+});
+
+test("patch assets guard: enforces ownership, blocks foreign watermarked replacement, and watermarks owner replacements", async () => {
+  const originalMain = await createSampleGlbBuffer(72);
+  const strangerMain = await createSampleGlbBuffer(70);
+  const { buffer: strangerWatermarked } = await embedLicenseAndWatermark(strangerMain, {
+    modelId: FREE_ID,
+    ownerId: STRANGER,
+    license: "CC0",
+    purchaseId: "original",
+  });
+  models[FREE_ID].owner_id = STRANGER;
+
+  // 1. Non-owner attempt -> 403
+  const forbiddenForm = new FormData();
+  forbiddenForm.append("file", new Blob([new Uint8Array(originalMain)], { type: "model/gltf-binary" }), "new.glb");
+  const forbiddenRes = await fetch(`${apiBase}/models/${PAID_ID}/assets`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token(STRANGER, "creator")}` },
+    body: forbiddenForm,
+  });
+  assert.equal(forbiddenRes.status, 403);
+
+  // 2. Owner attempting to slip in stranger's watermarked model -> 409 WATERMARK_CONFLICT
+  const conflictForm = new FormData();
+  conflictForm.append("file", new Blob([new Uint8Array(strangerWatermarked)], { type: "model/gltf-binary" }), "stolen.glb");
+  const conflictRes = await fetch(`${apiBase}/models/${PAID_ID}/assets`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token(OWNER, "creator")}` },
+    body: conflictForm,
+  });
+  assert.equal(conflictRes.status, 409);
+  assert.equal(await errCode(conflictRes), "WATERMARK_CONFLICT");
+
+  // 3. Owner replacing with fresh GLBs -> 200 and stored with valid watermarks under model & preview keys
+  const newMain = await createSampleGlbBuffer(74);
+  const newPreview = await createSampleGlbBuffer(66);
+  const okForm = new FormData();
+  okForm.append("file", new Blob([new Uint8Array(newMain)], { type: "model/gltf-binary" }), "main.glb");
+  okForm.append("preview", new Blob([new Uint8Array(newPreview)], { type: "model/gltf-binary" }), "preview.glb");
+  const okRes = await fetch(`${apiBase}/models/${PAID_ID}/assets`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token(OWNER, "creator")}` },
+    body: okForm,
+  });
+  assert.equal(okRes.status, 200);
+  const body = (await okRes.json()) as any;
+  assert.ok(body.model?.fileHash);
+  assert.ok(body.model?.previewHash);
+
+  const storedMain = await readStoredAsset(assetKey(PAID_ID, "model", body.model.fileHash));
+  const verifiedMain = await verifyGlbWatermark(storedMain, PAID_ID);
+  assert.equal(verifiedMain.isValidMetadata, true);
+  assert.equal(verifiedMain.isValidVertexWatermark, true);
+  assert.equal((verifiedMain.extractedMetadata as any)?.purchaseId, "original");
+
+  const storedPreview = await readStoredAsset(assetKey(PAID_ID, "preview", body.model.previewHash));
+  const verifiedPreview = await verifyGlbWatermark(storedPreview, PAID_ID);
+  assert.equal(verifiedPreview.isValidMetadata, true);
+  assert.equal(verifiedPreview.isValidVertexWatermark, true);
+  assert.equal((verifiedPreview.extractedMetadata as any)?.purchaseId, "preview");
 });

@@ -15,10 +15,16 @@ export default function ThemeToggle() {
   const t = useT();
   const [theme, setTheme] = useState<Theme | null>(null);
 
-  // The theme is set before paint by a script in <head>; read it after mount so server and client markup match.
+  // The theme is set before paint by a script in <head>; read it after mount so server and client markup match, and
+  // follow later changes (navigation, or the system setting changing while no choice is saved) made by ThemeSync.
   useEffect(() => {
-    setTheme(document.documentElement.dataset.theme === 'light' ? 'light' : 'dark');
-  }, [pathname]);
+    const root = document.documentElement;
+    const read = () => setTheme(root.dataset.theme === 'light' ? 'light' : 'dark');
+    read();
+    const observer = new MutationObserver(read);
+    observer.observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => observer.disconnect();
+  }, []);
 
   if (!isThemeReady(pathname) || !theme) return null;
 

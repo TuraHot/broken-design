@@ -1,7 +1,7 @@
 // Run: npm test  (Node's built-in runner; imports the TS source via type stripping)
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildHref, isPublicModel, parseParams, queryModels } from './pagination.ts';
+import { buildHref, extractAvailableTags, isPublicModel, parseParams, queryModels } from './pagination.ts';
 
 const m = (id, o = {}) => ({
   id,
@@ -68,4 +68,17 @@ test('isPublicModel and queryModels exclude hidden, banned, deleted, and suspend
   assert.equal(isPublicModel(models[1]), false);
   assert.deepEqual(queryModels(models, {}).items.map((x) => x.id), ['visible']);
   assert.equal(queryModels(models, {}).total, 1);
+});
+
+test('extractAvailableTags returns only tags present on visible models', () => {
+  const models = [
+    m('m1', { tags: ['character', 'Anime'] }),
+    m('m2', { tags: ['character', 'sci-fi'] }),
+    m('m-hidden', { tags: ['vehicle'], isHidden: true }),
+    m('m-deleted', { tags: ['architecture'], isDeleted: true }),
+  ];
+
+  const tags = extractAvailableTags(models);
+  assert.deepEqual(tags, ['character', 'sci-fi', 'anime']);
+  assert.deepEqual(parseParams({ tag: 'anime' }, tags), { tag: 'anime' });
 });

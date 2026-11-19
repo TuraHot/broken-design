@@ -5,6 +5,7 @@
 import { useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
+import { useT } from '@/lib/i18n/client';
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -24,6 +25,7 @@ export default function Modal({
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
   const titleId = useId();
+  const t = useT();
 
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null;
@@ -81,7 +83,7 @@ export default function Modal({
           <button
             type="button"
             onClick={() => closeRef.current()}
-            aria-label="Close"
+            aria-label={t('modal.close')}
             className="-mr-2 -mt-1 grid h-9 w-9 shrink-0 place-items-center rounded-lg text-white/65 transition-colors hover:text-white"
           >
             <X aria-hidden className="h-5 w-5" />

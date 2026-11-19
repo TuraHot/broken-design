@@ -4,14 +4,15 @@
 import { useEffect, useState } from 'react';
 import AdminList, { type Column } from '@/components/admin/AdminList';
 import { Badge, ConfirmAction } from '@/components/admin/ui';
-import { AdminApiError, setUserSuspended, type AdminUser } from '@/lib/admin-api';
+import { setUserSuspended, type AdminUser } from '@/lib/admin-api';
 import { formatDate } from '@/lib/format';
+import { adminErrorText } from '@/lib/i18n/admin-error';
 import { readSession } from '@/lib/session';
 
 function buildColumns(myId: string | null): Column<AdminUser>[] {
   return [
     {
-      header: 'User',
+      header: 'admin.col.user',
       cell: (u) => (
         <span className="block">
           <span className="block font-medium">{u.displayName}</span>
@@ -19,29 +20,30 @@ function buildColumns(myId: string | null): Column<AdminUser>[] {
         </span>
       ),
     },
-    { header: 'Role', cell: (u) => <Badge>{u.role}</Badge> },
-    { header: 'Seller', cell: (u) => <span className="text-white/65">{u.isSeller ? 'Yes' : 'No'}</span> },
+    { header: 'admin.col.role', cell: (u) => <Badge>{u.role}</Badge> },
+    { header: 'admin.col.seller', cell: (u, _api, t) => <span className="text-white/65">{u.isSeller ? t('admin.yesWord') : t('admin.noWord')}</span> },
     {
-      header: 'Status',
-      cell: (u) => (u.suspendedAt ? <Badge tone="danger">Suspended</Badge> : <Badge>Active</Badge>),
+      header: 'admin.col.status',
+      cell: (u, _api, t) => (u.suspendedAt ? <Badge tone="danger">{t('admin.suspended')}</Badge> : <Badge>{t('admin.active')}</Badge>),
     },
-    { header: 'Joined', cell: (u) => <span className="font-mono text-[13px] text-white/65">{formatDate(u.createdAt)}</span> },
+    { header: 'admin.col.joined', cell: (u) => <span className="font-mono text-[13px] text-white/65">{formatDate(u.createdAt)}</span> },
     {
-      header: 'Action',
-      cell: (u, api) => {
-        if (u.id === myId) return <span className="text-sm text-white/65">This is you</span>;
+      header: 'admin.col.action',
+      cell: (u, api, t) => {
+        if (u.id === myId) return <span className="text-sm text-white/65">{t('admin.you')}</span>;
         const suspended = u.suspendedAt !== null;
+        const action = suspended ? t('admin.restore') : t('admin.suspend');
         return (
           <ConfirmAction
-            label={suspended ? 'Restore' : 'Suspend'}
-            ariaLabel={`${suspended ? 'Restore' : 'Suspend'} ${u.displayName}`}
+            label={action}
+            ariaLabel={t('admin.actionOn', { action, name: u.displayName })}
             onConfirm={async () => {
               api.notify(null);
               try {
                 const res = await setUserSuspended(u.id, !suspended);
                 api.update(u.id, (row) => ({ ...row, suspendedAt: res.suspendedAt }));
               } catch (err) {
-                api.notify(err instanceof AdminApiError ? err.message : 'Could not change this account. Please try again.');
+                api.notify(adminErrorText(err, t, 'admin.errAccount'));
               }
             }}
           />
@@ -58,9 +60,8 @@ export default function AdminUsersPage() {
   return (
     <AdminList<AdminUser>
       path="/users"
-      label="Admin"
-      heading="Users"
-      searchLabel="Search name or email"
+      heading="admin.nav.users"
+      searchLabel="admin.search.users"
       columns={buildColumns(myId)}
     />
   );

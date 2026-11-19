@@ -184,7 +184,7 @@ Agent ทุกตัว **ห้ามละเมิด** กฎต่อไ�
 | **Frontend — Public Pages, Error Pages (`403`/`404`/`500`), Auth, Upload & Embed** (`frontend`) | **100%** | ✅ **4/4 tests** | หน้าแรก (`/`), `/gallery` (ค้นหา/กรอง/แบ่งหน้า), `/models/[id]`, `/creator`, `/creators/[handle]`, `/upload`, `/login`, `/embed/[id]`, `public/embed.js` (`<vm-model>`), เมนูบัญชี (`AccountMenu.tsx`), หน้า `403`, `not-found.tsx` (404), และ `error.tsx` (500) |
 | **Frontend — Admin Dashboard & Report Modal** (`frontend/src/app/admin/*`) | **100%** | ✅ พร้อมใช้งาน | `/admin`, `/admin/models`, `/admin/users`, `/admin/purchases`, `/admin/complaints` พร้อม Modal แจ้งปัญหา (`ReportForm.tsx`) ในเมนูผู้ใช้และ Footer *(เหลือเชื่อมปุ่ม Report ใน `/models/[id]` ให้เรียก `useReport().openReport()`)* |
 | **Frontend — Buyer & Seller Dashboards** (`frontend/src/app/me`, `seller`) | **100%** | ✅ พร้อมใช้งาน | `/me` (รายการที่ซื้อ, `embed_key`, Regenerate Key, ดาวน์โหลด `.glb` ฝังลายน้ำ, เปิดโหมดคนขาย) และ `/seller` (สรุปรายได้, ยอดขาย, โมเดลของฉัน, Soft Delete) เชื่อม API จริงครบ |
-| **Frontend — Mock Checkout & Optional Pages** (`frontend`) | **🚧** | 🚧 รอพัฒนา | ยังขาด `/pay/mock/[id]` (หน้าจำลองชำระเงิน) และหน้าเสริม `/docs`, `/licenses`, `/verify` ตรวจลายน้ำ |
+| **Frontend — Mock Checkout & Optional Pages** (`frontend`) | **🚧** | 🚧 รอพัฒนา | ยังขาด `/pay/mock/[id]` (หน้าจำลองชำระเงิน) และหน้าเสริม `/verify` ตรวจลายน้ำ (`/docs`, `/licenses` และหน้ากฎหมายร่าง 5 หน้า — `/terms`, `/privacy`, `/seller-terms`, `/refunds`, `/dmca` — ทำแล้ว) |
 
 > **หมายเหตุเพิ่มเติม:** โมดูล `interactions.routes.ts` (Like/Comment) และหน้า `/forgot-password` ปัจจุบันยังเป็น Stub/UI-only ตามลำดับ (อยู่นอก Scope หลักของระบบซื้อขายรายชิ้นและ CDN v1)
 

@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { useReport } from '@/components/report/ReportProvider';
+import { creatorHandle } from '@/lib/creators';
+import { useT } from '@/lib/i18n/client';
 import { clearSession, readSession, type Session } from '@/lib/session';
 
 const itemClass =
@@ -21,6 +23,7 @@ export default function AccountMenu() {
   const pathname = usePathname();
   const router = useRouter();
   const { openReport } = useReport();
+  const t = useT();
   const [ready, setReady] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
   const [open, setOpen] = useState(false);
@@ -75,7 +78,7 @@ export default function AccountMenu() {
         ready ? '' : 'invisible'
       }`}
     >
-      Log in
+      {t('nav.login')}
     </Link>
   );
 
@@ -93,7 +96,7 @@ export default function AccountMenu() {
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="true"
-        aria-label={`Account menu for ${name}`}
+        aria-label={t('menu.account', { name })}
         className="grid h-9 w-9 place-items-center rounded-full border border-hud/50 bg-white/5 text-[13px] font-medium text-white transition-colors hover:border-hud hover:bg-white/10"
       >
         {initialsOf(name)}
@@ -110,23 +113,35 @@ export default function AccountMenu() {
               // An admin only reaches the public pages through "View Website"; this is the way back.
               <li>
                 <Link href="/admin" className={itemClass}>
-                  Admin dashboard
+                  {t('menu.admin')}
                 </Link>
               </li>
             ) : (
               <>
                 <li>
                   <Link href="/me" className={itemClass}>
-                    Library
+                    {t('menu.library')}
                   </Link>
                 </li>
                 {user.is_seller && (
-                  <li>
-                    <Link href="/seller" className={itemClass}>
-                      Seller dashboard
-                    </Link>
-                  </li>
+                  <>
+                    <li>
+                      <Link href="/seller" className={itemClass}>
+                        {t('menu.seller')}
+                      </Link>
+                    </li>
+                    <li>
+                      <Link href={`/creators/${creatorHandle(name)}`} className={itemClass}>
+                        {t('menu.creatorProfile')}
+                      </Link>
+                    </li>
+                  </>
                 )}
+                <li>
+                  <Link href="/settings" className={itemClass}>
+                    {t('menu.settings')}
+                  </Link>
+                </li>
                 <li>
                   <button
                     type="button"
@@ -136,14 +151,14 @@ export default function AccountMenu() {
                     }}
                     className={itemClass}
                   >
-                    Report a problem
+                    {t('menu.report')}
                   </button>
                 </li>
               </>
             )}
             <li>
               <button type="button" onClick={logOut} className={itemClass}>
-                Log out
+                {t('menu.logout')}
               </button>
             </li>
           </ul>

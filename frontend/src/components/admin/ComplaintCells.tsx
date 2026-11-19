@@ -7,7 +7,6 @@ import type { RowApi } from './AdminList';
 import { Badge, ConfirmAction } from './ui';
 import Modal from '@/components/ui/Modal';
 import {
-  AdminApiError,
   setModelHidden,
   updateComplaint,
   type AdminComplaint,
@@ -15,34 +14,39 @@ import {
   type ComplaintStatus,
 } from '@/lib/admin-api';
 import { formatDate } from '@/lib/format';
+import { adminErrorText } from '@/lib/i18n/admin-error';
+import { useT } from '@/lib/i18n/client';
+import type { MessageKey } from '@/lib/i18n/messages';
 
-export const STATUS_LABELS: Record<ComplaintStatus, string> = {
-  open: 'Open',
-  in_review: 'In review',
-  resolved: 'Resolved',
-  dismissed: 'Dismissed',
+/** Text keys of the status and category names; translate them with `t(...)`. */
+export const STATUS_LABELS: Record<ComplaintStatus, MessageKey> = {
+  open: 'admin.status.open',
+  in_review: 'admin.status.in_review',
+  resolved: 'admin.status.resolved',
+  dismissed: 'admin.status.dismissed',
 };
 
-export const CATEGORY_LABELS: Record<ComplaintCategory, string> = {
-  model: 'Model',
-  account: 'Account / person',
-  purchase: 'Purchase',
-  other: 'Other',
+export const CATEGORY_LABELS: Record<ComplaintCategory, MessageKey> = {
+  model: 'admin.cat.model',
+  account: 'admin.cat.account',
+  purchase: 'admin.cat.purchase',
+  other: 'admin.cat.other',
 };
 
 const BTN = 'h-9 whitespace-nowrap rounded-lg border border-white/15 px-3 text-sm text-white/80 transition-colors hover:border-white/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-40';
 const LABEL = 'font-mono text-[11px] uppercase tracking-[0.16em] text-white/65';
 
 export function ComplaintMessage({ row, api }: { row: AdminComplaint; api: RowApi<AdminComplaint> }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   return (
     <div className="min-w-[220px] max-w-sm">
       <p className="line-clamp-2 break-words text-white/80">{row.message}</p>
       <button type="button" onClick={() => setOpen(true)} className={`${BTN} mt-2`}>
-        Read &amp; respond
+        {t('admin.readRespond')}
       </button>
       {open && (
-        <Modal title="Complaint" size="lg" onClose={() => setOpen(false)}>
+        <Modal title={t('admin.complaint')} size="lg" onClose={() => setOpen(false)}>
           <ComplaintDetails row={row} api={api} />
         </Modal>
       )}
@@ -51,17 +55,18 @@ export function ComplaintMessage({ row, api }: { row: AdminComplaint; api: RowAp
 }
 
 function ComplaintDetails({ row, api }: { row: AdminComplaint; api: RowApi<AdminComplaint> }) {
+  const t = useT();
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState(row.adminNote ?? '');
   const [error, setError] = useState<string | null>(null);
 
-  const run = async (task: () => Promise<void>, fallback: string) => {
+  const run = async (task: () => Promise<void>, fallback: MessageKey) => {
     setError(null);
     setBusy(true);
     try {
       await task();
     } catch (err) {
-      setError(err instanceof AdminApiError ? err.message : fallback);
+      setError(adminErrorText(err, t, fallback));
     } finally {
       setBusy(false);
     }
@@ -71,13 +76,13 @@ function ComplaintDetails({ row, api }: { row: AdminComplaint; api: RowApi<Admin
     run(async () => {
       const res = await updateComplaint(row.id, status);
       api.update(row.id, (r) => ({ ...r, status: res.status, handledAt: res.handledAt }));
-    }, 'Could not change the status. Please try again.');
+    }, 'admin.errStatus');
 
   const saveNote = () =>
     run(async () => {
       const res = await updateComplaint(row.id, row.status, note);
       api.update(row.id, (r) => ({ ...r, adminNote: res.adminNote }));
-    }, 'Could not save the note. Please try again.');
+    }, 'admin.errNote');
 
   const noteChanged = note.trim() !== (row.adminNote ?? '');
 
@@ -85,32 +90,32 @@ function ComplaintDetails({ row, api }: { row: AdminComplaint; api: RowApi<Admin
     <div className="grid gap-6">
       <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
         <div>
-          <dt className={LABEL}>From</dt>
+          <dt className={LABEL}>{t('admin.col.from')}</dt>
           <dd className="mt-1">
             <span className="block font-medium">{row.reporter.displayName}</span>
             <span className="block break-all text-white/65">{row.reporter.email}</span>
           </dd>
         </div>
         <div>
-          <dt className={LABEL}>Sent</dt>
+          <dt className={LABEL}>{t('admin.sent')}</dt>
           <dd className="mt-1 font-mono text-[13px] text-white/80">{formatDate(row.createdAt)}</dd>
         </div>
         <div>
-          <dt className={LABEL}>Type</dt>
+          <dt className={LABEL}>{t('admin.type')}</dt>
           <dd className="mt-1 flex flex-wrap gap-2">
-            <Badge>{CATEGORY_LABELS[row.category]}</Badge>
-            <Badge tone={row.status === 'open' ? 'warn' : 'neutral'}>{STATUS_LABELS[row.status]}</Badge>
+            <Badge>{t(CATEGORY_LABELS[row.category])}</Badge>
+            <Badge tone={row.status === 'open' ? 'warn' : 'neutral'}>{t(STATUS_LABELS[row.status])}</Badge>
           </dd>
         </div>
         {row.model && (
           <div>
-            <dt className={LABEL}>Reported model</dt>
+            <dt className={LABEL}>{t('admin.reportedModel')}</dt>
             <dd className="mt-1">
               <span className="block text-white">{row.model.title}</span>
-              {row.owner && <span className="block text-white/65">by {row.owner.displayName}</span>}
+              {row.owner && <span className="block text-white/65">{t('admin.by', { name: row.owner.displayName })}</span>}
               <span className="mt-1 flex flex-wrap gap-2">
-                {row.model.isHidden && <Badge tone="warn">Hidden</Badge>}
-                {row.owner?.isSuspended && <Badge tone="danger">Owner suspended</Badge>}
+                {row.model.isHidden && <Badge tone="warn">{t('admin.hidden')}</Badge>}
+                {row.owner?.isSuspended && <Badge tone="danger">{t('admin.ownerSuspended')}</Badge>}
               </span>
             </dd>
           </div>
@@ -118,17 +123,17 @@ function ComplaintDetails({ row, api }: { row: AdminComplaint; api: RowApi<Admin
       </dl>
 
       <section aria-labelledby={`msg-${row.id}`}>
-        <h3 id={`msg-${row.id}`} className={LABEL}>Message</h3>
+        <h3 id={`msg-${row.id}`} className={LABEL}>{t('admin.col.message')}</h3>
         <p className="mt-2 max-h-[40dvh] overflow-y-auto whitespace-pre-wrap break-words rounded-lg border border-white/10 bg-white/5 p-4 text-[15px] leading-relaxed text-white/90">
           {row.message}
         </p>
       </section>
 
       <section aria-labelledby={`resp-${row.id}`} className="grid gap-4 border-t border-white/10 pt-5">
-        <h3 id={`resp-${row.id}`} className={LABEL}>Your response</h3>
+        <h3 id={`resp-${row.id}`} className={LABEL}>{t('admin.yourResponse')}</h3>
 
         <div className="grid gap-1.5">
-          <label htmlFor={`status-${row.id}`} className="text-sm text-white/65">Status</label>
+          <label htmlFor={`status-${row.id}`} className="text-sm text-white/65">{t('admin.statusLabel')}</label>
           <select
             id={`status-${row.id}`}
             value={row.status}
@@ -137,49 +142,50 @@ function ComplaintDetails({ row, api }: { row: AdminComplaint; api: RowApi<Admin
             className="h-10 rounded-lg border border-white/15 bg-black px-3 text-sm text-white focus:border-white/50 focus:outline-none disabled:opacity-40"
           >
             {(Object.keys(STATUS_LABELS) as ComplaintStatus[]).map((s) => (
-              <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+              <option key={s} value={s}>{t(STATUS_LABELS[s])}</option>
             ))}
           </select>
           {row.handledAt && (
             <p className="text-sm text-white/65">
-              Last handled {formatDate(row.handledAt)}
-              {row.handledByName ? ` by ${row.handledByName}` : ''}
+              {row.handledByName
+                ? t('admin.lastHandledBy', { date: formatDate(row.handledAt), name: row.handledByName })
+                : t('admin.lastHandled', { date: formatDate(row.handledAt) })}
             </p>
           )}
         </div>
 
         <div className="grid gap-1.5">
-          <label htmlFor={`note-${row.id}`} className="text-sm text-white/65">Admin note (only admins see it)</label>
+          <label htmlFor={`note-${row.id}`} className="text-sm text-white/65">{t('admin.noteLabel')}</label>
           <textarea
             id={`note-${row.id}`}
             value={note}
             maxLength={1000}
             rows={3}
             onChange={(e) => setNote(e.target.value)}
-            placeholder="What did you decide, and why?"
+            placeholder={t('admin.notePlaceholder')}
             className="w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/40 focus:border-white/50 focus:outline-none"
           />
           <div>
             <button type="button" disabled={busy || !noteChanged} onClick={saveNote} className={BTN}>
-              {busy ? 'Saving…' : 'Save note'}
+              {busy ? t('admin.saving') : t('admin.saveNote')}
             </button>
           </div>
         </div>
 
         {row.model && (
           <div className="grid gap-1.5">
-            <span className="text-sm text-white/65">Reported model</span>
+            <span className="text-sm text-white/65">{t('admin.reportedModel')}</span>
             <div>
               <ConfirmAction
-                label={row.model.isHidden ? 'Restore model' : 'Hide model'}
-                ariaLabel={`${row.model.isHidden ? 'Restore' : 'Hide'} ${row.model.title}`}
+                label={row.model.isHidden ? t('admin.restoreModel') : t('admin.hideModel')}
+                ariaLabel={t('admin.actionOn', { action: row.model.isHidden ? t('admin.restore') : t('admin.hide'), name: row.model.title })}
                 onConfirm={async () => {
                   setError(null);
                   try {
                     const res = await setModelHidden(row.model!.id, !row.model!.isHidden);
                     api.update(row.id, (r) => (r.model ? { ...r, model: { ...r.model, isHidden: res.isHidden } } : r));
                   } catch (err) {
-                    setError(err instanceof AdminApiError ? err.message : 'Could not change this model. Please try again.');
+                    setError(adminErrorText(err, t, 'admin.errModel'));
                   }
                 }}
               />

@@ -7,9 +7,9 @@ import type { AdminPurchase } from '@/lib/admin-api';
 import { formatDate, formatMoney } from '@/lib/format';
 
 const COLUMNS: Column<AdminPurchase>[] = [
-  { header: 'Date', cell: (p) => <span className="font-mono text-[13px] text-white/65">{formatDate(p.paidAt ?? p.createdAt)}</span> },
+  { header: 'admin.col.date', cell: (p) => <span className="font-mono text-[13px] text-white/65">{formatDate(p.paidAt ?? p.createdAt)}</span> },
   {
-    header: 'Buyer',
+    header: 'admin.col.buyer',
     cell: (p) => (
       <span className="block">
         <span className="block font-medium">{p.buyer.displayName}</span>
@@ -18,14 +18,17 @@ const COLUMNS: Column<AdminPurchase>[] = [
     ),
   },
   {
-    header: 'Model',
+    header: 'admin.col.model',
     cell: (p) => <span className="text-white">{p.model.title}</span>,
   },
-  { header: 'Amount', cell: (p) => <span className="text-white/80">{formatMoney(p.amountCents, p.currency)}</span> },
-  { header: 'License', cell: (p) => <span className="text-white/65">{p.licenseType}</span> },
-  { header: 'Status', cell: (p) => (p.status === 'paid' ? <Badge>Paid</Badge> : <Badge tone="warn">Pending</Badge>) },
+  { header: 'admin.col.amount', cell: (p) => <span className="text-white/80">{formatMoney(p.amountCents, p.currency)}</span> },
+  { header: 'admin.col.license', cell: (p) => <span className="text-white/65">{p.licenseType}</span> },
   {
-    header: 'Watermark',
+    header: 'admin.col.status',
+    cell: (p, _api, t) => (p.status === 'paid' ? <Badge>{t('admin.paid')}</Badge> : <Badge tone="warn">{t('admin.pending')}</Badge>),
+  },
+  {
+    header: 'admin.col.watermark',
     cell: (p) =>
       p.watermarkHash ? (
         <span title={p.watermarkHash} className="font-mono text-[13px] text-white/65">
@@ -41,9 +44,8 @@ export default function AdminPurchasesPage() {
   return (
     <AdminList<AdminPurchase>
       path="/purchases"
-      label="Admin"
-      heading="Purchases"
-      searchLabel="Search buyer or model"
+      heading="admin.nav.purchases"
+      searchLabel="admin.search.purchases"
       columns={COLUMNS}
     />
   );

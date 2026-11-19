@@ -6,17 +6,21 @@ import { usePathname, useRouter } from 'next/navigation';
 import { FormEvent, useState } from 'react';
 import { Search, X } from 'lucide-react';
 import { hidesPublicChrome } from '@/lib/auth-paths';
+import { useT } from '@/lib/i18n/client';
+import type { MessageKey } from '@/lib/i18n/messages';
 import AccountMenu from './AccountMenu';
+import LanguageSwitch from './LanguageSwitch';
 
 // `desktopOnly` links are hidden below `sm` so the bar fits at 375px.
-const LINKS = [
-  { href: '/gallery', label: 'Gallery' },
-  { href: '/docs', label: 'Docs', desktopOnly: true },
-  { href: '/creator', label: 'Creator' },
+const LINKS: { href: string; label: MessageKey; desktopOnly?: boolean }[] = [
+  { href: '/gallery', label: 'nav.gallery' },
+  { href: '/docs', label: 'nav.docs', desktopOnly: true },
+  { href: '/creator', label: 'nav.creator' },
 ];
 
 export default function Navbar() {
   const pathname = usePathname();
+  const t = useT();
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [mobileSearch, setMobileSearch] = useState(false);
@@ -36,8 +40,8 @@ export default function Navbar() {
         type="search"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search 3D models"
-        aria-label="Search 3D models"
+        placeholder={t('nav.searchPlaceholder')}
+        aria-label={t('nav.searchLabel')}
         className="h-9 w-full rounded-lg border border-white/15 bg-white/5 pl-9 pr-3 text-sm text-white placeholder:text-white/40 focus:border-white/50 focus:outline-none"
       />
     </form>
@@ -58,9 +62,9 @@ export default function Navbar() {
                 <Link
                   href={href}
                   aria-current={active ? 'page' : undefined}
-                  className={active ? 'text-white' : 'text-white/65 transition-colors hover:text-white'}
+                  className={`whitespace-nowrap ${active ? 'text-white' : 'text-white/65 transition-colors hover:text-white'}`}
                 >
-                  {label}
+                  {t(label)}
                 </Link>
               </li>
             );
@@ -73,12 +77,13 @@ export default function Navbar() {
           <button
             type="button"
             onClick={() => setMobileSearch((v) => !v)}
-            aria-label={mobileSearch ? 'Close search' : 'Open search'}
+            aria-label={mobileSearch ? t('nav.closeSearch') : t('nav.openSearch')}
             aria-expanded={mobileSearch}
             className="grid h-9 w-8 place-items-center rounded-lg text-white/80 hover:text-white md:hidden"
           >
             {mobileSearch ? <X className="h-5 w-5" /> : <Search className="h-5 w-5" />}
           </button>
+          <LanguageSwitch />
           <AccountMenu />
         </div>
       </nav>

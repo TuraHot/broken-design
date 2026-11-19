@@ -21,9 +21,22 @@ export function extractModelId(text: string): string | null {
   return text.match(UUID_IN_TEXT)?.[0].toLowerCase() ?? null;
 }
 
+/**
+ * A failed send. `code` says what kind of failure it was so the form can show it in the visitor's language;
+ * `message` is the server's own text and only exists for `API` errors (shown as the server wrote it).
+ */
+export class ComplaintError extends Error {
+  constructor(
+    public code: 'LOGIN' | 'NETWORK' | 'API',
+    message = '',
+  ) {
+    super(message);
+  }
+}
+
 export async function submitComplaint(input: { category: ComplaintCategoryValue; modelId?: string; message: string }) {
   const session = readSession();
-  if (!session) throw new Error('Please log in to send a report.');
+  if (!session) throw new ComplaintError('LOGIN');
 
   let res: Response;
   try {
@@ -33,10 +46,10 @@ export async function submitComplaint(input: { category: ComplaintCategoryValue;
       body: JSON.stringify(input),
     });
   } catch {
-    throw new Error('Cannot reach the server. Please try again in a moment.');
+    throw new ComplaintError('NETWORK');
   }
 
   const data = await res.json().catch(() => null);
-  if (!res.ok) throw new Error(data?.error?.message || 'Could not send your report. Please try again.');
+  if (!res.ok) throw new ComplaintError('API', data?.error?.message ?? '');
   return data as { id: string; status: string; createdAt: string };
 }

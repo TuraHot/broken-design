@@ -3,7 +3,12 @@
 // A searchable, paged table loaded from an admin list endpoint. The page supplies the columns.
 import { useCallback, useEffect, useState } from 'react';
 import { AlertCircle, ArrowLeft, ArrowRight, Search } from 'lucide-react';
-import { AdminApiError, adminFetch, type Paged } from '@/lib/admin-api';
+import { adminFetch, type Paged } from '@/lib/admin-api';
+import { adminErrorText } from '@/lib/i18n/admin-error';
+import { useT } from '@/lib/i18n/client';
+import type { MessageKey } from '@/lib/i18n/messages';
+
+type Translate = (key: MessageKey, vars?: Record<string, string | number>) => string;
 
 export interface RowApi<T> {
   /** Replace one row in place after an action succeeded. */
@@ -13,8 +18,9 @@ export interface RowApi<T> {
 }
 
 export interface Column<T> {
-  header: string;
-  cell: (row: T, api: RowApi<T>) => React.ReactNode;
+  /** Text key of the column heading. */
+  header: MessageKey;
+  cell: (row: T, api: RowApi<T>, t: Translate) => React.ReactNode;
 }
 
 const PAGE_SIZE = 25;
@@ -22,20 +28,19 @@ const NAV_BTN = 'inline-flex items-center gap-2 rounded-lg border border-white/1
 
 export default function AdminList<T extends { id: string }>({
   path,
-  label,
   heading,
   searchLabel,
   columns,
   filter,
 }: {
   path: string;
-  label: string;
-  heading: string;
-  searchLabel: string;
+  heading: MessageKey;
+  searchLabel: MessageKey;
   columns: Column<T>[];
   /** Optional dropdown sent to the API as `?<param>=<value>` (an empty value means "no filter"). */
-  filter?: { param: string; label: string; initial: string; options: { value: string; label: string }[] };
+  filter?: { param: string; label: MessageKey; initial: string; options: { value: string; label: MessageKey }[] };
 }) {
+  const t = useT();
   const [page, setPage] = useState(1);
   const [draft, setDraft] = useState('');
   const [q, setQ] = useState('');
@@ -61,7 +66,7 @@ export default function AdminList<T extends { id: string }>({
       })
       .catch((err) => {
         if (ctrl.signal.aborted) return;
-        setError(err instanceof AdminApiError ? err.message : 'Something went wrong. Please try again.');
+        setError(adminErrorText(err, t));
         setLoading(false);
       });
     return () => ctrl.abort();
@@ -80,8 +85,8 @@ export default function AdminList<T extends { id: string }>({
 
   return (
     <section>
-      <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud">[ {label} ]</p>
-      <h1 className="mt-3 font-display text-[clamp(28px,4vw,48px)] uppercase leading-[1.02]">{heading}</h1>
+      <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud">[ {t('admin.label')} ]</p>
+      <h1 className="mt-3 font-display text-[clamp(28px,4vw,48px)] uppercase leading-[1.02]">{t(heading)}</h1>
 
       <form
         role="search"
@@ -98,18 +103,18 @@ export default function AdminList<T extends { id: string }>({
             type="search"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            aria-label={searchLabel}
-            placeholder={searchLabel}
+            aria-label={t(searchLabel)}
+            placeholder={t(searchLabel)}
             maxLength={100}
             className="h-9 w-full rounded-lg border border-white/15 bg-white/5 pl-9 pr-3 text-sm text-white placeholder:text-white/40 focus:border-white/50 focus:outline-none"
           />
         </div>
         <button type="submit" className="h-9 rounded-lg border border-white/15 px-3 text-sm text-white/80 transition-colors hover:border-white/40 hover:text-white">
-          Search
+          {t('admin.search')}
         </button>
         {filter && (
           <select
-            aria-label={filter.label}
+            aria-label={t(filter.label)}
             value={filterValue}
             onChange={(e) => {
               setPage(1);
@@ -118,7 +123,7 @@ export default function AdminList<T extends { id: string }>({
             className="h-9 rounded-lg border border-white/15 bg-black px-3 text-sm text-white focus:border-white/50 focus:outline-none"
           >
             {filter.options.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
+              <option key={o.value} value={o.value}>{t(o.label)}</option>
             ))}
           </select>
         )}
@@ -144,14 +149,14 @@ export default function AdminList<T extends { id: string }>({
             onClick={() => setAttempt((n) => n + 1)}
             className="mt-6 h-9 rounded-lg bg-white px-3.5 text-[15px] font-medium text-black transition-colors hover:bg-white/85"
           >
-            Try again
+            {t('admin.tryAgain')}
           </button>
         </div>
       ) : (
         <>
           <div
             role="region"
-            aria-label={`${heading} table`}
+            aria-label={t('admin.tableLabel', { heading: t(heading) })}
             tabIndex={0}
             className={`overflow-x-auto rounded-lg border border-white/10 bg-white/5 transition-opacity focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/50 ${loading ? 'opacity-60' : ''}`}
             aria-busy={loading}
@@ -161,7 +166,7 @@ export default function AdminList<T extends { id: string }>({
                 <tr>
                   {columns.map((c) => (
                     <th key={c.header} scope="col" className="px-4 py-3 font-mono text-[11px] font-normal uppercase tracking-[0.16em] text-white/65">
-                      {c.header}
+                      {t(c.header)}
                     </th>
                   ))}
                 </tr>
@@ -171,7 +176,7 @@ export default function AdminList<T extends { id: string }>({
                   <tr key={row.id} className="border-t border-white/10 align-middle">
                     {columns.map((c) => (
                       <td key={c.header} className="px-4 py-3">
-                        {c.cell(row, api)}
+                        {c.cell(row, api, t)}
                       </td>
                     ))}
                   </tr>
@@ -179,13 +184,13 @@ export default function AdminList<T extends { id: string }>({
                 {data && data.items.length === 0 && (
                   <tr>
                     <td colSpan={columns.length} className="px-4 py-10 text-center text-white/65">
-                      {q ? `Nothing matches “${q}”.` : 'Nothing here yet.'}
+                      {q ? t('admin.nothingMatches', { q }) : t('admin.nothingYet')}
                     </td>
                   </tr>
                 )}
                 {!data && loading && (
                   <tr>
-                    <td colSpan={columns.length} className="px-4 py-10 text-center text-white/65">Loading…</td>
+                    <td colSpan={columns.length} className="px-4 py-10 text-center text-white/65">{t('admin.loading')}</td>
                   </tr>
                 )}
               </tbody>
@@ -193,18 +198,18 @@ export default function AdminList<T extends { id: string }>({
           </div>
 
           {data && (
-            <nav aria-label="Pagination" className="mt-6 flex items-center justify-between gap-4">
-              <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-white/65">{data.total} total</span>
+            <nav aria-label={t('admin.pagination')} className="mt-6 flex items-center justify-between gap-4">
+              <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-white/65">{t('admin.total', { n: data.total })}</span>
               <div className="flex items-center gap-4">
                 <button type="button" className={NAV_BTN} disabled={page <= 1 || loading} onClick={() => setPage((p) => p - 1)}>
                   <ArrowLeft aria-hidden className="h-4 w-4" />
-                  Prev
+                  {t('admin.prev')}
                 </button>
                 <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-white/65">
-                  Page {data.page} / {totalPages}
+                  {t('admin.page', { page: data.page, total: totalPages })}
                 </span>
                 <button type="button" className={NAV_BTN} disabled={page >= totalPages || loading} onClick={() => setPage((p) => p + 1)}>
-                  Next
+                  {t('admin.next')}
                   <ArrowRight aria-hidden className="h-4 w-4" />
                 </button>
               </div>

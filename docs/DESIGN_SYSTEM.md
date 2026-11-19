@@ -125,6 +125,8 @@ Colours are CSS variables (space-separated RGB, so opacity modifiers work) mappe
 | `card` | `11 16 24` | `255 255 255` | panels |
 | `accent` | `143 211 255` | `123 79 224` | labels, links, focus |
 | `highlight` | `184 146 255` | `201 242 61` | highlights (a fill with dark text in light, never text) |
+| `warn` | `255 176 112` | `168 90 0` | warning text and borders (amber is too pale on the light canvas) |
+| `danger` | `252 165 165` | `185 28 28` | error text |
 
 Light values were read by eye from the reference image and are still to be confirmed. Purple on the light canvas is about 4.8:1.
 

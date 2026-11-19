@@ -17,6 +17,8 @@ const config: Config = {
         card: 'rgb(var(--c-card) / <alpha-value>)',
         accent: 'rgb(var(--c-accent) / <alpha-value>)',
         highlight: 'rgb(var(--c-highlight) / <alpha-value>)',
+        warn: 'rgb(var(--c-warn) / <alpha-value>)',
+        danger: 'rgb(var(--c-danger) / <alpha-value>)',
         hud: '#8fd3ff',
         violet: '#b892ff',
         amber: '#ffb070',

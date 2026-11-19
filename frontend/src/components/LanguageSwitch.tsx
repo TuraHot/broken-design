@@ -15,7 +15,7 @@ export default function LanguageSwitch() {
       onClick={() => setLocale(target)}
       aria-label={t('lang.switchTo')}
       title={t('lang.switchTo')}
-      className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-white/15 px-2 text-[12px] sm:text-[13px] text-white/80 transition-colors hover:bg-white/10 hover:text-white sm:px-2.5"
+      className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-ink/15 px-2 text-[12px] sm:text-[13px] text-ink/80 transition-colors hover:bg-ink/10 hover:text-ink sm:px-2.5"
     >
       <Languages aria-hidden className="hidden h-4 w-4 sm:block" />
       <span lang={locale}>

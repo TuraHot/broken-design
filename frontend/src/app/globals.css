@@ -12,6 +12,8 @@
   --c-card: 11 16 24;
   --c-accent: 143 211 255;
   --c-highlight: 184 146 255;
+  --c-warn: 255 176 112;
+  --c-danger: 252 165 165;
 }
 
 html[data-theme='light'] {
@@ -22,6 +24,8 @@ html[data-theme='light'] {
   --c-card: 255 255 255;
   --c-accent: 123 79 224;
   --c-highlight: 201 242 61;
+  --c-warn: 168 90 0;
+  --c-danger: 185 28 28;
 }
 
 html,

@@ -46,7 +46,7 @@ export default function ThemeToggle() {
       onClick={switchTheme}
       aria-label={label}
       title={label}
-      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-ink/15 text-ink/80 transition-colors hover:bg-ink/10 hover:text-ink"
+      className="inline-flex h-9 w-8 items-center sm:w-9 justify-center rounded-lg border border-ink/15 text-ink/80 transition-colors hover:bg-ink/10 hover:text-ink"
     >
       {theme === 'light' ? <Moon aria-hidden className="h-4 w-4" /> : <Sun aria-hidden className="h-4 w-4" />}
     </button>

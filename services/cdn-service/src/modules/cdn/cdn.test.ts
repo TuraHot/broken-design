@@ -176,6 +176,7 @@ function resetDb() {
               is_seller: u.is_seller ?? true,
               avatar_hash: u.avatar_hash ?? null,
               suspended_at: u.suspended_at ?? null,
+              deleted_at: u.deleted_at ?? null,
             },
           ]
         : [],
@@ -537,6 +538,32 @@ test("download: suspended downloader is blocked", async () => {
   });
   assert.equal(res.status, 403);
   assert.equal(await errCode(res), "ACCOUNT_SUSPENDED");
+});
+
+test("download: a downloader whose account an admin deleted is refused with 401 ACCOUNT_DELETED", async () => {
+  users[BUYER].deleted_at = new Date();
+  const res = await get(`/models/${PAID_ID}/download`, {
+    Authorization: `Bearer ${token(BUYER)}`,
+  });
+  assert.equal(res.status, 401);
+  assert.equal(await errCode(res), "ACCOUNT_DELETED");
+  assert.deepEqual(downloadIncrements, []);
+});
+
+test("upload: a token of a deleted account is refused before anything is read or stored", async () => {
+  users[OWNER].deleted_at = new Date();
+  const res = await fetch(`${apiBase}/models`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token(OWNER, "creator")}` },
+  });
+  assert.equal(res.status, 401);
+  assert.equal(await errCode(res), "ACCOUNT_DELETED");
+});
+
+test("embed key of a buyer whose account was deleted keeps streaming the model they bought", async () => {
+  users[BUYER].deleted_at = new Date();
+  const res = await get(`/models/${PAID_ID}/file.glb?key=${KEY}`);
+  assert.equal(res.status, 200);
 });
 
 test("download: resumed Range chunks do not increment the counter", async () => {

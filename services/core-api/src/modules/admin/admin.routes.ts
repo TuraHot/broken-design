@@ -45,11 +45,11 @@ adminRouter.get('/overview', async (_req, res) => {
   const [counts, licenses, top, purchases, users] = await Promise.all([
     db.query(
       `SELECT
-         (SELECT COUNT(*)::int FROM users) AS total_users,
-         (SELECT COUNT(*)::int FROM users WHERE suspended_at IS NOT NULL) AS suspended_users,
-         (SELECT COUNT(*)::int FROM users WHERE role = 'admin') AS admin_users,
-         (SELECT COUNT(*)::int FROM users WHERE is_seller = TRUE AND role <> 'admin') AS seller_users,
-         (SELECT COUNT(*)::int FROM users WHERE created_at > NOW() - INTERVAL '7 days') AS new_users_7d,
+         (SELECT COUNT(*)::int FROM users WHERE deleted_at IS NULL) AS total_users,
+         (SELECT COUNT(*)::int FROM users WHERE deleted_at IS NULL AND suspended_at IS NOT NULL) AS suspended_users,
+         (SELECT COUNT(*)::int FROM users WHERE deleted_at IS NULL AND role = 'admin') AS admin_users,
+         (SELECT COUNT(*)::int FROM users WHERE deleted_at IS NULL AND is_seller = TRUE AND role <> 'admin') AS seller_users,
+         (SELECT COUNT(*)::int FROM users WHERE deleted_at IS NULL AND created_at > NOW() - INTERVAL '7 days') AS new_users_7d,
          (SELECT COUNT(*)::int FROM models WHERE deleted_at IS NULL) AS total_models,
          (SELECT COUNT(*)::int FROM models WHERE deleted_at IS NULL AND hidden_at IS NOT NULL) AS hidden_models,
          (SELECT COUNT(*)::int FROM models WHERE deleted_at IS NULL AND price_cents = 0) AS free_models,
@@ -59,7 +59,7 @@ adminRouter.get('/overview', async (_req, res) => {
          (SELECT COUNT(*)::int FROM purchases WHERE status = 'paid') AS paid_purchases,
          (SELECT COUNT(*)::int FROM purchases WHERE status = 'pending') AS pending_purchases,
          (SELECT COUNT(*)::int FROM complaints WHERE status = 'open') AS open_complaints,
-         (SELECT COUNT(*)::int FROM creator_applications WHERE status = 'pending') AS pending_applications,
+         (SELECT COUNT(*)::int FROM creator_applications ca JOIN users u ON u.id = ca.user_id WHERE ca.status = 'pending' AND u.deleted_at IS NULL) AS pending_applications,
          (SELECT COUNT(*)::int FROM creator_withdrawals WHERE status = 'pending') AS pending_withdrawals,
          (SELECT COALESCE(SUM(amount_cents), 0) FROM purchases WHERE status = 'paid') AS total_revenue_cents,
          (SELECT COALESCE(SUM(amount_cents), 0) FROM purchases
@@ -89,7 +89,7 @@ adminRouter.get('/overview', async (_req, res) => {
     ),
     db.query(
       `SELECT id, display_name, email, role, created_at
-       FROM users ORDER BY created_at DESC LIMIT 5`,
+       FROM users WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT 5`,
     ),
   ]);
   const r = counts.rows[0];
@@ -144,12 +144,16 @@ adminRouter.get('/users', async (req, res) => {
   const { page, pageSize, offset, q } = parsePaging(req.query);
   const search = q ? likePattern(q) : null;
 
-  const where = search ? `WHERE email ILIKE $1 ESCAPE '\\' OR display_name ILIKE $1 ESCAPE '\\'` : '';
+  // A deleted account is searched by the address it had (original_email); its email column holds a placeholder.
+  const where = search
+    ? `WHERE email ILIKE $1 ESCAPE '\\' OR display_name ILIKE $1 ESCAPE '\\' OR original_email ILIKE $1 ESCAPE '\\'`
+    : '';
   const filterParams = search ? [search] : [];
 
   const total = await db.query(`SELECT COUNT(*)::int AS total FROM users ${where}`, filterParams);
   const rows = await db.query(
-    `SELECT id, email, display_name, role, is_seller, suspended_at, suspended_until, suspension_reason, created_at
+    `SELECT id, email, display_name, role, is_seller, suspended_at, suspended_until, suspension_reason, created_at,
+            deleted_at, deleted_reason, original_email
      FROM users ${where}
      ORDER BY created_at DESC
      LIMIT $${filterParams.length + 1} OFFSET $${filterParams.length + 2}`,
@@ -159,7 +163,7 @@ adminRouter.get('/users', async (req, res) => {
   res.json({
     items: rows.rows.map((u) => ({
       id: u.id,
-      email: u.email,
+      email: u.deleted_at ? u.original_email : u.email, // never show the placeholder of a deleted account
       displayName: u.display_name,
       role: u.role,
       isSeller: u.is_seller,
@@ -167,6 +171,8 @@ adminRouter.get('/users', async (req, res) => {
       suspendedUntil: u.suspended_until,
       suspensionReason: u.suspension_reason,
       createdAt: u.created_at,
+      deletedAt: u.deleted_at,
+      deletedReason: u.deleted_reason,
     })),
     page,
     pageSize,
@@ -298,14 +304,98 @@ adminRouter.get('/users/:id/suspensions', async (req, res) => {
   });
 });
 
+// ─── 3c. DELETE /api/admin/users/:id ────────────────────────────────────────
+// Deletes an account but keeps its history: the row stays (so models, purchases, complaints and suspensions that point at
+// it stay intact), the email is replaced by a unique placeholder and the real address moves to original_email. That frees
+// the address: signing up with it again makes a brand-new account (a new id), never the old one. The account can no longer
+// log in (no row has its email) or use an old token (requireAuth asks the database). Admins cannot be deleted and nobody
+// deletes their own account here, same as suspending. Needs a written reason (10-1000 characters). The person cannot be
+// told (the account is gone), so there is no notice. One statement does the update.
+const deleteBody = z.object({ reason: z.string().trim().min(10).max(1000) });
+
+adminRouter.delete('/users/:id', async (req, res) => {
+  const targetId = String(req.params.id);
+  requireUuid(targetId);
+
+  if (targetId === req.user!.id) {
+    throw new AppError(400, 'CANNOT_DELETE_SELF', 'Admins cannot delete their own account');
+  }
+
+  const body = deleteBody.safeParse(req.body);
+  if (!body.success) {
+    throw new AppError(400, 'INVALID_BODY', 'Body must be { "reason": 10-1000 characters }');
+  }
+
+  const result = await db.query<{ found: number; changed: number; already_deleted: boolean | null }>(
+    `WITH old AS (
+       SELECT id, role, email, deleted_at FROM users WHERE id = $1 FOR UPDATE
+     ),
+     upd AS (
+       UPDATE users u
+       SET deleted_at = NOW(),
+           deleted_by = $2::uuid,
+           deleted_reason = $3::text,
+           original_email = old.email,
+           email = 'deleted-' || old.id::text || '@deleted.invalid',
+           password_hash = '!deleted', -- not a valid hash, nothing can match it
+           is_seller = FALSE
+       FROM old
+       WHERE u.id = old.id AND old.deleted_at IS NULL AND old.role <> 'admin'
+       RETURNING u.id
+     )
+     SELECT (SELECT COUNT(*) FROM old)::int AS found,
+            (SELECT COUNT(*) FROM upd)::int AS changed,
+            (SELECT deleted_at IS NOT NULL FROM old) AS already_deleted`,
+    [targetId, req.user!.id, body.data.reason],
+  );
+
+  const row = result.rows[0];
+  if (!row || row.found === 0) {
+    throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
+  }
+  if (row.changed === 0) {
+    if (row.already_deleted) throw new AppError(409, 'ALREADY_DELETED', 'This account is already deleted');
+    // Admins are managed in the database, so no admin can remove another one from here.
+    throw new AppError(403, 'CANNOT_DELETE_ADMIN', 'Admin accounts cannot be deleted');
+  }
+
+  res.json({ id: targetId, isDeleted: true });
+});
+
 // ─── 4. GET /api/admin/models ───────────────────────────────────────────────
 // รวมโมเดลที่ถูกซ่อนและถูกลบ
+// Filters for the list: ?status=visible|hidden|deleted and ?license=CC0|CC-BY|CC-BY-NC|COMMERCIAL (both optional, combined with AND).
+const modelFilters = z.object({
+  status: z.enum(['visible', 'hidden', 'deleted']).optional(),
+  license: z.enum(['CC0', 'CC-BY', 'CC-BY-NC', 'COMMERCIAL']).optional(),
+});
+const MODEL_STATUS_SQL = {
+  visible: 'm.deleted_at IS NULL AND m.hidden_at IS NULL',
+  hidden: 'm.deleted_at IS NULL AND m.hidden_at IS NOT NULL',
+  deleted: 'm.deleted_at IS NOT NULL',
+} as const;
+
 adminRouter.get('/models', async (req, res) => {
   const { page, pageSize, offset, q } = parsePaging(req.query);
-  const search = q ? likePattern(q) : null;
+  const filters = modelFilters.safeParse(req.query);
+  if (!filters.success) {
+    throw new AppError(400, 'INVALID_QUERY', 'status must be visible, hidden or deleted; license must be CC0, CC-BY, CC-BY-NC or COMMERCIAL');
+  }
+  const { status, license } = filters.data;
 
-  const where = search ? `WHERE m.title ILIKE $1 ESCAPE '\\' OR u.display_name ILIKE $1 ESCAPE '\\'` : '';
-  const filterParams = search ? [search] : [];
+  const conditions: string[] = [];
+  const filterParams: unknown[] = [];
+  if (q) {
+    filterParams.push(likePattern(q));
+    const n = filterParams.length;
+    conditions.push(`(m.title ILIKE $${n} ESCAPE '\\' OR u.display_name ILIKE $${n} ESCAPE '\\')`);
+  }
+  if (status) conditions.push(MODEL_STATUS_SQL[status]);
+  if (license) {
+    filterParams.push(license);
+    conditions.push(`m.license = $${filterParams.length}::license_type`);
+  }
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
   const total = await db.query(
     `SELECT COUNT(*)::int AS total FROM models m JOIN users u ON u.id = m.owner_id ${where}`,
@@ -537,7 +627,7 @@ adminRouter.get('/purchases', async (req, res) => {
   if (q) {
     filterParams.push(likePattern(q));
     const n = filterParams.length;
-    conditions.push(`(m.title ILIKE $${n} ESCAPE '\\' OR u.email ILIKE $${n} ESCAPE '\\' OR u.display_name ILIKE $${n} ESCAPE '\\')`);
+    conditions.push(`(m.title ILIKE $${n} ESCAPE '\\' OR COALESCE(u.original_email, u.email) ILIKE $${n} ESCAPE '\\' OR u.display_name ILIKE $${n} ESCAPE '\\')`);
   }
   if (status) {
     filterParams.push(status);
@@ -560,7 +650,7 @@ adminRouter.get('/purchases', async (req, res) => {
   const rows = await db.query(
     `SELECT p.id, p.status, p.amount_cents, p.currency, p.license_type, p.watermark_hash,
             p.paid_at, p.created_at,
-            u.id AS buyer_id, u.email AS buyer_email, u.display_name AS buyer_name,
+            u.id AS buyer_id, COALESCE(u.original_email, u.email) AS buyer_email, u.display_name AS buyer_name,
             m.id AS model_id, m.title AS model_title
      ${joins}
      ${where}
@@ -597,10 +687,10 @@ adminRouter.get('/purchases/:id', async (req, res) => {
   const result = await db.query(
     `SELECT p.id, p.status, p.amount_cents, p.currency, p.license_type, p.watermark_hash,
             p.provider_session_id, p.paid_at, p.created_at,
-            u.id AS buyer_id, u.email AS buyer_email, u.display_name AS buyer_name, u.suspended_at AS buyer_suspended_at,
+            u.id AS buyer_id, COALESCE(u.original_email, u.email) AS buyer_email, u.display_name AS buyer_name, u.suspended_at AS buyer_suspended_at,
             m.id AS model_id, m.title AS model_title, m.license AS model_license,
             m.hidden_at AS model_hidden_at, m.deleted_at AS model_deleted_at,
-            o.id AS owner_id, o.email AS owner_email, o.display_name AS owner_name
+            o.id AS owner_id, COALESCE(o.original_email, o.email) AS owner_email, o.display_name AS owner_name
      FROM purchases p
      JOIN users u ON u.id = p.user_id
      JOIN models m ON m.id = p.model_id
@@ -655,7 +745,7 @@ adminRouter.get('/complaints', async (req, res) => {
     params.push(likePattern(q));
     const n = params.length;
     conditions.push(
-      `(c.message ILIKE $${n} ESCAPE '\\' OR u.display_name ILIKE $${n} ESCAPE '\\' OR u.email ILIKE $${n} ESCAPE '\\' OR m.title ILIKE $${n} ESCAPE '\\')`,
+      `(c.message ILIKE $${n} ESCAPE '\\' OR u.display_name ILIKE $${n} ESCAPE '\\' OR COALESCE(u.original_email, u.email) ILIKE $${n} ESCAPE '\\' OR m.title ILIKE $${n} ESCAPE '\\')`,
     );
   }
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -668,7 +758,7 @@ adminRouter.get('/complaints', async (req, res) => {
   const total = await db.query(`SELECT COUNT(*)::int AS total ${joins} ${where}`, params);
   const rows = await db.query(
     `SELECT c.id, c.category, c.message, c.status, c.admin_note, c.handled_at, c.created_at,
-            u.id AS reporter_id, u.display_name AS reporter_name, u.email AS reporter_email,
+            u.id AS reporter_id, u.display_name AS reporter_name, COALESCE(u.original_email, u.email) AS reporter_email,
             m.id AS model_id, m.title AS model_title, m.hidden_at AS model_hidden_at,
             o.id AS owner_id, o.display_name AS owner_name, o.suspended_at AS owner_suspended_at,
             h.display_name AS handled_by_name
@@ -723,14 +813,31 @@ adminRouter.patch('/complaints/:id', async (req, res) => {
   const { status, adminNote } = body.data;
   const handled = status !== 'open';
 
+  // One statement: update the complaint and, when it has just been closed (resolved or dismissed) and was not
+  // closed with that same status before, put a notice in the reporter's inbox with the result and the admin's note.
+  // Saving the same result again, or moving to open / in_review, sends nothing. A deleted reporter gets no notice.
   const result = await db.query(
-    `UPDATE complaints
-     SET status = $2,
-         admin_note = CASE WHEN $3::boolean THEN $4::text ELSE admin_note END,
-         handled_by = CASE WHEN $5::boolean THEN $6::uuid ELSE NULL END,
-         handled_at = CASE WHEN $5::boolean THEN NOW() ELSE NULL END
-     WHERE id = $1
-     RETURNING id, status, admin_note, handled_at`,
+    `WITH old AS (
+       SELECT id, status, reporter_id, category, model_id FROM complaints WHERE id = $1 FOR UPDATE
+     ), upd AS (
+       UPDATE complaints c
+       SET status = $2,
+           admin_note = CASE WHEN $3::boolean THEN $4::text ELSE c.admin_note END,
+           handled_by = CASE WHEN $5::boolean THEN $6::uuid ELSE NULL END,
+           handled_at = CASE WHEN $5::boolean THEN NOW() ELSE NULL END
+       FROM old
+       WHERE c.id = old.id
+       RETURNING c.id, c.status, c.admin_note, c.handled_at
+     ), note AS (
+       INSERT INTO notifications (user_id, kind, model_id, data)
+       SELECT old.reporter_id, 'complaint_' || upd.status, old.model_id,
+              jsonb_build_object('complaintId', upd.id, 'category', old.category, 'note', upd.admin_note)
+       FROM upd JOIN old ON old.id = upd.id
+       JOIN users u ON u.id = old.reporter_id AND u.deleted_at IS NULL
+       WHERE upd.status IN ('resolved', 'dismissed') AND old.status <> upd.status
+       RETURNING id
+     )
+     SELECT upd.*, EXISTS (SELECT 1 FROM note) AS notified FROM upd`,
     [id, status, adminNote !== undefined, adminNote ? adminNote : null, handled, req.user!.id],
   );
   if (result.rowCount === 0) {
@@ -738,7 +845,7 @@ adminRouter.patch('/complaints/:id', async (req, res) => {
   }
 
   const r = result.rows[0];
-  res.json({ id: r.id, status: r.status, adminNote: r.admin_note, handledAt: r.handled_at });
+  res.json({ id: r.id, status: r.status, adminNote: r.admin_note, handledAt: r.handled_at, reporterNotified: r.notified === true });
 });
 
 // ─── Creator Applications (Admin Approval) ──────────────────────────────────
@@ -756,6 +863,7 @@ adminRouter.get('/creator-applications', async (req, res) => {
      FROM creator_applications ca
      JOIN users u ON u.id = ca.user_id
      WHERE ($1 = 'all' OR ca.status = $1)
+       AND u.deleted_at IS NULL -- the applicant's account was deleted: nothing left to approve
      ORDER BY ca.created_at DESC
      LIMIT 100`,
     [status],
@@ -790,12 +898,13 @@ adminRouter.patch('/creator-applications/:id', async (req, res) => {
     throw new AppError(400, 'BAD_REQUEST', 'Status must be approved or rejected');
   }
 
-  // Atomic CTE: lock application & user, validate pending/role/suspension, update application, promote user, and notify applicant.
+  // Atomic CTE: lock application & user, validate pending/not-deleted/role/suspension, update application, promote user, and notify applicant.
   const result = await db.query<{
     found: number;
     prev_status: string | null;
     user_role: string | null;
     user_suspended_at: Date | string | null;
+    user_deleted_at: Date | string | null;
     id: string | null;
     user_id: string | null;
     status: string | null;
@@ -803,7 +912,7 @@ adminRouter.patch('/creator-applications/:id', async (req, res) => {
     reviewed_at: Date | string | null;
   }>(
     `WITH target AS (
-       SELECT ca.id, ca.user_id, ca.status, u.role AS user_role, u.suspended_at AS user_suspended_at
+       SELECT ca.id, ca.user_id, ca.status, u.role AS user_role, u.suspended_at AS user_suspended_at, u.deleted_at AS user_deleted_at
        FROM creator_applications ca
        JOIN users u ON u.id = ca.user_id
        WHERE ca.id = $1
@@ -817,6 +926,7 @@ adminRouter.patch('/creator-applications/:id', async (req, res) => {
            reviewed_at = NOW()
        FROM target t
        WHERE ca.id = t.id
+         AND t.user_deleted_at IS NULL
          AND t.status = 'pending'
          AND ($2::varchar <> 'approved' OR (t.user_role <> 'admin' AND t.user_suspended_at IS NULL))
        RETURNING ca.id, ca.user_id, ca.status, ca.admin_note, ca.reviewed_at
@@ -842,6 +952,7 @@ adminRouter.patch('/creator-applications/:id', async (req, res) => {
        (SELECT status FROM target) AS prev_status,
        (SELECT user_role::text FROM target) AS user_role,
        (SELECT user_suspended_at FROM target) AS user_suspended_at,
+       (SELECT user_deleted_at FROM target) AS user_deleted_at,
        a.id,
        a.user_id,
        a.status,
@@ -855,6 +966,10 @@ adminRouter.patch('/creator-applications/:id', async (req, res) => {
   const row = result.rows[0];
   if (!row || row.found === 0) {
     throw new AppError(404, 'APPLICATION_NOT_FOUND', 'Creator application not found');
+  }
+  // An admin deleted this account: it must not be turned into a seller again.
+  if (row.user_deleted_at !== null) {
+    throw new AppError(409, 'ACCOUNT_DELETED', "The applicant's account has been deleted");
   }
   if (row.prev_status !== 'pending') {
     throw new AppError(409, 'ALREADY_REVIEWED', 'This creator application has already been reviewed');
@@ -874,6 +989,70 @@ adminRouter.patch('/creator-applications/:id', async (req, res) => {
       adminNote: row.admin_note ?? null,
       reviewedAt: row.reviewed_at,
     },
+  });
+});
+
+// ─── Admin notifications: what is waiting for an admin right now ────────────
+// There is no table of notices for admins. The items are the things that need an admin and have not been handled yet:
+// creator applications still pending and complaints still open, newest first. An item stops being listed the moment it is
+// handled, so "unread" means "still needs action" and is the same for every admin. Each item says what it is; the page
+// links it to the page that handles it (/admin/creator-approvals, /admin/complaints). Applications of deleted accounts
+// are skipped (nothing left to approve).
+const WAITING_COUNTS_SQL = `SELECT
+     (SELECT COUNT(*)::int FROM creator_applications ca
+        JOIN users u ON u.id = ca.user_id
+        WHERE ca.status = 'pending' AND u.deleted_at IS NULL) AS creator_applications,
+     (SELECT COUNT(*)::int FROM complaints WHERE status = 'open') AS complaints`;
+
+function waitingCounts(row: { creator_applications: number; complaints: number }) {
+  return {
+    creatorApplications: row.creator_applications,
+    complaints: row.complaints,
+    total: row.creator_applications + row.complaints,
+  };
+}
+
+// Counts only: the sidebar asks for this every minute.
+adminRouter.get('/notifications/summary', async (_req, res) => {
+  const result = await db.query(WAITING_COUNTS_SQL);
+  res.json(waitingCounts(result.rows[0]));
+});
+
+adminRouter.get('/notifications', async (_req, res) => {
+  const [counts, items] = await Promise.all([
+    db.query(WAITING_COUNTS_SQL),
+    db.query(
+      `SELECT * FROM (
+         SELECT 'creator_application'::text AS kind, ca.id, ca.created_at,
+                u.id AS person_id, u.display_name AS person_name, COALESCE(u.original_email, u.email) AS person_email,
+                ca.note AS text, NULL::text AS category, NULL::text AS model_title
+         FROM creator_applications ca
+         JOIN users u ON u.id = ca.user_id
+         WHERE ca.status = 'pending' AND u.deleted_at IS NULL
+         UNION ALL
+         SELECT 'complaint'::text, c.id, c.created_at,
+                u.id, u.display_name, COALESCE(u.original_email, u.email),
+                c.message, c.category::text, m.title
+         FROM complaints c
+         JOIN users u ON u.id = c.reporter_id
+         LEFT JOIN models m ON m.id = c.model_id
+         WHERE c.status = 'open'
+       ) waiting
+       ORDER BY created_at DESC
+       LIMIT 50`,
+    ),
+  ]);
+  res.json({
+    counts: waitingCounts(counts.rows[0]),
+    items: items.rows.map((r) => ({
+      kind: r.kind,
+      id: r.id,
+      createdAt: r.created_at,
+      person: { id: r.person_id, displayName: r.person_name, email: r.person_email },
+      text: r.text ? String(r.text).slice(0, 300) : '',
+      category: r.category,
+      modelTitle: r.model_title,
+    })),
   });
 });
 
@@ -982,7 +1161,7 @@ adminRouter.get('/withdrawals', async (req, res) => {
     params.push(likePattern(q));
     const n = params.length;
     conditions.push(
-      `(u.display_name ILIKE $${n} ESCAPE '\\' OR u.email ILIKE $${n} ESCAPE '\\' OR w.payout_account ILIKE $${n} ESCAPE '\\')`,
+      `(u.display_name ILIKE $${n} ESCAPE '\\' OR COALESCE(u.original_email, u.email) ILIKE $${n} ESCAPE '\\' OR w.payout_account ILIKE $${n} ESCAPE '\\')`,
     );
   }
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -994,7 +1173,7 @@ adminRouter.get('/withdrawals', async (req, res) => {
       `SELECT w.id, w.seller_id, w.gross_amount_cents, w.platform_fee_cents, w.net_amount_cents,
               w.fee_rate_bps, w.currency, w.payout_method, w.payout_account, w.status,
               w.created_at, w.processed_at,
-              u.display_name AS seller_name, u.email AS seller_email
+              u.display_name AS seller_name, COALESCE(u.original_email, u.email) AS seller_email
        ${joins}
        ${where}
        ORDER BY CASE w.status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END, w.created_at DESC

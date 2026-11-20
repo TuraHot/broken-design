@@ -48,6 +48,9 @@ test('POST /api/models/:id/checkout - rejects unauthenticated requests', async (
 test('payments - rejects malformed non-UUID ids with 400 INVALID_ID before hitting Postgres', async () => {
   const originalQuery = db.query.bind(db);
   (db as any).query = async (sql: string) => {
+    if (sql.includes('SELECT deleted_at FROM users WHERE id = $1')) {
+      return { rowCount: 1, rows: [{ deleted_at: null }] };
+    }
     if (sql.includes('suspended_at') && sql.includes('FROM users WHERE id = $1')) {
       return { rowCount: 1, rows: [{ suspended_at: null, role: 'user' }] };
     }
@@ -387,6 +390,8 @@ test('POST /api/purchases/:id/confirm-mock - prevents duplicate confirmation and
 test('POST /api/purchases/:id/confirm-mock - rejects when PAYMENT_PROVIDER is not mock', async () => {
   const originalProvider = env.paymentProvider;
   (env as any).paymentProvider = 'stripe';
+  const originalQuery = db.query.bind(db);
+  (db as any).query = async () => ({ rowCount: 0, rows: [] }); // requireAuth asks if the account was deleted
 
   const server = app.listen(0);
   const port = (server.address() as any).port;
@@ -400,6 +405,7 @@ test('POST /api/purchases/:id/confirm-mock - rejects when PAYMENT_PROVIDER is no
     assert.equal(body.error?.code, 'MOCK_DISABLED');
   } finally {
     server.close();
+    db.query = originalQuery;
     (env as any).paymentProvider = originalProvider;
   }
 });

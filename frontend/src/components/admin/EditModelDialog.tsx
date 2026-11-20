@@ -1,8 +1,11 @@
 'use client';
 
-// The one "Edit" dialog for a model: change its license, and hide or restore it. Each action takes a written
-// reason that the owner receives as a notice, and each is kept in the history shown at the bottom.
+// The "Edit" dialog for a model, as a short guided flow instead of one long form:
+//   1. choose what to do (change the license, or hide / restore the model),
+//   2. fill in only what that action needs (pick the new license, then the written reason),
+//   3. confirm. The reason is what the owner reads in a notice; every change is kept in the history shown at the bottom.
 import { useEffect, useState } from 'react';
+import { ArrowLeft, ChevronRight, Eye, EyeOff, Scale } from 'lucide-react';
 import HistoryList, { type HistoryEntry } from '@/components/admin/HistoryList';
 import ReasonField, { isReasonValid } from '@/components/admin/ReasonField';
 import Modal from '@/components/ui/Modal';
@@ -11,8 +14,12 @@ import { adminErrorText } from '@/lib/i18n/admin-error';
 import { useT } from '@/lib/i18n/client';
 
 const LICENSES = ['CC0', 'CC-BY', 'CC-BY-NC', 'COMMERCIAL'] as const;
-const FIELD = 'mt-1.5 w-full rounded-lg border border-white/15 bg-black px-3 text-sm text-white focus:border-white/50 focus:outline-none';
 const SECTION = 'font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70';
+const PRIMARY =
+  'h-10 rounded-lg bg-white px-4 text-sm font-medium text-black transition-colors hover:bg-white/85 disabled:cursor-not-allowed disabled:opacity-50';
+const SECONDARY = 'h-10 rounded-lg border border-white/15 px-4 text-sm text-white/80 transition-colors hover:border-white/40 hover:text-white';
+
+type Step = 'menu' | 'license' | 'visibility';
 
 export default function EditModelDialog({
   model,
@@ -26,10 +33,12 @@ export default function EditModelDialog({
   onHiddenChanged: (isHidden: boolean) => void;
 }) {
   const t = useT();
-  const [license, setLicense] = useState<string>(LICENSES.find((l) => l !== model.license) ?? 'CC0');
+  const [step, setStep] = useState<Step>('menu');
+  const [license, setLicense] = useState<string | null>(null);
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState<string | null>(null);
 
   const [history, setHistory] = useState<HistoryEntry[] | null>(null);
   const [historyError, setHistoryError] = useState<string | null>(null);
@@ -66,123 +75,148 @@ export default function EditModelDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [model.id, historyRound]);
 
-  const valid = license !== model.license && isReasonValid(reason, true);
+  const goTo = (next: Step) => {
+    setStep(next);
+    setReason('');
+    setLicense(null);
+    setError(null);
+    if (next !== 'menu') setDone(null);
+  };
 
-  const submitLicense = async (e: React.FormEvent) => {
+  // Hiding needs a written reason; restoring may have one.
+  const requiresReason = step === 'license' || !model.isHidden;
+  const canSubmit = !busy && isReasonValid(reason, requiresReason) && (step !== 'license' || (license !== null && license !== model.license));
+
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!valid || busy) return;
+    if (!canSubmit) return;
     setBusy(true);
     setError(null);
     try {
-      const res = await setModelLicense(model.id, license, reason.trim());
-      onLicenseChanged(res.license);
+      if (step === 'license' && license) {
+        const res = await setModelLicense(model.id, license, reason.trim());
+        onLicenseChanged(res.license);
+        setDone(t('admin.edit.doneLicense', { license: res.license }));
+      } else {
+        const res = await setModelHidden(model.id, { hidden: !model.isHidden, ...(reason.trim() ? { reason: reason.trim() } : {}) });
+        onHiddenChanged(res.isHidden);
+        setDone(t(res.isHidden ? 'admin.edit.doneHidden' : 'admin.edit.doneRestored'));
+      }
       setHistoryRound((n) => n + 1);
+      setStep('menu');
       setReason('');
-      setLicense(LICENSES.find((l) => l !== res.license) ?? 'CC0');
+      setLicense(null);
     } catch (err) {
-      setError(adminErrorText(err, t, 'admin.license.errFail'));
+      setError(adminErrorText(err, t, step === 'license' ? 'admin.license.errFail' : 'admin.errModel'));
     } finally {
       setBusy(false);
     }
   };
 
-  const [hideReason, setHideReason] = useState('');
-  const [hideBusy, setHideBusy] = useState(false);
-  // Hiding needs a written reason; restoring may have one.
-  const requiresHideReason = !model.isHidden;
-  const hideValid = isReasonValid(hideReason, requiresHideReason);
-
-  const submitHidden = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!hideValid || hideBusy) return;
-    setHideBusy(true);
-    setError(null);
-    try {
-      const res = await setModelHidden(model.id, { hidden: !model.isHidden, ...(hideReason.trim() ? { reason: hideReason.trim() } : {}) });
-      onHiddenChanged(res.isHidden);
-      setHideReason('');
-      setHistoryRound((n) => n + 1);
-    } catch (err) {
-      setError(adminErrorText(err, t, 'admin.errModel'));
-    } finally {
-      setHideBusy(false);
-    }
-  };
+  const menuButton = (Icon: typeof Scale, title: string, desc: string, next: Step) => (
+    <button
+      type="button"
+      onClick={() => goTo(next)}
+      className="flex w-full items-center gap-4 rounded-lg border border-white/15 bg-white/5 p-4 text-left transition-colors hover:border-white/40 hover:bg-white/10"
+    >
+      <Icon aria-hidden className="h-5 w-5 shrink-0 text-white/80" />
+      <span className="grid flex-1 gap-0.5">
+        <span className="text-[15px] font-medium text-white">{title}</span>
+        <span className="text-sm text-white/65">{desc}</span>
+      </span>
+      <ChevronRight aria-hidden className="h-4 w-4 shrink-0 text-white/50" />
+    </button>
+  );
 
   return (
     <Modal title={t('admin.edit.title', { name: model.title })} onClose={onClose}>
       <div className="grid gap-6">
-        <form onSubmit={submitLicense} noValidate className="grid gap-5" aria-labelledby="edit-license-title">
-          <h3 id="edit-license-title" className={SECTION}>{t('admin.edit.licenseSection')}</h3>
-          <p className="text-sm text-white/65">
-            {t('admin.license.current')}: <span className="font-mono text-white">{model.license}</span>
-          </p>
+        {step === 'menu' && (
+          <section aria-labelledby="edit-choose-title" className="grid gap-3">
+            <h3 id="edit-choose-title" className={SECTION}>{t('admin.edit.choose')}</h3>
+            {done && <p role="status" className="rounded-lg border border-hud/40 bg-hud/10 px-3 py-2 text-sm text-hud">{done}</p>}
+            {menuButton(
+              Scale,
+              t('admin.edit.menuLicense'),
+              t('admin.edit.menuLicenseDesc', { license: model.license }),
+              'license',
+            )}
+            {model.isHidden
+              ? menuButton(Eye, t('admin.edit.menuRestore'), t('admin.edit.menuRestoreDesc'), 'visibility')
+              : menuButton(EyeOff, t('admin.edit.menuHide'), t('admin.edit.menuHideDesc'), 'visibility')}
+          </section>
+        )}
 
-          <div>
-            <label htmlFor="license-new" className="text-sm text-white/65">{t('admin.license.new')}</label>
-            <select id="license-new" value={license} onChange={(e) => setLicense(e.target.value)} className={`${FIELD} h-10`}>
-              {LICENSES.map((l) => (
-                <option key={l} value={l} disabled={l === model.license}>{l}</option>
-              ))}
-            </select>
-          </div>
+        {step !== 'menu' && (
+          <form onSubmit={submit} noValidate className="grid gap-5" aria-labelledby="edit-step-title">
+            <div className="flex items-center gap-3">
+              <button type="button" onClick={() => goTo('menu')} disabled={busy} aria-label={t('admin.edit.back')} className="grid h-8 w-8 place-items-center rounded-lg border border-white/15 text-white/80 hover:border-white/40 hover:text-white disabled:opacity-50">
+                <ArrowLeft aria-hidden className="h-4 w-4" />
+              </button>
+              <h3 id="edit-step-title" className={SECTION}>
+                {t(step === 'license' ? 'admin.edit.menuLicense' : model.isHidden ? 'admin.edit.menuRestore' : 'admin.edit.menuHide')}
+              </h3>
+            </div>
 
-          <ReasonField id="license-reason" label={t('admin.license.reason')} value={reason} onChange={setReason} required />
+            {step === 'license' && (
+              <fieldset className="grid gap-2">
+                <legend className="text-sm text-white/65">
+                  {t('admin.license.current')}: <span className="font-mono text-white">{model.license}</span>. {t('admin.edit.pickLicense')}
+                </legend>
+                <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                  {LICENSES.filter((l) => l !== model.license).map((l) => (
+                    <label
+                      key={l}
+                      className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2.5 text-sm transition-colors ${
+                        license === l ? 'border-white bg-white/10 text-white' : 'border-white/15 text-white/80 hover:border-white/40'
+                      }`}
+                    >
+                      <input type="radio" name="license-new" value={l} checked={license === l} onChange={() => setLicense(l)} className="accent-white" />
+                      <span className="font-mono">{l}</span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+            )}
 
-          <p className="rounded-lg border border-amber/40 bg-amber/10 px-3 py-2 text-sm text-amber">{t('admin.license.warning')}</p>
+            {/* The reason comes after the choice: nothing to explain until a license is picked. */}
+            {(step === 'visibility' || license !== null) && (
+              <>
+                <ReasonField
+                  id="edit-reason"
+                  label={t(step === 'visibility' && model.isHidden ? 'admin.edit.restoreReason' : 'admin.license.reason')}
+                  value={reason}
+                  onChange={setReason}
+                  required={requiresReason}
+                  rows={step === 'license' ? 4 : 3}
+                />
+                <p className="rounded-lg border border-amber/40 bg-amber/10 px-3 py-2 text-sm text-amber">
+                  {t(step === 'license' ? 'admin.license.warning' : model.isHidden ? 'admin.edit.restoreWarning' : 'admin.edit.hideWarning')}
+                </p>
+              </>
+            )}
 
-          <div className="flex justify-end">
-            <button
-              type="submit"
-              disabled={!valid || busy}
-              className="h-10 rounded-lg bg-white px-4 text-sm font-medium text-black transition-colors hover:bg-white/85 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {busy ? t('admin.license.saving') : t('admin.license.submit')}
-            </button>
-          </div>
-        </form>
+            {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
 
-        <form onSubmit={submitHidden} noValidate aria-labelledby="edit-visibility-title" className="grid gap-4 border-t border-white/10 pt-5">
-          <h3 id="edit-visibility-title" className={SECTION}>{t('admin.edit.visibilitySection')}</h3>
-          <p className="text-sm text-white/65">{model.isHidden ? t('admin.edit.hiddenNow') : t('admin.edit.visibleNow')}</p>
+            <div className="flex justify-end gap-3">
+              <button type="button" onClick={() => goTo('menu')} disabled={busy} className={SECONDARY}>{t('admin.edit.back')}</button>
+              <button type="submit" disabled={!canSubmit} className={PRIMARY}>
+                {busy
+                  ? t('admin.license.saving')
+                  : t(step === 'license' ? 'admin.license.submit' : model.isHidden ? 'admin.edit.restoreSubmit' : 'admin.edit.hideSubmit')}
+              </button>
+            </div>
+          </form>
+        )}
 
-          <ReasonField
-            id="hide-reason"
-            label={t(model.isHidden ? 'admin.edit.restoreReason' : 'admin.license.reason')}
-            value={hideReason}
-            onChange={setHideReason}
-            required={requiresHideReason}
-            rows={3}
-          />
-
-          {!model.isHidden && (
-            <p className="rounded-lg border border-amber/40 bg-amber/10 px-3 py-2 text-sm text-amber">{t('admin.edit.hideWarning')}</p>
-          )}
-
-          <div className="flex justify-end">
-            <button
-              type="submit"
-              disabled={!hideValid || hideBusy}
-              className="h-10 rounded-lg bg-white px-4 text-sm font-medium text-black transition-colors hover:bg-white/85 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {hideBusy ? t('admin.license.saving') : t(model.isHidden ? 'admin.edit.restoreSubmit' : 'admin.edit.hideSubmit')}
-            </button>
-          </div>
-        </form>
-
-        {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
-
-        <HistoryList entries={history} error={historyError} headingId="model-history-title" />
-
-        <div className="flex justify-end border-t border-white/10 pt-4">
-          <button
-            type="button"
-            onClick={onClose}
-            className="h-10 rounded-lg border border-white/15 px-4 text-sm text-white/80 hover:border-white/40 hover:text-white"
-          >
-            {t('admin.edit.close')}
-          </button>
-        </div>
+        {step === 'menu' && (
+          <>
+            <HistoryList entries={history} error={historyError} headingId="model-history-title" />
+            <div className="flex justify-end border-t border-white/10 pt-4">
+              <button type="button" onClick={onClose} className={SECONDARY}>{t('admin.edit.close')}</button>
+            </div>
+          </>
+        )}
       </div>
     </Modal>
   );

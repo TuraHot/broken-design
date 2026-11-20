@@ -18,6 +18,7 @@ export default function ReasonField({
   onChange,
   required,
   rows = 4,
+  hint,
 }: {
   /** Unique on the page: the hint and the counter are linked to the field through it. */
   id: string;
@@ -27,6 +28,8 @@ export default function ReasonField({
   /** True when the action cannot go ahead without a reason (the "too short" warning only appears then). */
   required: boolean;
   rows?: number;
+  /** Replaces the default hint, which says the owner reads the reason (not true when only admins see it). */
+  hint?: string;
 }) {
   const t = useT();
   const length = value.trim().length;
@@ -43,7 +46,7 @@ export default function ReasonField({
         className="mt-1.5 w-full rounded-lg border border-white/15 bg-black px-3 py-2 text-sm text-white placeholder:text-white/40 focus:border-white/50 focus:outline-none"
       />
       <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2 text-xs text-white/50">
-        <span id={`${id}-hint`}>{t('admin.license.reasonHint')}</span>
+        <span id={`${id}-hint`}>{hint ?? t('admin.license.reasonHint')}</span>
         <span id={`${id}-count`} className="font-mono">{t('admin.license.count', { n: length, max: REASON_MAX })}</span>
       </div>
       {required && length > 0 && length < REASON_MIN && (

@@ -2,10 +2,10 @@
 
 // Register form: username, email, and password. Directly connected to Core API (/api/auth/register).
 import Link from 'next/link';
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AlertCircle, Eye, EyeOff } from 'lucide-react';
-import { register } from '@/lib/auth';
+import { REGISTER_EMAIL_KEY, register } from '@/lib/auth';
 import { authErrorText } from '@/lib/i18n/auth-error';
 import { useT } from '@/lib/i18n/client';
 import { EMAIL_RE, FIELD, Field } from './Field';
@@ -20,6 +20,21 @@ export default function RegisterForm() {
   const [errors, setErrors] = useState<Partial<Record<keyof typeof values | 'api', string>>>({});
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  // The email the login page found no account for (read once, then removed), so the person does not type it again.
+  const [fromLogin, setFromLogin] = useState(false);
+
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem(REGISTER_EMAIL_KEY);
+      sessionStorage.removeItem(REGISTER_EMAIL_KEY);
+      if (saved) {
+        setValues((prev) => (prev.email ? prev : { ...prev, email: saved }));
+        setFromLogin(true);
+      }
+    } catch {
+      // storage blocked: start with an empty email
+    }
+  }, []);
 
   const update = (key: keyof typeof values) => (e: React.ChangeEvent<HTMLInputElement>) => {
     setValues((prev) => ({ ...prev, [key]: e.target.value }));
@@ -86,6 +101,12 @@ export default function RegisterForm() {
         {t('auth.register.title')}
       </h1>
       <p className="mt-3 text-[15px] leading-relaxed text-white/65">{t('auth.register.lead')}</p>
+
+      {fromLogin && (
+        <p role="status" className="mt-6 rounded-lg border border-hud/40 bg-hud/10 px-3 py-2 text-sm text-hud">
+          {t('auth.register.noAccountNotice')}
+        </p>
+      )}
 
       <div className="mt-8 rounded-lg border border-white/10 bg-white/5 p-5 sm:p-6">
         <form onSubmit={onSubmit} noValidate className="grid gap-4">

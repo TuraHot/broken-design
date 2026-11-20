@@ -110,6 +110,7 @@ function ComplaintDetails({ row, api }: { row: AdminComplaint; api: RowApi<Admin
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState(row.adminNote ?? '');
   const [error, setError] = useState<string | null>(null);
+  const [notified, setNotified] = useState(false);
 
   const run = async (task: () => Promise<void>, fallback: MessageKey) => {
     setError(null);
@@ -123,10 +124,13 @@ function ComplaintDetails({ row, api }: { row: AdminComplaint; api: RowApi<Admin
     }
   };
 
+  // Closing (resolved / dismissed) sends the reporter a notice with the admin's note, so a note that is typed but not
+  // saved yet goes along with the status change instead of being left behind.
   const changeStatus = (status: ComplaintStatus) =>
     run(async () => {
-      const res = await updateComplaint(row.id, status);
-      api.update(row.id, (r) => ({ ...r, status: res.status, handledAt: res.handledAt }));
+      const res = await updateComplaint(row.id, status, noteChanged ? note : undefined);
+      api.update(row.id, (r) => ({ ...r, status: res.status, handledAt: res.handledAt, adminNote: res.adminNote }));
+      setNotified(res.reporterNotified);
     }, 'admin.errStatus');
 
   const saveNote = () =>
@@ -196,6 +200,8 @@ function ComplaintDetails({ row, api }: { row: AdminComplaint; api: RowApi<Admin
               <option key={s} value={s}>{t(STATUS_LABELS[s])}</option>
             ))}
           </select>
+          <p className="text-sm text-white/65">{t('admin.closeHint')}</p>
+          {notified && <p className="text-sm text-hud">{t('admin.reporterNotified', { name: row.reporter.displayName })}</p>}
           {row.handledAt && (
             <p className="text-sm text-white/65">
               {row.handledByName

@@ -62,6 +62,9 @@ export interface AdminUser {
   suspendedUntil: string | null;
   suspensionReason: string | null;
   createdAt: string;
+  /** Set when an admin deleted the account (the row stays as history; `email` is then the address it had). */
+  deletedAt: string | null;
+  deletedReason: string | null;
 }
 
 export interface AdminModel {
@@ -161,6 +164,16 @@ export const setUserSuspended = (id: string, body: { suspended: boolean; reason?
     { method: 'PATCH', body: JSON.stringify(body) },
   );
 
+/**
+ * Delete an account but keep its history (reason required, 10-1000 characters). The email is freed: signing up with it
+ * again makes a brand-new account. Admins and your own account are refused by the server.
+ */
+export const deleteUser = (id: string, reason: string) =>
+  adminFetch<{ id: string; isDeleted: boolean }>(`/users/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    body: JSON.stringify({ reason }),
+  });
+
 /** Hide (reason required, the owner is notified) or restore (reason optional). */
 export const setModelHidden = (id: string, body: { hidden: boolean; reason?: string }) =>
   adminFetch<{ id: string; isHidden: boolean; hiddenAt: string | null }>(
@@ -192,6 +205,76 @@ export const fetchModelHistory = (modelId: string) =>
   adminFetch<{ items: ModelHistoryEntry[] }>(`/models/${encodeURIComponent(modelId)}/history`);
 
 /** The written reason of an admin action (license change, hide, suspend): the API accepts 10 to 1000 characters. */
+// ─── What waits for an admin (creator applications and open complaints) ───────
+export interface AdminWaitingCounts {
+  creatorApplications: number;
+  complaints: number;
+  total: number;
+}
+
+export interface AdminNotificationItem {
+  kind: 'creator_application' | 'complaint';
+  id: string;
+  createdAt: string;
+  person: { id: string; displayName: string; email: string };
+  /** The applicant's note or the complaint message (cut to 300 characters by the server). */
+  text: string;
+  /** Complaints only: model | account | purchase | other. */
+  category: string | null;
+  modelTitle: string | null;
+}
+
+export const fetchWaitingSummary = () => adminFetch<AdminWaitingCounts>('/notifications/summary');
+
+/** Sent on `window` when an application or a complaint was handled, so the sidebar numbers update at once. */
+export const WAITING_CHANGED_EVENT = 'lixyte:admin-waiting-changed';
+
+function announceWaitingChanged<T>(result: T): T {
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(WAITING_CHANGED_EVENT));
+  return result;
+}
+
+export const fetchNotifications = () =>
+  adminFetch<{ counts: AdminWaitingCounts; items: AdminNotificationItem[] }>('/notifications');
+
+// ─── Creator approvals ───────────────────────────────────────────────────────
+export type CreatorApplicationStatus = 'pending' | 'approved' | 'rejected';
+
+export interface AdminCreatorApplication {
+  id: string;
+  userId: string;
+  email: string;
+  displayName: string;
+  note: string;
+  status: CreatorApplicationStatus;
+  adminNote: string | null;
+  createdAt: string;
+  reviewedAt: string | null;
+}
+
+export interface AdminInviteCode {
+  id: string;
+  code: string;
+  maxUses: number;
+  usedCount: number;
+  expiresAt: string | null;
+  createdAt: string;
+}
+
+export const fetchCreatorApplications = (status: CreatorApplicationStatus | 'all') =>
+  adminFetch<{ applications: AdminCreatorApplication[] }>(`/creator-applications?status=${status}`);
+
+export const reviewCreatorApplication = (id: string, status: 'approved' | 'rejected', adminNote?: string) =>
+  adminFetch<{ application: { id: string; status: CreatorApplicationStatus } }>(
+    `/creator-applications/${encodeURIComponent(id)}`,
+    { method: 'PATCH', body: JSON.stringify({ status, ...(adminNote ? { adminNote } : {}) }) },
+  ).then(announceWaitingChanged);
+
+export const fetchInviteCodes = () => adminFetch<{ codes: AdminInviteCode[] }>('/invite-codes');
+
+export const createInviteCode = (maxUses = 1) =>
+  adminFetch<{ code: AdminInviteCode }>('/invite-codes', { method: 'POST', body: JSON.stringify({ maxUses }) });
+
 export const REASON_MIN = 10;
 export const REASON_MAX = 1000;
 
@@ -202,47 +285,10 @@ export const setModelLicense = (id: string, license: string, reason: string) =>
   });
 
 export const updateComplaint = (id: string, status: ComplaintStatus, adminNote?: string) =>
-  adminFetch<{ id: string; status: ComplaintStatus; adminNote: string | null; handledAt: string | null }>(
+  adminFetch<{ id: string; status: ComplaintStatus; adminNote: string | null; handledAt: string | null; reporterNotified: boolean }>(
     `/complaints/${encodeURIComponent(id)}`,
     { method: 'PATCH', body: JSON.stringify(adminNote === undefined ? { status } : { status, adminNote }) },
-  );
-
-export interface AdminCreatorApplication {
-  id: string;
-  userId: string;
-  email: string;
-  displayName: string;
-  note: string;
-  status: 'pending' | 'approved' | 'rejected';
-  createdAt: string;
-}
-
-export interface AdminInviteCode {
-  id: string;
-  code: string;
-  maxUses: number;
-  usedCount: number;
-  expiresAt?: string | null;
-  createdAt: string;
-}
-
-export const fetchCreatorApplications = (status: 'pending' | 'approved' | 'rejected' | 'all' = 'pending') =>
-  adminFetch<{ applications: AdminCreatorApplication[] }>(`/creator-applications?status=${encodeURIComponent(status)}`);
-
-export const reviewCreatorApplication = (id: string, status: 'approved' | 'rejected', adminNote?: string) =>
-  adminFetch<{ application: { id: string; userId: string; status: string; adminNote: string | null; reviewedAt: string } }>(
-    `/creator-applications/${encodeURIComponent(id)}`,
-    { method: 'PATCH', body: JSON.stringify(adminNote === undefined ? { status } : { status, adminNote }) },
-  );
-
-export const fetchInviteCodes = () =>
-  adminFetch<{ codes: AdminInviteCode[] }>('/invite-codes');
-
-export const createInviteCode = (body: { code?: string; maxUses?: number; expiresAt?: string } = { maxUses: 1 }) =>
-  adminFetch<{ code: AdminInviteCode }>('/invite-codes', {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
+  ).then(announceWaitingChanged);
 
 export type WithdrawalStatus = 'pending' | 'approved' | 'paid' | 'rejected';
 

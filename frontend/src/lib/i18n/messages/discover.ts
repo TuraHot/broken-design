@@ -131,7 +131,6 @@ export const discoverEn = {
   'model.buyNoUrl': 'Payment checkout URL is not available.',
   'model.buyFailed': 'Checkout could not be completed.',
   'model.buyFailedStatus': 'Checkout failed ({status})',
-  'model.ownerTitle': 'Your Model',
   'model.ownerNote': 'Creators cannot buy or download their own uploaded models.',
   'model.ownerDisabled': 'Your Model (Cannot Buy/Download)',
   // embed snippets
@@ -419,7 +418,6 @@ export const discoverTh: Record<keyof typeof discoverEn, string> = {
   'model.buyNoUrl': 'ไม่พบลิงก์ชำระเงิน',
   'model.buyFailed': 'ดำเนินการสั่งซื้อไม่สำเร็จ',
   'model.buyFailedStatus': 'สั่งซื้อไม่สำเร็จ ({status})',
-  'model.ownerTitle': 'ผลงานของคุณ',
   'model.ownerNote': 'ครีเอเตอร์ไม่สามารถซื้อหรือดาวน์โหลดผลงานของตนเองได้',
   'model.ownerDisabled': 'ผลงานของคุณ (ซื้อ/ดาวน์โหลดไม่ได้)',
   'embed.snip.buy': 'ซื้อโมเดลเพื่อรับ embed key ของคุณ',

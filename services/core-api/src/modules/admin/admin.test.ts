@@ -437,6 +437,55 @@ test('GET /api/admin/models - includes hidden and deleted models with owner info
   );
 });
 
+test('GET /api/admin/models - status and license filters are combined with the search, values go in as parameters', async () => {
+  const seen: { sql: string; params: any[] }[] = [];
+  await withServer(
+    ACTIVE_ADMIN,
+    (sql, params) => {
+      if (sql.includes('FROM models m')) seen.push({ sql, params });
+      if (sql.includes('COUNT(*)::int AS total FROM models')) return { rowCount: 1, rows: [{ total: 0 }] };
+    },
+    async (base) => {
+      const res = await fetch(`${base}/models?q=rob&status=hidden&license=CC-BY`, { headers: { Authorization: `Bearer ${token()}` } });
+      assert.equal(res.status, 200);
+      assert.equal(seen.length, 2);
+      for (const { sql } of seen) {
+        assert.ok(sql.includes('m.deleted_at IS NULL AND m.hidden_at IS NOT NULL'));
+        assert.ok(sql.includes('m.license = $2::license_type'));
+      }
+      assert.deepEqual(seen[0].params, ['%rob%', 'CC-BY']);
+
+      seen.length = 0;
+      await fetch(`${base}/models?status=deleted`, { headers: { Authorization: `Bearer ${token()}` } });
+      assert.ok(seen[0].sql.includes('m.deleted_at IS NOT NULL'));
+      assert.deepEqual(seen[0].params, []);
+
+      seen.length = 0;
+      await fetch(`${base}/models?status=visible`, { headers: { Authorization: `Bearer ${token()}` } });
+      assert.ok(seen[0].sql.includes('m.deleted_at IS NULL AND m.hidden_at IS NULL'));
+    },
+  );
+});
+
+test('GET /api/admin/models - 400 for an unknown status or license, nothing is queried', async () => {
+  let queried = false;
+  await withServer(
+    ACTIVE_ADMIN,
+    (sql) => {
+      if (sql.includes('FROM models m')) queried = true;
+      return undefined;
+    },
+    async (base) => {
+      for (const qs of ['status=gone', 'license=MIT', "status=hidden'%20OR%201=1"]) {
+        const res = await fetch(`${base}/models?${qs}`, { headers: { Authorization: `Bearer ${token()}` } });
+        assert.equal(res.status, 400);
+        assert.equal((await res.json()).error.code, 'INVALID_QUERY');
+      }
+      assert.equal(queried, false);
+    },
+  );
+});
+
 // ─── PATCH /api/admin/models/:id/hide (reason, history, notice to the owner) ────────
 const HIDE_REASON = 'The preview shows content that is not allowed on the platform.';
 
@@ -672,6 +721,57 @@ test('PATCH /api/admin/complaints/:id - status only keeps the note; reopening cl
       });
       assert.equal(res.status, 200);
       assert.equal((await res.json()).handledAt, null);
+    },
+  );
+});
+
+test('PATCH /api/admin/complaints/:id - closing it notifies the reporter in the SAME statement, only on a real change to resolved/dismissed', async () => {
+  const statements: string[] = [];
+  await withServer(
+    ACTIVE_ADMIN,
+    (sql) => {
+      if (sql.includes('UPDATE complaints')) {
+        statements.push(sql);
+        return {
+          rowCount: 1,
+          rows: [{ id: COMPLAINT_ID, status: 'resolved', admin_note: 'Hidden the model.', handled_at: '2026-11-16T01:00:00.000Z', notified: true }],
+        };
+      }
+    },
+    async (base) => {
+      const res = await fetch(`${base}/complaints/${COMPLAINT_ID}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'resolved', adminNote: 'Hidden the model.' }),
+      });
+      assert.equal(res.status, 200);
+      assert.equal((await res.json()).reporterNotified, true);
+    },
+  );
+  assert.equal(statements.length, 1);
+  const sql = statements[0];
+  assert.match(sql, /INSERT INTO notifications/);
+  assert.match(sql, /'complaint_' \|\| upd\.status/);
+  assert.match(sql, /upd\.status IN \('resolved', 'dismissed'\) AND old\.status <> upd\.status/); // not again for the same result
+  assert.match(sql, /u\.deleted_at IS NULL/); // a deleted reporter gets nothing
+  assert.match(sql, /FOR UPDATE/);
+});
+
+test('PATCH /api/admin/complaints/:id - reporterNotified is false when the statement inserted no notice', async () => {
+  await withServer(
+    ACTIVE_ADMIN,
+    (sql) => {
+      if (sql.includes('UPDATE complaints')) {
+        return { rowCount: 1, rows: [{ id: COMPLAINT_ID, status: 'in_review', admin_note: null, handled_at: '2026-11-16T01:00:00.000Z', notified: false }] };
+      }
+    },
+    async (base) => {
+      const res = await fetch(`${base}/complaints/${COMPLAINT_ID}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'in_review' }),
+      });
+      assert.equal((await res.json()).reporterNotified, false);
     },
   );
 });
@@ -1013,6 +1113,7 @@ test('PATCH /api/admin/creator-applications/:id - validates UUID, approves atomi
     prev_status: 'pending',
     user_role: 'user',
     user_suspended_at: null,
+    user_deleted_at: null,
     id: APP_ID,
     user_id: TARGET_ID,
     status: 'approved',
@@ -1230,4 +1331,295 @@ test('PATCH /api/admin/withdrawals/:id - transitions atomically with notificatio
       assert.equal((await conflict.json()).error.code, 'INVALID_TRANSITION');
     },
   );
+});
+
+// ─── DELETE /api/admin/users/:id (soft delete, history stays, email is freed) ──────────
+const DELETE_REASON = 'Account used to resell stolen models, confirmed by two complaints.';
+
+function deleteUser(base: string, body: unknown, id = TARGET_ID) {
+  return fetch(`${base}/users/${id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+// the row the delete statement reports back
+const deleteRow = (o: Partial<{ found: number; changed: number; already_deleted: boolean | null }> = {}) => ({
+  rowCount: 1,
+  rows: [{ found: 1, changed: 1, already_deleted: false, ...o }],
+});
+
+test('DELETE /api/admin/users/:id - soft deletes in ONE statement, keeps the real email and frees the address', async () => {
+  const statements: { sql: string; params: any[] }[] = [];
+  await withServer(
+    ACTIVE_ADMIN,
+    (sql, params) => {
+      if (!sql.includes('SET deleted_at = NOW()')) return undefined;
+      statements.push({ sql, params });
+      return deleteRow();
+    },
+    async (base) => {
+      const res = await deleteUser(base, { reason: `  ${DELETE_REASON}  ` });
+      assert.equal(res.status, 200);
+      assert.deepEqual(await res.json(), { id: TARGET_ID, isDeleted: true });
+    },
+  );
+  assert.equal(statements.length, 1);
+  const { sql, params } = statements[0];
+  assert.match(sql, /UPDATE users/);
+  assert.match(sql, /original_email = old\.email/); // the real address is kept for the history
+  assert.match(sql, /email = 'deleted-' \|\| old\.id::text \|\| '@deleted\.invalid'/); // a unique placeholder frees the address
+  assert.match(sql, /password_hash = '!deleted'/);
+  assert.match(sql, /old\.role <> 'admin'/);
+  assert.match(sql, /old\.deleted_at IS NULL/);
+  assert.match(sql, /FOR UPDATE/);
+  assert.doesNotMatch(sql, /DELETE FROM/); // nothing is removed, so every purchase, model and complaint stays
+  assert.deepEqual(params, [TARGET_ID, ADMIN_ID, DELETE_REASON]); // reason trimmed, admin from the token
+});
+
+test('DELETE /api/admin/users/:id - needs a written reason of 10 to 1000 characters', async () => {
+  let touched = false;
+  await withServer(
+    ACTIVE_ADMIN,
+    (sql) => {
+      if (sql.includes('SET deleted_at')) touched = true;
+      return undefined;
+    },
+    async (base) => {
+      for (const body of [{}, { reason: '' }, { reason: 'too short' }, { reason: 'x'.repeat(1001) }, { reason: 42 }]) {
+        const res = await deleteUser(base, body);
+        assert.equal(res.status, 400);
+        assert.equal((await res.json()).error.code, 'INVALID_BODY');
+      }
+    },
+  );
+  assert.equal(touched, false);
+});
+
+test('DELETE /api/admin/users/:id - an admin cannot delete their own account, and a bad id is refused', async () => {
+  let touched = false;
+  await withServer(
+    ACTIVE_ADMIN,
+    (sql) => {
+      if (sql.includes('SET deleted_at')) touched = true;
+      return undefined;
+    },
+    async (base) => {
+      const self = await deleteUser(base, { reason: DELETE_REASON }, ADMIN_ID);
+      assert.equal(self.status, 400);
+      assert.equal((await self.json()).error.code, 'CANNOT_DELETE_SELF');
+      const bad = await deleteUser(base, { reason: DELETE_REASON }, 'not-a-uuid');
+      assert.equal(bad.status, 400);
+      assert.equal((await bad.json()).error.code, 'INVALID_ID');
+    },
+  );
+  assert.equal(touched, false);
+});
+
+test('DELETE /api/admin/users/:id - 404 for an unknown user, 403 for an admin, 409 when already deleted', async () => {
+  const cases: { row: ReturnType<typeof deleteRow>; status: number; code: string }[] = [
+    { row: deleteRow({ found: 0, changed: 0, already_deleted: null }), status: 404, code: 'USER_NOT_FOUND' },
+    { row: deleteRow({ changed: 0, already_deleted: false }), status: 403, code: 'CANNOT_DELETE_ADMIN' },
+    { row: deleteRow({ changed: 0, already_deleted: true }), status: 409, code: 'ALREADY_DELETED' },
+  ];
+  for (const c of cases) {
+    await withServer(
+      ACTIVE_ADMIN,
+      (sql) => (sql.includes('SET deleted_at = NOW()') ? c.row : undefined),
+      async (base) => {
+        const res = await deleteUser(base, { reason: DELETE_REASON });
+        assert.equal(res.status, c.status);
+        assert.equal((await res.json()).error.code, c.code);
+      },
+    );
+  }
+});
+
+test('DELETE /api/admin/users/:id - only an active admin (checked in the database) can delete', async () => {
+  let touched = false;
+  const handler = (sql: string) => {
+    if (sql.includes('SET deleted_at')) touched = true;
+    return undefined;
+  };
+  await withServer({ role: 'user', suspended_at: null }, handler, async (base) => {
+    const res = await deleteUser(base, { reason: DELETE_REASON });
+    assert.equal(res.status, 403);
+    assert.equal((await res.json()).error.code, 'FORBIDDEN');
+  });
+  await withServer({ role: 'admin', suspended_at: '2026-11-01T00:00:00.000Z' }, handler, async (base) => {
+    const res = await deleteUser(base, { reason: DELETE_REASON });
+    assert.equal(res.status, 403);
+    assert.equal((await res.json()).error.code, 'ACCOUNT_SUSPENDED');
+  });
+  assert.equal(touched, false);
+});
+
+test('admin routes - an admin whose own account was deleted is refused with 401 ACCOUNT_DELETED', async () => {
+  await withServer(
+    ACTIVE_ADMIN,
+    (sql) => (sql.includes('SELECT deleted_at FROM users') ? { rowCount: 1, rows: [{ deleted_at: '2026-11-20T00:00:00.000Z' }] } : undefined),
+    async (base) => {
+      const res = await fetch(`${base}/overview`, { headers: { Authorization: `Bearer ${token()}` } });
+      assert.equal(res.status, 401);
+      assert.equal((await res.json()).error.code, 'ACCOUNT_DELETED');
+    },
+  );
+});
+
+// ─── GET /api/admin/notifications (what waits for an admin) ──────────────────────────
+test('GET /api/admin/notifications/summary - counts pending applications and open complaints', async () => {
+  let sql = '';
+  await withServer(
+    ACTIVE_ADMIN,
+    (q) => {
+      if (!q.includes('AS creator_applications')) return undefined;
+      sql = q;
+      return { rowCount: 1, rows: [{ creator_applications: 3, complaints: 2 }] };
+    },
+    async (base) => {
+      const res = await fetch(`${base}/notifications/summary`, { headers: { Authorization: `Bearer ${token()}` } });
+      assert.equal(res.status, 200);
+      assert.deepEqual(await res.json(), { creatorApplications: 3, complaints: 2, total: 5 });
+    },
+  );
+  assert.match(sql, /ca\.status = 'pending'/);
+  assert.match(sql, /u\.deleted_at IS NULL/); // an applicant whose account was deleted is not waiting for anyone
+  assert.match(sql, /status = 'open'/);
+});
+
+test('GET /api/admin/notifications - lists the waiting items newest first with the counts, and needs an admin', async () => {
+  let feedSql = '';
+  await withServer(
+    ACTIVE_ADMIN,
+    (q) => {
+      if (q.includes('AS creator_applications') && !q.includes('UNION')) {
+        return { rowCount: 1, rows: [{ creator_applications: 1, complaints: 1 }] };
+      }
+      if (q.includes('UNION ALL')) {
+        feedSql = q;
+        return {
+          rowCount: 2,
+          rows: [
+            { kind: 'complaint', id: 'c1', created_at: '2026-11-20T10:00:00.000Z', person_id: TARGET_ID, person_name: 'Bob', person_email: 'bob@example.com', text: 'x'.repeat(400), category: 'copyright', model_title: 'Robot' },
+            { kind: 'creator_application', id: 'a1', created_at: '2026-11-19T10:00:00.000Z', person_id: TARGET_ID, person_name: 'Alice', person_email: 'alice@example.com', text: 'I make robots', category: null, model_title: null },
+          ],
+        };
+      }
+      return undefined;
+    },
+    async (base) => {
+      const res = await fetch(`${base}/notifications`, { headers: { Authorization: `Bearer ${token()}` } });
+      assert.equal(res.status, 200);
+      const body = await res.json();
+      assert.deepEqual(body.counts, { creatorApplications: 1, complaints: 1, total: 2 });
+      assert.equal(body.items.length, 2);
+      assert.equal(body.items[0].kind, 'complaint');
+      assert.equal(body.items[0].text.length, 300); // long messages are cut for the list
+      assert.equal(body.items[0].modelTitle, 'Robot');
+      assert.deepEqual(body.items[1].person, { id: TARGET_ID, displayName: 'Alice', email: 'alice@example.com' });
+      assert.equal(JSON.stringify(body).includes('password'), false);
+    },
+  );
+  assert.match(feedSql, /ORDER BY created_at DESC/);
+  assert.match(feedSql, /LIMIT 50/);
+  assert.match(feedSql, /ca\.status = 'pending' AND u\.deleted_at IS NULL/);
+
+  await withServer({ role: 'user', suspended_at: null }, () => undefined, async (base) => {
+    const res = await fetch(`${base}/notifications`, { headers: { Authorization: `Bearer ${token()}` } });
+    assert.equal(res.status, 403);
+    const sum = await fetch(`${base}/notifications/summary`, { headers: { Authorization: `Bearer ${token()}` } });
+    assert.equal(sum.status, 403);
+  });
+});
+
+test('creator applications - an application of a deleted account is not listed and cannot be approved', async () => {
+  let listSql = '';
+  let patchSql = '';
+  const APP_ID = '66666666-6666-4666-8666-666666666666';
+  await withServer(
+    ACTIVE_ADMIN,
+    (sql) => {
+      if (sql.includes('FROM creator_applications ca') && sql.includes('LIMIT 100')) {
+        listSql = sql;
+        return { rowCount: 0, rows: [] };
+      }
+      if (sql.includes('WITH target AS') && sql.includes('creator_applications')) {
+        patchSql = sql;
+        return {
+          rowCount: 1,
+          rows: [
+            {
+              found: 1,
+              prev_status: 'pending',
+              user_role: 'user',
+              user_suspended_at: null,
+              user_deleted_at: '2026-11-20T00:00:00.000Z',
+              id: null,
+              user_id: null,
+              status: null,
+              admin_note: null,
+              reviewed_at: null,
+            },
+          ],
+        };
+      }
+      return undefined;
+    },
+    async (base) => {
+      const list = await fetch(`${base}/creator-applications`, { headers: { Authorization: `Bearer ${token()}` } });
+      assert.equal(list.status, 200);
+      const res = await fetch(`${base}/creator-applications/${APP_ID}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'approved' }),
+      });
+      assert.equal(res.status, 409);
+      assert.equal((await res.json()).error.code, 'ACCOUNT_DELETED');
+    },
+  );
+  assert.match(listSql, /u\.deleted_at IS NULL/);
+  assert.match(patchSql, /t\.user_deleted_at IS NULL/); // neither the application nor the user is updated when deleted
+});
+
+test('GET /api/admin/users - a deleted account shows the address it had, not the placeholder, and can be searched by it', async () => {
+  let where = '';
+  await withServer(
+    ACTIVE_ADMIN,
+    (sql) => {
+      if (sql.includes('COUNT(*)::int AS total FROM users')) return { rowCount: 1, rows: [{ total: 1 }] };
+      if (sql.includes('FROM users') && sql.includes('LIMIT')) {
+        where = sql;
+        return {
+          rowCount: 1,
+          rows: [
+            {
+              id: TARGET_ID,
+              email: `deleted-${TARGET_ID}@deleted.invalid`,
+              original_email: 'alice@example.com',
+              display_name: 'Alice',
+              role: 'creator',
+              is_seller: false,
+              suspended_at: null,
+              suspended_until: null,
+              suspension_reason: null,
+              created_at: '2026-11-01T00:00:00.000Z',
+              deleted_at: '2026-11-20T00:00:00.000Z',
+              deleted_reason: DELETE_REASON,
+            },
+          ],
+        };
+      }
+    },
+    async (base) => {
+      const res = await fetch(`${base}/users?q=alice`, { headers: { Authorization: `Bearer ${token()}` } });
+      assert.equal(res.status, 200);
+      const u = (await res.json()).items[0];
+      assert.equal(u.email, 'alice@example.com');
+      assert.equal(u.deletedAt, '2026-11-20T00:00:00.000Z');
+      assert.equal(u.deletedReason, DELETE_REASON);
+      assert.equal(JSON.stringify(u).includes('deleted.invalid'), false);
+    },
+  );
+  assert.match(where, /original_email ILIKE/);
 });

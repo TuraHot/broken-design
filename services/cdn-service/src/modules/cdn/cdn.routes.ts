@@ -17,7 +17,7 @@ import multer from "multer";
 import rateLimit from "express-rate-limit";
 import { env } from "../../config/env";
 import { AppError } from "../../middlewares/error.middleware";
-import { verifyJwtToken, type AuthUser } from "../../middlewares/auth.middleware";
+import { isAccountDeleted, verifyJwtToken, type AuthUser } from "../../middlewares/auth.middleware";
 import { validateGlbHeader } from "../../utils/glbValidator";
 import {
   embedLicenseAndWatermark,
@@ -122,17 +122,21 @@ cdnRouter.use(
   },
 );
 
-/** Optional JWT: returns the user if a valid Bearer token is sent, `null` if none, 401 if invalid. */
-function optionalUser(req: Request): AuthUser | null {
+/** Optional JWT: returns the user if a valid Bearer token is sent, `null` if none, 401 if invalid or the account is deleted. */
+async function optionalUser(req: Request): Promise<AuthUser | null> {
   const header = req.headers.authorization;
   if (!header) return null;
   if (!header.startsWith("Bearer "))
     throw new AppError(401, "UNAUTHORIZED", "Invalid Authorization header");
+  let user: AuthUser;
   try {
-    return verifyJwtToken(header.slice(7));
+    user = verifyJwtToken(header.slice(7));
   } catch {
     throw new AppError(401, "INVALID_TOKEN", "Invalid or expired JWT token");
   }
+  if (await isAccountDeleted(user.id))
+    throw new AppError(401, "ACCOUNT_DELETED", "This account has been deleted");
+  return user;
 }
 
 // ─── GET /cdn/models/:id/file.glb?key= ─────────────────────────────────────
@@ -184,7 +188,7 @@ cdnRouter.get("/models/:id/preview.glb", async (req, res) => {
 
 // ─── GET /cdn/models/:id/download ──────────────────────────────────────────
 cdnRouter.get("/models/:id/download", downloadLimiter, async (req, res) => {
-  const user = optionalUser(req);
+  const user = await optionalUser(req);
   const model = await loadModel(String(req.params.id));
   let purchaseInfo: PaidDownloadAccess | null = null;
 

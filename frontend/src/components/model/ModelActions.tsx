@@ -189,15 +189,6 @@ export default function ModelActions({
 
   return (
     <div className="space-y-2">
-      {isOwner && (
-        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-300">
-          <p className="font-semibold">{t("model.ownerTitle")}</p>
-          <p className="mt-0.5 text-amber-200/80">
-            {t("model.ownerNote")}
-          </p>
-        </div>
-      )}
-
       <button
         type="button"
         disabled={!ready || !signedIn || busy || isOwner}

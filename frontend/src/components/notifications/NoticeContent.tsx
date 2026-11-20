@@ -105,5 +105,19 @@ export default function NoticeContent({ n }: { n: NoticeItem }) {
     );
   }
 
+  if (n.kind === 'complaint_resolved' || n.kind === 'complaint_dismissed') {
+    return (
+      <>
+        <p className="mt-2 text-sm text-ink">{t(n.kind === 'complaint_resolved' ? 'notice.complaintResolved' : 'notice.complaintDismissed')}</p>
+        {n.data.note && (
+          <>
+            <p className="mt-2 text-xs text-ink/50">{t('notice.adminNote')}</p>
+            <p className="mt-1 whitespace-pre-wrap break-words text-sm text-ink/80">{n.data.note}</p>
+          </>
+        )}
+      </>
+    );
+  }
+
   return <p className="mt-2 text-sm text-ink">{t('notice.other')}</p>;
 }

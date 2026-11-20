@@ -7,20 +7,28 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Box, Flag, LayoutDashboard, LogOut, Receipt, Users, Wallet, type LucideIcon } from 'lucide-react';
+import { Bell, Box, Flag, LayoutDashboard, LogOut, Receipt, UserCheck, Users, Wallet, type LucideIcon } from 'lucide-react';
 import LanguageSwitch from '@/components/LanguageSwitch';
+import { fetchWaitingSummary, WAITING_CHANGED_EVENT, type AdminWaitingCounts } from '@/lib/admin-api';
 import { useT } from '@/lib/i18n/client';
 import type { MessageKey } from '@/lib/i18n/messages';
 import { clearSession, readSession, SESSION_UPDATED_EVENT, type Session } from '@/lib/session';
 
-const TABS: { href: string; label: MessageKey; icon: LucideIcon }[] = [
+type Count = keyof AdminWaitingCounts;
+
+// `count` = which waiting number to show next to the tab (applications and complaints still waiting for an admin).
+const TABS: { href: string; label: MessageKey; icon: LucideIcon; count?: Count }[] = [
   { href: '/admin', label: 'admin.nav.overview', icon: LayoutDashboard },
+  { href: '/admin/notifications', label: 'admin.nav.notifications', icon: Bell, count: 'total' },
   { href: '/admin/models', label: 'admin.nav.models', icon: Box },
   { href: '/admin/users', label: 'admin.nav.users', icon: Users },
+  { href: '/admin/creator-approvals', label: 'admin.nav.creatorApprovals', icon: UserCheck, count: 'creatorApplications' },
   { href: '/admin/purchases', label: 'admin.nav.purchases', icon: Receipt },
   { href: '/admin/withdrawals', label: 'admin.nav.withdrawals', icon: Wallet },
-  { href: '/admin/complaints', label: 'admin.nav.complaints', icon: Flag },
+  { href: '/admin/complaints', label: 'admin.nav.complaints', icon: Flag, count: 'complaints' },
 ];
+
+const REFRESH_MS = 60_000;
 
 const PRIMARY = 'inline-flex h-9 items-center rounded-lg bg-white px-3.5 text-[15px] font-medium text-black transition-colors hover:bg-white/85';
 const SIDE_LINK = 'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-[15px] transition-colors';
@@ -58,6 +66,29 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
     };
   }, []);
 
+  // How many things wait for an admin (shown next to the tabs). Read again on every page change and once a minute while
+  // the tab is visible; a failed read keeps the last numbers (the pages themselves show their own errors).
+  const [waiting, setWaiting] = useState<AdminWaitingCounts | null>(null);
+  const isAdmin = session?.user.role === 'admin';
+  useEffect(() => {
+    if (!isAdmin) return;
+    let cancelled = false;
+    const read = () => {
+      if (document.visibilityState === 'hidden') return;
+      fetchWaitingSummary()
+        .then((c) => !cancelled && setWaiting(c))
+        .catch(() => undefined);
+    };
+    read();
+    const timer = window.setInterval(read, REFRESH_MS);
+    window.addEventListener(WAITING_CHANGED_EVENT, read);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      window.removeEventListener(WAITING_CHANGED_EVENT, read);
+    };
+  }, [isAdmin, pathname]);
+
   if (!ready) {
     return (
       <main className="grid min-h-dvh place-items-center px-4">
@@ -81,12 +112,21 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
 
   const isActive = (href: string) => (href === '/admin' ? pathname === '/admin' : pathname.startsWith(href));
   const tabLinks = (cls: (active: boolean) => string, withIcon: boolean) =>
-    TABS.map(({ href, label, icon: Icon }) => (
-      <Link key={href} href={href} aria-current={isActive(href) ? 'page' : undefined} className={cls(isActive(href))}>
-        {withIcon && <Icon aria-hidden className="h-4 w-4 shrink-0" />}
-        {t(label)}
-      </Link>
-    ));
+    TABS.map(({ href, label, icon: Icon, count }) => {
+      const n = count && waiting ? waiting[count] : 0;
+      return (
+        <Link key={href} href={href} aria-current={isActive(href) ? 'page' : undefined} className={cls(isActive(href))}>
+          {withIcon && <Icon aria-hidden className="h-4 w-4 shrink-0" />}
+          {t(label)}
+          {n > 0 && (
+            <span className="ml-2 grid h-5 min-w-5 place-items-center rounded-full border border-amber/50 px-1.5 font-mono text-[11px] text-amber md:ml-auto">
+              <span aria-hidden>{n > 99 ? '99+' : n}</span>
+              <span className="sr-only">{t('admin.waitingCount', { n })}</span>
+            </span>
+          )}
+        </Link>
+      );
+    });
 
   return (
     <div className="min-h-dvh">
@@ -134,7 +174,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
         <nav aria-label={t('admin.navLabel')} className="flex gap-1 overflow-x-auto border-t border-white/10 px-2">
           {tabLinks(
             (active) =>
-              `-mb-px whitespace-nowrap border-b-2 px-3 py-2 text-[15px] transition-colors ${
+              `-mb-px inline-flex items-center whitespace-nowrap border-b-2 px-3 py-2 text-[15px] transition-colors ${
                 active ? 'border-white text-white' : 'border-transparent text-white/65 hover:text-white'
               }`,
             false,

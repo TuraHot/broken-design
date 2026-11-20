@@ -45,20 +45,31 @@ export function verifyJwtToken(token: string): AuthUser {
   };
 }
 
-export function requireAuth(req: Request, _res: Response, next: NextFunction) {
+/**
+ * Checks the JWT and that the account has not been deleted by an admin. A JWT stays valid for a day, so the token alone
+ * cannot prove the account still exists: one indexed lookup asks the database every time (AGENT.md §3.2). A database
+ * error is an error, never a pass. A deleted account gets 401 ACCOUNT_DELETED.
+ */
+export async function requireAuth(req: Request, _res: Response, next: NextFunction) {
   const header = req.headers.authorization;
 
   if (!header?.startsWith('Bearer ')) {
     throw new AppError(401, 'UNAUTHORIZED', 'Missing or invalid Authorization header');
   }
 
+  let user: AuthUser;
   try {
-    const token = header.slice(7);
-    req.user = verifyJwtToken(token);
-    next();
+    user = verifyJwtToken(header.slice(7));
   } catch {
     throw new AppError(401, 'INVALID_TOKEN', 'Invalid or expired JWT token');
   }
+
+  const result = await db.query(`SELECT deleted_at FROM users WHERE id = $1`, [user.id]);
+  if (result.rows[0]?.deleted_at) {
+    throw new AppError(401, 'ACCOUNT_DELETED', 'This account has been deleted');
+  }
+  req.user = user;
+  next();
 }
 
 /**

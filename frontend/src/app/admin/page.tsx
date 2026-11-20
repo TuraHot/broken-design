@@ -82,7 +82,7 @@ export default function AdminOverviewPage() {
 
   const attention = data
     ? [
-        { id: 'apps', n: data.pendingApplications ?? 0, text: t((data.pendingApplications ?? 0) === 1 ? 'admin.ov.application.one' : 'admin.ov.application.many'), href: '/admin/users' },
+        { id: 'apps', n: data.pendingApplications ?? 0, text: t((data.pendingApplications ?? 0) === 1 ? 'admin.ov.application.one' : 'admin.ov.application.many'), href: '/admin/creator-approvals' },
         { id: 'wd', n: data.pendingWithdrawals ?? 0, text: t((data.pendingWithdrawals ?? 0) === 1 ? 'admin.ov.withdrawal.one' : 'admin.ov.withdrawal.many'), href: '/admin/withdrawals' },
         { id: 'complaints', n: data.openComplaints, text: t(data.openComplaints === 1 ? 'admin.ov.complaint.one' : 'admin.ov.complaint.many'), href: '/admin/complaints' },
         { id: 'suspended', n: data.suspendedUsers, text: t(data.suspendedUsers === 1 ? 'admin.ov.suspended.one' : 'admin.ov.suspended.many'), href: '/admin/users' },

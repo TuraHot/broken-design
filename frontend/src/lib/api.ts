@@ -354,6 +354,7 @@ export interface NoticeItem {
     reason?: string | null;
     until?: string | null;
     auto?: boolean;
+    note?: string | null;
     liker_id?: string;
     liker_name?: string;
     model_title?: string;

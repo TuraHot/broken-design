@@ -47,8 +47,8 @@ import type {
 
 type TabKey = 'models' | 'dashboard' | 'wallet';
 
-const CARD = 'rounded-xl border border-white/10 bg-white/[0.04] p-5';
-const LABEL = 'font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70';
+const CARD = 'rounded-xl border border-line bg-ink/[0.04] p-5';
+const LABEL = 'font-mono text-[11px] uppercase tracking-[0.16em] text-accent';
 
 interface Props {
   handle: string;
@@ -217,7 +217,7 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
     if (!ready) {
       return (
         <main className="mx-auto max-w-[1400px] px-4 pb-16 pt-28 md:px-6">
-          <div className="h-40 animate-pulse rounded-xl border border-white/10 bg-white/5" />
+          <div className="h-40 animate-pulse rounded-xl border border-line bg-ink/5" />
         </main>
       );
     }
@@ -225,11 +225,11 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
       <main className="mx-auto max-w-[680px] px-4 pb-16 pt-28 text-center md:px-6">
         <div className={CARD}>
           <p className={LABEL}>{t('creators.label')}</p>
-          <h1 className="mt-2 font-display text-2xl uppercase text-white">{t('profile.notFound')}</h1>
-          <p className="mt-2 text-sm text-white/65">{t('profile.notFoundDesc', { handle })}</p>
+          <h1 className="mt-2 font-display text-2xl uppercase text-ink">{t('profile.notFound')}</h1>
+          <p className="mt-2 text-sm text-ink-soft">{t('profile.notFoundDesc', { handle })}</p>
           <Link
             href="/gallery"
-            className="mt-5 inline-block rounded-lg bg-white px-4 py-2 text-sm font-medium text-black hover:bg-white/85"
+            className="mt-5 inline-block rounded-lg bg-ink px-4 py-2 text-sm font-medium text-canvas hover:bg-ink/85"
           >
             {t('profile.browseGallery')}
           </Link>
@@ -255,14 +255,14 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
   const tabClass = (tab: TabKey) =>
     `relative whitespace-nowrap pb-3 text-sm font-medium transition-colors ${
       currentTab === tab
-        ? 'text-white after:absolute after:inset-x-0 after:bottom-0 after:h-[2px] after:bg-white'
-        : 'text-white/55 hover:text-white/85'
+        ? 'text-ink after:absolute after:inset-x-0 after:bottom-0 after:h-[2px] after:bg-ink'
+        : 'text-ink-soft hover:text-ink/85'
     }`;
 
   return (
     <main className="pb-16 pt-16">
       {/* Full-width Cover Banner (VGen prototype style) */}
-      <div className="relative h-40 w-full overflow-hidden border-b border-white/10 bg-[#0c0e14] sm:h-52">
+      <div className="relative h-40 w-full overflow-hidden border-b border-line bg-card sm:h-52">
         <svg aria-hidden viewBox="0 0 1240 240" preserveAspectRatio="none" className="h-full w-full">
           <defs>
             <linearGradient id="vgen-cover-holo" x1="0" x2="1" y1="0" y2="0">
@@ -283,10 +283,10 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
           <button
             type="button"
             onClick={() => setPreviewPublic((v) => !v)}
-            className="absolute bottom-3 right-4 inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/75 px-3.5 py-1.5 text-xs font-medium text-white backdrop-blur transition-colors hover:bg-black"
+            className="absolute bottom-3 right-4 inline-flex items-center gap-2 rounded-full border border-line bg-canvas/75 px-3.5 py-1.5 text-xs font-medium text-ink backdrop-blur transition-colors hover:bg-canvas"
           >
             <span>{previewPublic ? t('profile.exitPreview') : t('profile.preview')}</span>
-            <span className={`h-2 w-2 rounded-full ${previewPublic ? 'bg-amber' : 'bg-emerald-400'}`} />
+            <span className={`h-2 w-2 rounded-full ${previewPublic ? 'bg-warn' : 'bg-emerald-500'}`} />
           </button>
         )}
       </div>
@@ -301,20 +301,20 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                 name={displayName}
                 avatarUrl={avatarUrl}
                 size="xl"
-                className="!h-24 !w-24 sm:!h-28 sm:!w-28 !border-4 !border-black shadow-lg"
+                className="!h-24 !w-24 sm:!h-28 sm:!w-28 !border-4 !border-canvas shadow-lg"
               />
             </div>
 
             <div className="mt-3">
-              <h1 className="font-display text-2xl uppercase leading-tight text-white">{displayName}</h1>
-              <p className="mt-0.5 text-sm text-white/55">@{handle}</p>
+              <h1 className="font-display text-2xl uppercase leading-tight text-ink">{displayName}</h1>
+              <p className="mt-0.5 text-sm text-ink-soft">@{handle}</p>
             </div>
 
             {showOwnerTabs && (
               <div className="mt-4 flex flex-col gap-2">
                 <Link
                   href="/upload"
-                  className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-full bg-white/10 px-4 text-xs font-medium text-white transition-colors hover:bg-white/15"
+                  className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-full bg-ink/10 px-4 text-xs font-medium text-ink transition-colors hover:bg-ink/15"
                 >
                   <Plus className="h-3.5 w-3.5" />
                   {t('profile.uploadGlb')}
@@ -324,25 +324,25 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
 
             {/* Rounded Stat Pills (matching Followers / Following style) */}
             <div className="mt-3 grid grid-cols-2 gap-2">
-              <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-center font-mono text-xs text-white/80">
-                <span className="font-semibold text-white">{formatCount(modelCount)}</span> {t('profile.modelsPill')}
+              <div className="rounded-full border border-line bg-ink/5 px-3 py-1.5 text-center font-mono text-xs text-ink/80">
+                <span className="font-semibold text-ink">{formatCount(modelCount)}</span> {t('profile.modelsPill')}
               </div>
-              <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-center font-mono text-xs text-white/80">
-                <span className="font-semibold text-white">{formatCount(totalDownloads)}</span> {t('profile.dlsPill')}
+              <div className="rounded-full border border-line bg-ink/5 px-3 py-1.5 text-center font-mono text-xs text-ink/80">
+                <span className="font-semibold text-ink">{formatCount(totalDownloads)}</span> {t('profile.dlsPill')}
               </div>
             </div>
 
-            <div className="mt-4 border-t border-white/10 pt-4">
-              <div className="flex items-center justify-between text-xs font-medium text-white/80">
+            <div className="mt-4 border-t border-line pt-4">
+              <div className="flex items-center justify-between text-xs font-medium text-ink/80">
                 <span>{t('profile.aboutMe')}</span>
-                <span className="font-mono text-[11px] text-white/45">
+                <span className="font-mono text-[11px] text-ink/45">
                   {formatCount(totalLikes)} {t('creators.likes')}
                 </span>
               </div>
-              <p className="mt-1.5 text-sm leading-relaxed text-white/60">{bio}</p>
+              <p className="mt-1.5 text-sm leading-relaxed text-ink/60">{bio}</p>
               <Link
                 href="/creator"
-                className="mt-3 inline-block font-mono text-[11px] uppercase tracking-wider text-hud/75 hover:text-hud"
+                className="mt-3 inline-block font-mono text-[11px] uppercase tracking-wider text-accent hover:text-accent"
               >
                 {t('profile.creatorHub')}
               </Link>
@@ -357,10 +357,10 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
           <div className="min-w-0 flex-1 pt-2 lg:pt-5">
             <nav
               aria-label={t('profile.navAria')}
-              className="flex items-center gap-6 overflow-x-auto border-b border-white/10"
+              className="flex items-center gap-6 overflow-x-auto border-b border-line"
             >
               <button type="button" onClick={() => setActiveTab('models')} className={tabClass('models')}>
-                {t('profile.tabModels')} <span className="ml-1 font-mono text-xs text-white/50">{modelCount}</span>
+                {t('profile.tabModels')} <span className="ml-1 font-mono text-xs text-ink-soft">{modelCount}</span>
               </button>
               {showOwnerTabs && (
                 <>
@@ -377,7 +377,7 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
             {statusMsg && (
               <div
                 role="status"
-                className="mt-4 flex items-center gap-2 rounded-lg border border-hud/30 bg-hud/10 px-4 py-3 text-sm text-hud"
+                className="mt-4 flex items-center gap-2 rounded-lg border border-accent/30 bg-accent/10 px-4 py-3 text-sm text-accent"
               >
                 <AlertCircle className="h-4 w-4 shrink-0" />
                 <span>{statusMsg}</span>
@@ -396,12 +396,12 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                     ))}
                   </ul>
                 ) : (
-                  <div className="rounded-xl border border-white/10 bg-white/[0.02] p-10 text-center">
-                    <p className="text-sm text-white/50">{t('profile.noPublicModels')}</p>
+                  <div className="rounded-xl border border-line bg-ink/[0.02] p-10 text-center">
+                    <p className="text-sm text-ink-soft">{t('profile.noPublicModels')}</p>
                     {showOwnerTabs && (
                       <Link
                         href="/upload"
-                        className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-white px-4 py-2 text-xs font-medium text-black hover:bg-white/85"
+                        className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-ink px-4 py-2 text-xs font-medium text-canvas hover:bg-ink/85"
                       >
                         <Plus className="h-3.5 w-3.5" />
                         {t('profile.uploadFirst')}
@@ -419,49 +419,49 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                   <div className={CARD}>
-                    <div className="flex items-center justify-between text-white/50">
+                    <div className="flex items-center justify-between text-ink-soft">
                       <span className={LABEL}>{t('seller.revenue')}</span>
-                      <Coins className="h-4 w-4 text-hud" />
+                      <Coins className="h-4 w-4 text-accent" />
                     </div>
-                    <p className="mt-3 font-display text-2xl uppercase text-white">
+                    <p className="mt-3 font-display text-2xl uppercase text-ink">
                       {formatPrice(salesSummary?.totalRevenue || 0)}
                     </p>
-                    <p className="mt-1 font-mono text-[11px] text-white/40">{t('seller.revenueNote')}</p>
+                    <p className="mt-1 font-mono text-[11px] text-ink/40">{t('seller.revenueNote')}</p>
                   </div>
 
                   <div className={CARD}>
-                    <div className="flex items-center justify-between text-white/50">
+                    <div className="flex items-center justify-between text-ink-soft">
                       <span className={LABEL}>{t('seller.sales')}</span>
-                      <ShoppingBag className="h-4 w-4 text-emerald-400" />
+                      <ShoppingBag className="h-4 w-4 text-emerald-500" />
                     </div>
-                    <p className="mt-3 font-display text-2xl uppercase text-white">
+                    <p className="mt-3 font-display text-2xl uppercase text-ink">
                       {t('seller.orders', { n: salesSummary?.totalSales ?? 0 })}
                     </p>
-                    <p className="mt-1 font-mono text-[11px] text-white/40">{t('seller.salesNote')}</p>
+                    <p className="mt-1 font-mono text-[11px] text-ink/40">{t('seller.salesNote')}</p>
                   </div>
 
                   <div className={CARD}>
-                    <div className="flex items-center justify-between text-white/50">
+                    <div className="flex items-center justify-between text-ink-soft">
                       <span className={LABEL}>{t('seller.activeModels')}</span>
-                      <Layers className="h-4 w-4 text-purple-400" />
+                      <Layers className="h-4 w-4 text-accent" />
                     </div>
-                    <p className="mt-3 font-display text-2xl uppercase text-white">
+                    <p className="mt-3 font-display text-2xl uppercase text-ink">
                       {t('seller.modelsCount', { n: activeSellerModels.length })}
                     </p>
-                    <p className="mt-1 font-mono text-[11px] text-white/40">{t('seller.activeNote')}</p>
+                    <p className="mt-1 font-mono text-[11px] text-ink/40">{t('seller.activeNote')}</p>
                   </div>
                 </div>
 
                 {/* My 3D Models Table */}
                 <div>
-                  <div className="flex items-center justify-between border-b border-white/10 pb-3">
-                    <h2 className="font-display text-base uppercase text-white">
-                      {t('seller.myModels')} <span className="ml-1 font-mono text-xs text-white/50">({models.length})</span>
+                  <div className="flex items-center justify-between border-b border-line pb-3">
+                    <h2 className="font-display text-base uppercase text-ink">
+                      {t('seller.myModels')} <span className="ml-1 font-mono text-xs text-ink-soft">({models.length})</span>
                     </h2>
                     <button
                       type="button"
                       onClick={() => token && loadDashboardData(token)}
-                      className="flex items-center gap-1 font-mono text-xs text-white/65 hover:text-white"
+                      className="flex items-center gap-1 font-mono text-xs text-ink-soft hover:text-ink"
                     >
                       <RefreshCw className="h-3 w-3" /> {t('seller.refresh')}
                     </button>
@@ -469,12 +469,12 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
 
                   {models.length === 0 ? (
                     <div className={`${CARD} mt-4 text-center py-8`}>
-                      <p className="text-sm text-white/55">{t('profile.noUploadedModels')}</p>
+                      <p className="text-sm text-ink-soft">{t('profile.noUploadedModels')}</p>
                     </div>
                   ) : (
-                    <div className="mt-4 overflow-x-auto rounded-xl border border-white/10">
+                    <div className="mt-4 overflow-x-auto rounded-xl border border-line">
                       <table className="w-full text-left text-sm">
-                        <thead className="border-b border-white/10 bg-white/5 font-mono text-[11px] uppercase tracking-wider text-white/50">
+                        <thead className="border-b border-line bg-ink/5 font-mono text-[11px] uppercase tracking-wider text-ink-soft">
                           <tr>
                             <th className="px-4 py-3">{t('seller.thModel')}</th>
                             <th className="px-4 py-3">{t('seller.thPrice')}</th>
@@ -483,24 +483,24 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                             <th className="px-4 py-3 text-right">{t('seller.thActions')}</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-white/5">
+                        <tbody className="divide-y divide-line">
                           {models.map((m) => (
-                            <tr key={m.id} className="hover:bg-white/[0.02]">
-                              <td className="px-4 py-3 font-medium text-white">
+                            <tr key={m.id} className="hover:bg-ink/[0.02]">
+                              <td className="px-4 py-3 font-medium text-ink">
                                 {m.isDeleted ? (
                                   <div className="flex items-center gap-3 opacity-60">
-                                    <div className="relative flex h-11 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10 bg-white/5">
-                                      <ImageIcon className="h-4 w-4 text-white/30" />
+                                    <div className="relative flex h-11 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md border border-line bg-ink/5">
+                                      <ImageIcon className="h-4 w-4 text-ink/30" />
                                     </div>
                                     <span className="truncate">{m.title}</span>
                                   </div>
                                 ) : (
                                   <Link
                                     href={`/models/${m.id}`}
-                                    className="group flex items-center gap-3 transition-colors hover:text-hud"
+                                    className="group flex items-center gap-3 transition-colors hover:text-accent"
                                   >
-                                    <div className="relative flex h-11 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10 bg-white/5 group-hover:border-hud/40">
-                                      <ImageIcon className="h-4 w-4 text-white/30" />
+                                    <div className="relative flex h-11 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md border border-line bg-ink/5 group-hover:border-accent/40">
+                                      <ImageIcon className="h-4 w-4 text-ink/30" />
                                       {/* eslint-disable-next-line @next/next/no-img-element */}
                                       <img
                                         src={m.posterUrl || `${CDN_SERVICE_URL}/cdn/models/${m.id}/poster.webp`}
@@ -516,22 +516,22 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                                   </Link>
                                 )}
                               </td>
-                              <td className="px-4 py-3 font-mono text-xs text-white/75">
+                              <td className="px-4 py-3 font-mono text-xs text-ink/75">
                                 {m.priceCents === 0 ? t('acct.free') : formatPrice(m.priceCents)}
                               </td>
-                              <td className="px-4 py-3 font-mono text-xs text-white/75">
+                              <td className="px-4 py-3 font-mono text-xs text-ink/75">
                                 <span className="inline-flex items-center gap-1">
-                                  <Download className="h-3 w-3 text-white/40" />
+                                  <Download className="h-3 w-3 text-ink/40" />
                                   {m.downloadCount}
                                 </span>
                               </td>
                               <td className="px-4 py-3 font-mono text-[11px] uppercase">
                                 {m.isDeleted ? (
-                                  <span className="text-red-400">{t('seller.statusDeleted')}</span>
+                                  <span className="text-danger">{t('seller.statusDeleted')}</span>
                                 ) : m.isHidden ? (
-                                  <span className="text-amber">{t('seller.statusHidden')}</span>
+                                  <span className="text-warn">{t('seller.statusHidden')}</span>
                                 ) : (
-                                  <span className="text-emerald-400">{t('seller.statusLive')}</span>
+                                  <span className="text-emerald-500">{t('seller.statusLive')}</span>
                                 )}
                               </td>
                               <td className="px-4 py-3 text-right">
@@ -540,7 +540,7 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                                     <button
                                       type="button"
                                       onClick={() => openEditModal(m)}
-                                      className="rounded border border-white/15 px-2 py-1 text-xs text-white/75 hover:bg-white/10 hover:text-white"
+                                      className="rounded border border-line px-2 py-1 text-xs text-ink/75 hover:bg-ink/10 hover:text-ink"
                                       title={t('profile.editBtn')}
                                       aria-label={t('profile.editBtn')}
                                     >
@@ -552,7 +552,7 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                                       type="button"
                                       disabled={busyAction === `delete-${m.id}`}
                                       onClick={() => setDeletingModel(m)}
-                                      className="rounded border border-red-500/30 bg-red-500/10 px-2 py-1 text-xs text-red-400 hover:bg-red-500/20 disabled:opacity-50"
+                                      className="rounded border border-danger/30 bg-danger/10 px-2 py-1 text-xs text-danger hover:bg-danger/20 disabled:opacity-50"
                                       title={t('profile.deleteBtn')}
                                       aria-label={t('profile.deleteBtn')}
                                     >
@@ -572,12 +572,12 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                 {/* Recent Orders */}
                 {salesSummary && salesSummary.sales.length > 0 && (
                   <div>
-                    <h2 className="border-b border-white/10 pb-3 font-display text-base uppercase text-white">
+                    <h2 className="border-b border-line pb-3 font-display text-base uppercase text-ink">
                       {t('seller.ordersTitle')}
                     </h2>
-                    <div className="mt-4 overflow-x-auto rounded-xl border border-white/10">
+                    <div className="mt-4 overflow-x-auto rounded-xl border border-line">
                       <table className="w-full text-left font-mono text-xs">
-                        <thead className="border-b border-white/10 bg-white/5 text-[11px] uppercase tracking-wider text-white/50">
+                        <thead className="border-b border-line bg-ink/5 text-[11px] uppercase tracking-wider text-ink-soft">
                           <tr>
                             <th className="px-4 py-3">{t('seller.thModel')}</th>
                             <th className="px-4 py-3">{t('seller.thBuyer')}</th>
@@ -585,13 +585,13 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                             <th className="px-4 py-3">{t('seller.thDate')}</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-white/5">
+                        <tbody className="divide-y divide-line">
                           {salesSummary.sales.map((s) => (
-                            <tr key={s.purchaseId} className="hover:bg-white/[0.02]">
-                              <td className="px-4 py-3 text-white">{s.title}</td>
-                              <td className="px-4 py-3 text-white/70">{s.buyerName || t('seller.buyerFallback')}</td>
-                              <td className="px-4 py-3 font-medium text-emerald-400">+{formatPrice(s.priceCents)}</td>
-                              <td className="px-4 py-3 text-white/40">{dateFmt(s.soldAt)}</td>
+                            <tr key={s.purchaseId} className="hover:bg-ink/[0.02]">
+                              <td className="px-4 py-3 text-ink">{s.title}</td>
+                              <td className="px-4 py-3 text-ink/70">{s.buyerName || t('seller.buyerFallback')}</td>
+                              <td className="px-4 py-3 font-medium text-emerald-500">+{formatPrice(s.priceCents)}</td>
+                              <td className="px-4 py-3 text-ink/40">{dateFmt(s.soldAt)}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -608,13 +608,13 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                 <div className="grid gap-6 lg:grid-cols-[1fr_1.2fr]">
                   <div className={CARD}>
                     <div className="flex items-center gap-2">
-                      <Wallet className="h-4 w-4 text-hud" />
+                      <Wallet className="h-4 w-4 text-accent" />
                       <span className={LABEL}>{t('seller.held')}</span>
                     </div>
-                    <p className="mt-2 font-display text-3xl uppercase text-white">
+                    <p className="mt-2 font-display text-3xl uppercase text-ink">
                       {formatMoney(walletData?.wallet.availableGrossCents ?? 0, 'USD')}
                     </p>
-                    <p className="mt-1 text-xs text-white/55">
+                    <p className="mt-1 text-xs text-ink-soft">
                       {t('seller.heldNote')}
                     </p>
 
@@ -627,16 +627,16 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                       const previewNet = Math.max(0, previewGross - previewFee);
 
                       return (
-                        <dl className="mt-5 space-y-2 border-t border-white/10 pt-4 font-mono text-xs">
-                          <div className="flex justify-between text-white/70">
+                        <dl className="mt-5 space-y-2 border-t border-line pt-4 font-mono text-xs">
+                          <div className="flex justify-between text-ink/70">
                             <dt>{t('seller.gross')}</dt>
                             <dd>{formatMoney(previewGross, 'USD')}</dd>
                           </div>
-                          <div className="flex justify-between text-amber">
+                          <div className="flex justify-between text-warn">
                             <dt>{t('seller.fee', { pct: feeBps / 100 })}</dt>
                             <dd>-{formatMoney(previewFee, 'USD')}</dd>
                           </div>
-                          <div className="flex justify-between border-t border-white/10 pt-2 text-sm font-semibold text-hud">
+                          <div className="flex justify-between border-t border-line pt-2 text-sm font-semibold text-accent">
                             <dt>{t('seller.net')}</dt>
                             <dd>{formatMoney(previewNet, 'USD')}</dd>
                           </div>
@@ -672,7 +672,7 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                     <span className={LABEL}>{t('seller.withdrawLabel')}</span>
                     <div className="mt-4 grid gap-4 sm:grid-cols-2">
                       <div>
-                        <label htmlFor="profile-withdraw-amount" className="block text-xs text-white/75">
+                        <label htmlFor="profile-withdraw-amount" className="block text-xs text-ink/75">
                           {t('seller.amountUsd')}
                         </label>
                         <input
@@ -683,18 +683,18 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                           value={withdrawAmountUsd}
                           onChange={(e) => setWithdrawAmountUsd(e.target.value)}
                           placeholder="0.00"
-                          className="mt-1.5 h-10 w-full rounded-lg border border-white/15 bg-black/50 px-3 font-mono text-sm text-white focus:border-hud/60 focus:outline-none"
+                          className="mt-1.5 h-10 w-full rounded-lg border border-line bg-canvas/50 px-3 font-mono text-sm text-ink focus:border-accent/60 focus:outline-none"
                         />
                       </div>
                       <div>
-                        <label htmlFor="profile-payout-method" className="block text-xs text-white/75">
+                        <label htmlFor="profile-payout-method" className="block text-xs text-ink/75">
                           {t('seller.payoutMethod')}
                         </label>
                         <select
                           id="profile-payout-method"
                           value={payoutMethod}
                           onChange={(e) => setPayoutMethod(e.target.value as 'promptpay' | 'bank')}
-                          className="mt-1.5 h-10 w-full rounded-lg border border-white/15 bg-black/50 px-3 text-sm text-white focus:border-hud/60 focus:outline-none"
+                          className="mt-1.5 h-10 w-full rounded-lg border border-line bg-canvas/50 px-3 text-sm text-ink focus:border-accent/60 focus:outline-none"
                         >
                           <option value="promptpay">{t('seller.promptpay')}</option>
                           <option value="bank">{t('seller.bank')}</option>
@@ -703,7 +703,7 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                     </div>
 
                     <div className="mt-4">
-                      <label htmlFor="profile-payout-account" className="block text-xs text-white/75">
+                      <label htmlFor="profile-payout-account" className="block text-xs text-ink/75">
                         {payoutMethod === 'promptpay' ? t('seller.accountPromptpay') : t('seller.accountBank')}
                       </label>
                       <input
@@ -713,14 +713,14 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                         value={payoutAccount}
                         onChange={(e) => setPayoutAccount(e.target.value)}
                         placeholder={payoutMethod === 'promptpay' ? t('seller.phPromptpay') : t('seller.phBank')}
-                        className="mt-1.5 h-10 w-full rounded-lg border border-white/15 bg-black/50 px-3 text-sm text-white focus:border-hud/60 focus:outline-none"
+                        className="mt-1.5 h-10 w-full rounded-lg border border-line bg-canvas/50 px-3 text-sm text-ink focus:border-accent/60 focus:outline-none"
                       />
                     </div>
 
                     <button
                       type="submit"
                       disabled={busyAction === 'withdraw' || (walletData?.wallet.availableGrossCents ?? 0) <= 0}
-                      className="mt-5 inline-flex h-10 items-center justify-center rounded-lg bg-white px-5 font-mono text-xs font-semibold uppercase tracking-wider text-black transition-colors hover:bg-white/85 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="mt-5 inline-flex h-10 items-center justify-center rounded-lg bg-ink px-5 font-mono text-xs font-semibold uppercase tracking-wider text-canvas transition-colors hover:bg-ink/85 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {busyAction === 'withdraw' ? t('seller.processing') : t('seller.withdrawButton')}
                     </button>
@@ -728,9 +728,9 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                 </div>
 
                 {walletData && walletData.withdrawals.length > 0 && (
-                  <div className="overflow-x-auto rounded-xl border border-white/10">
+                  <div className="overflow-x-auto rounded-xl border border-line">
                     <table className="w-full text-left font-mono text-xs">
-                      <thead className="border-b border-white/10 bg-white/5 text-[11px] uppercase tracking-wider text-white/50">
+                      <thead className="border-b border-line bg-ink/5 text-[11px] uppercase tracking-wider text-ink-soft">
                         <tr>
                           <th className="px-4 py-3">{t('seller.thGross')}</th>
                           <th className="px-4 py-3">{t('seller.thFee')}</th>
@@ -740,17 +740,17 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                           <th className="px-4 py-3">{t('seller.thDate')}</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-white/5">
+                      <tbody className="divide-y divide-line">
                         {walletData.withdrawals.map((w) => (
-                          <tr key={w.id} className="hover:bg-white/[0.02]">
-                            <td className="px-4 py-3 text-white">{formatMoney(w.grossAmountCents, w.currency)}</td>
-                            <td className="px-4 py-3 text-amber">-{formatMoney(w.platformFeeCents, w.currency)}</td>
-                            <td className="px-4 py-3 font-medium text-hud">{formatMoney(w.netAmountCents, w.currency)}</td>
-                            <td className="px-4 py-3 text-white/70">
+                          <tr key={w.id} className="hover:bg-ink/[0.02]">
+                            <td className="px-4 py-3 text-ink">{formatMoney(w.grossAmountCents, w.currency)}</td>
+                            <td className="px-4 py-3 text-warn">-{formatMoney(w.platformFeeCents, w.currency)}</td>
+                            <td className="px-4 py-3 font-medium text-accent">{formatMoney(w.netAmountCents, w.currency)}</td>
+                            <td className="px-4 py-3 text-ink/70">
                               {w.payoutMethod.toUpperCase()} · {w.payoutAccount}
                             </td>
-                            <td className="px-4 py-3 uppercase text-white/80">{w.status}</td>
-                            <td className="px-4 py-3 text-white/40">{dateFmt(w.createdAt)}</td>
+                            <td className="px-4 py-3 uppercase text-ink/80">{w.status}</td>
+                            <td className="px-4 py-3 text-ink/40">{dateFmt(w.createdAt)}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -769,18 +769,18 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
           role="dialog"
           aria-modal="true"
           aria-label={t('profile.editTitle')}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-canvas/80 px-4 backdrop-blur-sm"
         >
           <form
             onSubmit={handleSaveEdit}
-            className="w-full max-w-[460px] rounded-2xl border border-white/15 bg-[#0b0d12] p-6 shadow-2xl"
+            className="w-full max-w-[460px] rounded-2xl border border-line bg-card p-6 shadow-2xl"
           >
             <div className="flex items-center justify-between">
-              <h2 className="font-display text-lg uppercase text-white">{t('profile.editTitle')}</h2>
+              <h2 className="font-display text-lg uppercase text-ink">{t('profile.editTitle')}</h2>
               <button
                 type="button"
                 onClick={() => setEditingModel(null)}
-                className="rounded p-1 text-white/55 hover:bg-white/10 hover:text-white"
+                className="rounded p-1 text-ink-soft hover:bg-ink/10 hover:text-ink"
                 aria-label={t('modal.close')}
               >
                 <X className="h-4 w-4" />
@@ -789,7 +789,7 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
 
             <div className="mt-4 space-y-3.5">
               <div>
-                <label htmlFor="edit-model-title" className="block text-xs text-white/75">
+                <label htmlFor="edit-model-title" className="block text-xs text-ink/75">
                   {t('profile.fieldTitle')}
                 </label>
                 <input
@@ -798,13 +798,13 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                   required
                   value={editTitle}
                   onChange={(e) => setEditTitle(e.target.value)}
-                  className="mt-1 h-10 w-full rounded-lg border border-white/15 bg-white/5 px-3 text-sm text-white focus:border-hud/60 focus:outline-none"
+                  className="mt-1 h-10 w-full rounded-lg border border-line bg-ink/5 px-3 text-sm text-ink focus:border-accent/60 focus:outline-none"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="edit-model-price" className="block text-xs text-white/75">
+                  <label htmlFor="edit-model-price" className="block text-xs text-ink/75">
                     {t('profile.fieldPrice')}
                   </label>
                   <input
@@ -814,18 +814,18 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                     step="0.01"
                     value={editPriceUsd}
                     onChange={(e) => setEditPriceUsd(e.target.value)}
-                    className="mt-1 h-10 w-full rounded-lg border border-white/15 bg-white/5 px-3 font-mono text-sm text-white focus:border-hud/60 focus:outline-none"
+                    className="mt-1 h-10 w-full rounded-lg border border-line bg-ink/5 px-3 font-mono text-sm text-ink focus:border-accent/60 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label htmlFor="edit-model-license" className="block text-xs text-white/75">
+                  <label htmlFor="edit-model-license" className="block text-xs text-ink/75">
                     {t('profile.fieldLicense')}
                   </label>
                   <select
                     id="edit-model-license"
                     value={editLicense}
                     onChange={(e) => setEditLicense(e.target.value)}
-                    className="mt-1 h-10 w-full rounded-lg border border-white/15 bg-[#0b0d12] px-3 text-sm text-white focus:border-hud/60 focus:outline-none"
+                    className="mt-1 h-10 w-full rounded-lg border border-line bg-card px-3 text-sm text-ink focus:border-accent/60 focus:outline-none"
                   >
                     <option value="CC0">CC0</option>
                     <option value="CC-BY">CC-BY</option>
@@ -836,7 +836,7 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
               </div>
 
               <div>
-                <label htmlFor="edit-model-desc" className="block text-xs text-white/75">
+                <label htmlFor="edit-model-desc" className="block text-xs text-ink/75">
                   {t('profile.fieldDesc')}
                 </label>
                 <textarea
@@ -844,16 +844,16 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                   rows={3}
                   value={editDescription}
                   onChange={(e) => setEditDescription(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-white/15 bg-white/5 p-3 text-sm text-white focus:border-hud/60 focus:outline-none"
+                  className="mt-1 w-full rounded-lg border border-line bg-ink/5 p-3 text-sm text-ink focus:border-accent/60 focus:outline-none"
                 />
               </div>
 
-              <div className="space-y-2.5 border-t border-white/10 pt-3">
-                <p className="font-mono text-[10px] uppercase tracking-wider text-white/50">
+              <div className="space-y-2.5 border-t border-line pt-3">
+                <p className="font-mono text-[10px] uppercase tracking-wider text-ink-soft">
                   {t('profile.replaceFiles')}
                 </p>
                 <div>
-                  <label htmlFor="edit-model-file" className="block text-xs text-white/75">
+                  <label htmlFor="edit-model-file" className="block text-xs text-ink/75">
                     {t('profile.fileMain')}
                   </label>
                   <input
@@ -861,11 +861,11 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                     type="file"
                     accept=".glb,model/gltf-binary"
                     onChange={(e) => setEditMainFile(e.target.files?.[0] ?? null)}
-                    className="mt-1 block w-full text-xs text-white/65 file:mr-3 file:rounded-md file:border file:border-white/20 file:bg-white/10 file:px-3 file:py-1.5 file:text-xs file:text-white hover:file:bg-white/15"
+                    className="mt-1 block w-full text-xs text-ink-soft file:mr-3 file:rounded-md file:border file:border-line file:bg-ink/10 file:px-3 file:py-1.5 file:text-xs file:text-ink hover:file:bg-ink/15"
                   />
                 </div>
                 <div>
-                  <label htmlFor="edit-preview-file" className="block text-xs text-white/75">
+                  <label htmlFor="edit-preview-file" className="block text-xs text-ink/75">
                     {t('profile.filePreview')}
                   </label>
                   <input
@@ -873,11 +873,11 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                     type="file"
                     accept=".glb,model/gltf-binary"
                     onChange={(e) => setEditPreviewFile(e.target.files?.[0] ?? null)}
-                    className="mt-1 block w-full text-xs text-white/65 file:mr-3 file:rounded-md file:border file:border-white/20 file:bg-white/10 file:px-3 file:py-1.5 file:text-xs file:text-white hover:file:bg-white/15"
+                    className="mt-1 block w-full text-xs text-ink-soft file:mr-3 file:rounded-md file:border file:border-line file:bg-ink/10 file:px-3 file:py-1.5 file:text-xs file:text-ink hover:file:bg-ink/15"
                   />
                 </div>
                 <div>
-                  <label htmlFor="edit-poster-file" className="block text-xs text-white/75">
+                  <label htmlFor="edit-poster-file" className="block text-xs text-ink/75">
                     {t('profile.filePoster')}
                   </label>
                   <input
@@ -885,7 +885,7 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                     type="file"
                     accept="image/webp,image/png,image/jpeg"
                     onChange={(e) => setEditPosterFile(e.target.files?.[0] ?? null)}
-                    className="mt-1 block w-full text-xs text-white/65 file:mr-3 file:rounded-md file:border file:border-white/20 file:bg-white/10 file:px-3 file:py-1.5 file:text-xs file:text-white hover:file:bg-white/15"
+                    className="mt-1 block w-full text-xs text-ink-soft file:mr-3 file:rounded-md file:border file:border-line file:bg-ink/10 file:px-3 file:py-1.5 file:text-xs file:text-ink hover:file:bg-ink/15"
                   />
                 </div>
               </div>
@@ -895,14 +895,14 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
               <button
                 type="button"
                 onClick={() => setEditingModel(null)}
-                className="h-9 rounded-lg border border-white/20 px-4 text-xs text-white/80 hover:bg-white/10"
+                className="h-9 rounded-lg border border-line px-4 text-xs text-ink/80 hover:bg-ink/10"
               >
                 {t('creator.apply.cancel')}
               </button>
               <button
                 type="submit"
                 disabled={busyAction === `edit-${editingModel.id}`}
-                className="h-9 rounded-lg bg-white px-4 text-xs font-semibold text-black hover:bg-white/85 disabled:opacity-50"
+                className="h-9 rounded-lg bg-ink px-4 text-xs font-semibold text-canvas hover:bg-ink/85 disabled:opacity-50"
               >
                 {busyAction === `edit-${editingModel.id}` ? t('profile.saving') : t('profile.saveChanges')}
               </button>
@@ -917,27 +917,27 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
           role="dialog"
           aria-modal="true"
           aria-label={t('profile.removeConfirm')}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-canvas/80 px-4 backdrop-blur-sm"
         >
-          <div className="w-full max-w-[420px] rounded-2xl border border-white/15 bg-[#0b0d12] p-6 shadow-2xl">
+          <div className="w-full max-w-[420px] rounded-2xl border border-line bg-card p-6 shadow-2xl">
             <div className="flex items-center justify-between">
-              <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-red-400">
+              <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-danger">
                 {t('profile.removeEyebrow')}
               </span>
               <button
                 type="button"
                 onClick={() => setDeletingModel(null)}
-                className="rounded p-1 text-white/55 hover:bg-white/10 hover:text-white"
+                className="rounded p-1 text-ink-soft hover:bg-ink/10 hover:text-ink"
                 aria-label={t('modal.close')}
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <h2 className="mt-2 font-display text-lg uppercase text-white">
+            <h2 className="mt-2 font-display text-lg uppercase text-ink">
               {t('profile.removeTitle', { title: deletingModel.title })}
             </h2>
-            <p className="mt-2 text-sm leading-relaxed text-white/65">
+            <p className="mt-2 text-sm leading-relaxed text-ink-soft">
               {t('profile.removeBody')}
             </p>
 
@@ -946,7 +946,7 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                 type="button"
                 onClick={() => setDeletingModel(null)}
                 disabled={busyAction === `delete-${deletingModel.id}`}
-                className="h-9 rounded-lg border border-white/20 px-4 text-xs text-white/80 hover:bg-white/10 disabled:opacity-50"
+                className="h-9 rounded-lg border border-line px-4 text-xs text-ink/80 hover:bg-ink/10 disabled:opacity-50"
               >
                 {t('creator.apply.cancel')}
               </button>
@@ -954,7 +954,7 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                 type="button"
                 disabled={busyAction === `delete-${deletingModel.id}`}
                 onClick={() => handleSoftDelete(deletingModel.id, deletingModel.title)}
-                className="h-9 rounded-lg border border-red-500/40 bg-red-500/20 px-4 text-xs font-semibold text-red-300 transition-colors hover:bg-red-500/30 disabled:opacity-50"
+                className="h-9 rounded-lg border border-danger/40 bg-danger/20 px-4 text-xs font-semibold text-danger transition-colors hover:bg-danger/30 disabled:opacity-50"
               >
                 {busyAction === `delete-${deletingModel.id}` ? t('profile.removing') : t('profile.removeConfirm')}
               </button>

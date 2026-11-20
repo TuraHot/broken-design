@@ -11,7 +11,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: locale === 'th' ? 'ข้อกำหนดสำหรับผู้ขาย · Lixyte' : 'Seller Terms · Lixyte' };
 }
 
-const link = 'text-white underline underline-offset-4';
+const link = 'text-ink underline underline-offset-4';
 
 export default async function SellerTermsPage() {
   const { locale } = await getT();

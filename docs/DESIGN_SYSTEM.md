@@ -123,11 +123,11 @@ Colours are CSS variables (space-separated RGB, so opacity modifiers work) mappe
 | `ink-soft` | `166 166 166` | `59 59 59` | secondary text |
 | `line` | `26 26 26` | `207 207 207` | hairlines |
 | `card` | `11 16 24` | `255 255 255` | panels |
-| `accent` | `143 211 255` | `123 79 224` | labels, links, focus |
+| `accent` | `143 211 255` | `112 70 214` | labels, links, focus |
 | `highlight` | `184 146 255` | `201 242 61` | highlights (a fill with dark text in light, never text) |
-| `warn` | `255 176 112` | `168 90 0` | warning text and borders (amber is too pale on the light canvas) |
+| `warn` | `255 176 112` | `156 82 0` | warning text and borders (amber is too pale on the light canvas) |
 | `danger` | `252 165 165` | `185 28 28` | error text |
 
-Light values were read by eye from the reference image and are still to be confirmed. Purple on the light canvas is about 4.8:1.
+Light values were read by eye from the reference image and are still to be confirmed. Purple on the light canvas is about 5.7:1 and at least 4.5:1 on the ink/5 panels (it was 123 79 224, 4.3:1 on panels). Faint text (`text-ink/30..55`, `placeholder:text-ink/..`, `text-accent/60..80`, `text-emerald-400/500`) is lifted to 4.5:1 or more in the light theme only by rules at the end of `globals.css`.
 
-**A route is light-ready only when it is listed in `THEME_READY_ROUTES` (`lib/theme.ts`); every other route is always dark and the toggle is hidden there.** To migrate a page: convert its classes (`text-white` to `text-ink`, `bg-black` to `bg-canvas`, `border-white/10` to `border-line`, `text-hud` to `text-accent`, `bg-white text-black` to `bg-ink text-canvas`), add the route, then check both themes at desktop and 360 px, reduced motion, no flash on reload, body-text contrast of at least 4.5:1, `npx tsc --noEmit`, English and Thai. The Navbar, Footer and landing page must be converted before `/` is added.
+**A route is light-ready only when it is listed in `THEME_READY_ROUTES` (`lib/theme.ts`); every other route is always dark and the toggle is hidden there.** To migrate a page: convert its classes (`text-white` to `text-ink`, `bg-black` to `bg-canvas`, `border-white/10` to `border-line`, `text-hud` to `text-accent`, `bg-white text-black` to `bg-ink text-canvas`), add the route (a `[id]` segment matches any single path segment, e.g. `/models/[id]`), WebGL scenes drawn light-on-black with `mix-blend-screen` (the `/creator` butterfly) get `[html[data-theme='light']_&]:mix-blend-multiply` plus an `invert(1) hue-rotate(180deg)` filter so they read as dark ink on the light canvas), Routes left dark on purpose: `/embed/[id]` (shown inside other sites, its background comes from `?background=`) and the 404 page for unknown paths (the theme is chosen from the path). then check both themes at desktop and 360 px, reduced motion, no flash on reload, body-text contrast of at least 4.5:1, `npx tsc --noEmit`, English and Thai. The Navbar, Footer and landing page must be converted before `/` is added.

@@ -23,8 +23,8 @@ export default function ModelLikeButton({
         disabled={busy || !isRealModel}
         aria-pressed={liked}
         aria-label={liked ? t('model.unlike') : t('model.like')}
-        className={`inline-flex items-center gap-1.5 rounded px-1 py-0.5 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-hud disabled:opacity-60 ${
-          liked ? 'text-white hover:text-red-400' : 'text-white/65 hover:text-white'
+        className={`inline-flex items-center gap-1.5 rounded px-1 py-0.5 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-60 ${
+          liked ? 'text-ink hover:text-danger' : 'text-ink-soft hover:text-ink'
         }`}
       >
         <Heart

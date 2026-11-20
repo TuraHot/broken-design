@@ -14,10 +14,10 @@ import { adminErrorText } from '@/lib/i18n/admin-error';
 import { useT } from '@/lib/i18n/client';
 
 const LICENSES = ['CC0', 'CC-BY', 'CC-BY-NC', 'COMMERCIAL'] as const;
-const SECTION = 'font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70';
+const SECTION = 'font-mono text-[11px] uppercase tracking-[0.16em] text-accent';
 const PRIMARY =
-  'h-10 rounded-lg bg-white px-4 text-sm font-medium text-black transition-colors hover:bg-white/85 disabled:cursor-not-allowed disabled:opacity-50';
-const SECONDARY = 'h-10 rounded-lg border border-white/15 px-4 text-sm text-white/80 transition-colors hover:border-white/40 hover:text-white';
+  'h-10 rounded-lg bg-ink px-4 text-sm font-medium text-canvas transition-colors hover:bg-ink/85 disabled:cursor-not-allowed disabled:opacity-50';
+const SECONDARY = 'h-10 rounded-lg border border-line px-4 text-sm text-ink/80 transition-colors hover:border-ink/40 hover:text-ink';
 
 type Step = 'menu' | 'license' | 'visibility';
 
@@ -117,14 +117,14 @@ export default function EditModelDialog({
     <button
       type="button"
       onClick={() => goTo(next)}
-      className="flex w-full items-center gap-4 rounded-lg border border-white/15 bg-white/5 p-4 text-left transition-colors hover:border-white/40 hover:bg-white/10"
+      className="flex w-full items-center gap-4 rounded-lg border border-line bg-ink/5 p-4 text-left transition-colors hover:border-ink/40 hover:bg-ink/10"
     >
-      <Icon aria-hidden className="h-5 w-5 shrink-0 text-white/80" />
+      <Icon aria-hidden className="h-5 w-5 shrink-0 text-ink/80" />
       <span className="grid flex-1 gap-0.5">
-        <span className="text-[15px] font-medium text-white">{title}</span>
-        <span className="text-sm text-white/65">{desc}</span>
+        <span className="text-[15px] font-medium text-ink">{title}</span>
+        <span className="text-sm text-ink-soft">{desc}</span>
       </span>
-      <ChevronRight aria-hidden className="h-4 w-4 shrink-0 text-white/50" />
+      <ChevronRight aria-hidden className="h-4 w-4 shrink-0 text-ink/50" />
     </button>
   );
 
@@ -134,7 +134,7 @@ export default function EditModelDialog({
         {step === 'menu' && (
           <section aria-labelledby="edit-choose-title" className="grid gap-3">
             <h3 id="edit-choose-title" className={SECTION}>{t('admin.edit.choose')}</h3>
-            {done && <p role="status" className="rounded-lg border border-hud/40 bg-hud/10 px-3 py-2 text-sm text-hud">{done}</p>}
+            {done && <p role="status" className="rounded-lg border border-accent/40 bg-accent/10 px-3 py-2 text-sm text-accent">{done}</p>}
             {menuButton(
               Scale,
               t('admin.edit.menuLicense'),
@@ -150,7 +150,7 @@ export default function EditModelDialog({
         {step !== 'menu' && (
           <form onSubmit={submit} noValidate className="grid gap-5" aria-labelledby="edit-step-title">
             <div className="flex items-center gap-3">
-              <button type="button" onClick={() => goTo('menu')} disabled={busy} aria-label={t('admin.edit.back')} className="grid h-8 w-8 place-items-center rounded-lg border border-white/15 text-white/80 hover:border-white/40 hover:text-white disabled:opacity-50">
+              <button type="button" onClick={() => goTo('menu')} disabled={busy} aria-label={t('admin.edit.back')} className="grid h-8 w-8 place-items-center rounded-lg border border-line text-ink/80 hover:border-ink/40 hover:text-ink disabled:opacity-50">
                 <ArrowLeft aria-hidden className="h-4 w-4" />
               </button>
               <h3 id="edit-step-title" className={SECTION}>
@@ -160,18 +160,18 @@ export default function EditModelDialog({
 
             {step === 'license' && (
               <fieldset className="grid gap-2">
-                <legend className="text-sm text-white/65">
-                  {t('admin.license.current')}: <span className="font-mono text-white">{model.license}</span>. {t('admin.edit.pickLicense')}
+                <legend className="text-sm text-ink-soft">
+                  {t('admin.license.current')}: <span className="font-mono text-ink">{model.license}</span>. {t('admin.edit.pickLicense')}
                 </legend>
                 <div className="mt-2 grid gap-2 sm:grid-cols-3">
                   {LICENSES.filter((l) => l !== model.license).map((l) => (
                     <label
                       key={l}
                       className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2.5 text-sm transition-colors ${
-                        license === l ? 'border-white bg-white/10 text-white' : 'border-white/15 text-white/80 hover:border-white/40'
+                        license === l ? 'border-ink bg-ink/10 text-ink' : 'border-line text-ink/80 hover:border-ink/40'
                       }`}
                     >
-                      <input type="radio" name="license-new" value={l} checked={license === l} onChange={() => setLicense(l)} className="accent-white" />
+                      <input type="radio" name="license-new" value={l} checked={license === l} onChange={() => setLicense(l)} className="accent-ink" />
                       <span className="font-mono">{l}</span>
                     </label>
                   ))}
@@ -190,13 +190,13 @@ export default function EditModelDialog({
                   required={requiresReason}
                   rows={step === 'license' ? 4 : 3}
                 />
-                <p className="rounded-lg border border-amber/40 bg-amber/10 px-3 py-2 text-sm text-amber">
+                <p className="rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-warn">
                   {t(step === 'license' ? 'admin.license.warning' : model.isHidden ? 'admin.edit.restoreWarning' : 'admin.edit.hideWarning')}
                 </p>
               </>
             )}
 
-            {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
+            {error && <p role="alert" className="text-sm text-danger">{error}</p>}
 
             <div className="flex justify-end gap-3">
               <button type="button" onClick={() => goTo('menu')} disabled={busy} className={SECONDARY}>{t('admin.edit.back')}</button>
@@ -212,7 +212,7 @@ export default function EditModelDialog({
         {step === 'menu' && (
           <>
             <HistoryList entries={history} error={historyError} headingId="model-history-title" />
-            <div className="flex justify-end border-t border-white/10 pt-4">
+            <div className="flex justify-end border-t border-line pt-4">
               <button type="button" onClick={onClose} className={SECONDARY}>{t('admin.edit.close')}</button>
             </div>
           </>

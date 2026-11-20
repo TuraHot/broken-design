@@ -31,7 +31,7 @@ export default async function CreatorPage() {
   const { t } = await getT();
   return (
     <main className="overflow-x-clip">
-      <section className="relative mx-auto grid max-w-[1400px] items-center gap-10 px-4 pb-16 pt-24 md:px-6 lg:min-h-[calc(100dvh-2rem)] lg:grid-cols-[1.05fr_1fr]">
+      <section className="relative mx-auto grid max-w-[1400px] grid-cols-[minmax(0,1fr)] items-center gap-10 px-4 pb-16 pt-24 md:px-6 lg:min-h-[calc(100dvh-2rem)] lg:grid-cols-[1.05fr_1fr]">
         {/* two flowing waves across the full width, filled with a soft pink that fades downward, under the butterfly */}
         <svg
           aria-hidden
@@ -80,18 +80,18 @@ export default async function CreatorPage() {
           </g>
         </svg>
         <div className="relative z-10">
-          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70">{t('creator.eyebrow')}</p>
-          <h1 className="mt-4 font-display text-[clamp(28px,4vw,56px)] uppercase leading-[1.05] text-white">
+          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-accent">{t('creator.eyebrow')}</p>
+          <h1 className="mt-4 font-display text-[clamp(28px,4vw,56px)] uppercase leading-[1.05] text-ink">
             {t('creator.title1')}{' '}
-            <span className="bg-gradient-to-r from-hud via-violet to-amber bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-accent via-violet to-amber [html[data-theme='light']_&]:via-accent [html[data-theme='light']_&]:to-accent bg-clip-text text-transparent">
               {t('creator.title2')}
             </span>
           </h1>
-          <p className="mt-5 max-w-[50ch] text-[15px] leading-relaxed text-white/65">
+          <p className="mt-5 max-w-[50ch] text-[15px] leading-relaxed text-ink-soft">
             {t('creator.lead')}
           </p>
           <CreatorActions />
-          <pre className="mt-8 max-w-full overflow-x-auto rounded-lg border border-white/10 bg-[#0d0d0d] px-4 py-3 font-mono text-[12.5px] text-white/65">
+          <pre className="mt-8 max-w-full overflow-x-auto rounded-lg border border-line bg-card px-4 py-3 font-mono text-[12.5px] text-ink-soft">
             <code>{'<vm-model model-id="your-model"></vm-model>'}</code>
           </pre>
         </div>
@@ -104,12 +104,12 @@ export default async function CreatorPage() {
           <SectionHeading label={t('creator.featuresLabel')} title={t('creator.featuresTitle')} />
           <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {FEATURES.map(({ icon: Icon, title, body }) => (
-              <li key={title} className="rounded-lg border border-white/10 bg-white/5 p-5">
-                <span className="grid h-10 w-10 place-items-center rounded-lg border border-hud/30 text-hud">
+              <li key={title} className="rounded-lg border border-line bg-ink/5 p-5">
+                <span className="grid h-10 w-10 place-items-center rounded-lg border border-accent/30 text-accent">
                   <Icon aria-hidden className="h-5 w-5" />
                 </span>
-                <h3 className="mt-4 text-[15px] font-medium text-white">{t(title)}</h3>
-                <p className="mt-1.5 text-sm leading-relaxed text-white/65">{t(body)}</p>
+                <h3 className="mt-4 text-[15px] font-medium text-ink">{t(title)}</h3>
+                <p className="mt-1.5 text-sm leading-relaxed text-ink-soft">{t(body)}</p>
               </li>
             ))}
           </ul>
@@ -119,10 +119,10 @@ export default async function CreatorPage() {
           <SectionHeading label={t('creator.stepsLabel')} title={t('creator.stepsTitle')} />
           <ol className="grid gap-4 md:grid-cols-3">
             {STEPS.map(({ n, title, body }) => (
-              <li key={n} className="rounded-lg border border-white/10 bg-white/5 p-5">
-                <span className="font-mono text-[11px] tracking-[0.16em] text-hud/70">{n}</span>
-                <h3 className="mt-3 font-display text-base uppercase leading-snug text-white">{t(title)}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-white/65">{t(body)}</p>
+              <li key={n} className="rounded-lg border border-line bg-ink/5 p-5">
+                <span className="font-mono text-[11px] tracking-[0.16em] text-accent">{n}</span>
+                <h3 className="mt-3 font-display text-base uppercase leading-snug text-ink">{t(title)}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-ink-soft">{t(body)}</p>
               </li>
             ))}
           </ol>

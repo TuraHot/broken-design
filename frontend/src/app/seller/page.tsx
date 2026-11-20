@@ -54,7 +54,7 @@ export default function SellerRedirectPage() {
 
   return (
     <main className="mx-auto max-w-[1200px] px-4 pb-16 pt-24 md:px-6">
-      <p className="font-mono text-sm text-white/50">{t('seller.loading')}</p>
+      <p className="font-mono text-sm text-ink-soft">{t('seller.loading')}</p>
     </main>
   );
 }

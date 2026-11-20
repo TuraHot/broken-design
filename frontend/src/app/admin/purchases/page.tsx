@@ -19,7 +19,7 @@ function DetailsAction({ purchase }: { purchase: AdminPurchase }) {
         type="button"
         onClick={() => setOpen(true)}
         aria-label={t('admin.actionOn', { action: t('admin.purchase.details'), name: purchase.model.title })}
-        className="h-8 whitespace-nowrap rounded-lg border border-white/15 px-3 text-sm text-white/80 transition-colors hover:border-white/40 hover:text-white"
+        className="h-8 whitespace-nowrap rounded-lg border border-line px-3 text-sm text-ink/80 transition-colors hover:border-ink/40 hover:text-ink"
       >
         {t('admin.purchase.details')}
       </button>
@@ -29,22 +29,22 @@ function DetailsAction({ purchase }: { purchase: AdminPurchase }) {
 }
 
 const COLUMNS: Column<AdminPurchase>[] = [
-  { header: 'admin.col.date', cell: (p) => <span className="font-mono text-[13px] text-white/65">{formatDate(p.paidAt ?? p.createdAt)}</span> },
+  { header: 'admin.col.date', cell: (p) => <span className="font-mono text-[13px] text-ink-soft">{formatDate(p.paidAt ?? p.createdAt)}</span> },
   {
     header: 'admin.col.buyer',
     cell: (p) => (
       <span className="block">
         <span className="block font-medium">{p.buyer.displayName}</span>
-        <span className="block text-white/65">{p.buyer.email}</span>
+        <span className="block text-ink-soft">{p.buyer.email}</span>
       </span>
     ),
   },
   {
     header: 'admin.col.model',
-    cell: (p) => <span className="text-white">{p.model.title}</span>,
+    cell: (p) => <span className="text-ink">{p.model.title}</span>,
   },
-  { header: 'admin.col.amount', cell: (p) => <span className="text-white/80">{formatMoney(p.amountCents, p.currency)}</span> },
-  { header: 'admin.col.license', cell: (p) => <span className="text-white/65">{p.licenseType}</span> },
+  { header: 'admin.col.amount', cell: (p) => <span className="text-ink/80">{formatMoney(p.amountCents, p.currency)}</span> },
+  { header: 'admin.col.license', cell: (p) => <span className="text-ink-soft">{p.licenseType}</span> },
   {
     header: 'admin.col.status',
     cell: (p, _api, t) => (p.status === 'paid' ? <Badge>{t('admin.paid')}</Badge> : <Badge tone="warn">{t('admin.pending')}</Badge>),
@@ -53,11 +53,11 @@ const COLUMNS: Column<AdminPurchase>[] = [
     header: 'admin.col.watermark',
     cell: (p) =>
       p.watermarkHash ? (
-        <span title={p.watermarkHash} className="font-mono text-[13px] text-white/65">
+        <span title={p.watermarkHash} className="font-mono text-[13px] text-ink-soft">
           {p.watermarkHash.slice(0, 12)}…
         </span>
       ) : (
-        <span className="text-white/65">—</span>
+        <span className="text-ink-soft">—</span>
       ),
   },
   { header: 'admin.col.action', cell: (p) => <DetailsAction purchase={p} /> },

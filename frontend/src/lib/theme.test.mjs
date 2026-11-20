@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { isThemeReady, readCookie, resolveTheme, themeBootstrapScript } from './theme.ts';
 
-const routes = ['/', '/about'];
+const routes = ['/', '/about', '/m/[id]'];
 
 test('isThemeReady matches exact routes only, ignoring a trailing slash, query and hash', () => {
   assert.equal(isThemeReady('/', routes), true);
@@ -33,10 +33,10 @@ test('a garbage cookie is treated as no cookie', () => {
   assert.equal(resolveTheme('/', '', false, routes), 'dark');
 });
 
-test('with the default route list only the landing page can be light', () => {
+test('with the default route list only converted pages can be light', () => {
   assert.equal(resolveTheme('/', 'light', true), 'light');
-  assert.equal(resolveTheme('/gallery', 'light', true), 'dark');
-  assert.equal(resolveTheme('/login', null, true), 'dark');
+  assert.equal(resolveTheme('/gallery', 'light', true), 'light');
+  assert.equal(resolveTheme('/embed/abc', null, true), 'dark');
 });
 
 test('readCookie finds the named cookie only', () => {
@@ -62,7 +62,7 @@ function runBootstrap(routes, { pathname, cookie = '', systemLight = false, noMa
 }
 
 test('bootstrap script agrees with resolveTheme for every combination', () => {
-  for (const pathname of ['/', '/gallery', '/about/', '/about/x']) {
+  for (const pathname of ['/', '/gallery', '/about/', '/about/x', '/m/abc', '/m/abc/', '/m', '/m/a/b']) {
     for (const saved of [null, 'light', 'dark', 'blue']) {
       for (const systemLight of [true, false]) {
         const cookie = saved === null ? 'a=1' : 'a=1; theme=' + saved;
@@ -79,4 +79,12 @@ test('bootstrap script agrees with resolveTheme for every combination', () => {
 test('bootstrap script falls back to dark when matchMedia is missing or the cookie cannot be read', () => {
   assert.equal(runBootstrap(routes, { pathname: '/', noMatchMedia: true }), 'dark');
   assert.equal(runBootstrap(routes, { pathname: '/', cookieThrows: true }), 'dark');
+});
+
+test('a [param] segment matches any one segment', () => {
+  const r = ['/models/[id]'];
+  assert.equal(resolveTheme('/models/abc-123', 'light', true, r), 'light');
+  assert.equal(resolveTheme('/models/abc-123/', 'light', true, r), 'light');
+  assert.equal(resolveTheme('/models', 'light', true, r), 'dark');
+  assert.equal(resolveTheme('/models/a/b', 'light', true, r), 'dark');
 });

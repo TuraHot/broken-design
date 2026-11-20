@@ -26,7 +26,7 @@ function WithdrawalActions({ row, api }: { row: AdminWithdrawal; api: RowApi<Adm
 
   if (row.status === 'paid' || row.status === 'rejected') {
     return (
-      <span className="font-mono text-xs text-white/45">
+      <span className="font-mono text-xs text-ink/45">
         {row.processedAt ? formatDate(row.processedAt) : t('admin.wd.done')}
       </span>
     );
@@ -53,7 +53,7 @@ function WithdrawalActions({ row, api }: { row: AdminWithdrawal; api: RowApi<Adm
           type="button"
           disabled={busy}
           onClick={() => void run('approved')}
-          className="h-8 whitespace-nowrap rounded-lg border border-hud/40 bg-hud/10 px-3 text-sm font-medium text-hud transition-colors hover:bg-hud/20 disabled:opacity-50"
+          className="h-8 whitespace-nowrap rounded-lg border border-accent/40 bg-accent/10 px-3 text-sm font-medium text-accent transition-colors hover:bg-accent/20 disabled:opacity-50"
         >
           {t('admin.wd.approve')}
         </button>
@@ -77,14 +77,14 @@ function WithdrawalActions({ row, api }: { row: AdminWithdrawal; api: RowApi<Adm
 const COLUMNS: Column<AdminWithdrawal>[] = [
   {
     header: 'admin.col.date',
-    cell: (w) => <span className="font-mono text-[13px] text-white/65">{formatDate(w.createdAt)}</span>,
+    cell: (w) => <span className="font-mono text-[13px] text-ink-soft">{formatDate(w.createdAt)}</span>,
   },
   {
     header: 'admin.col.seller',
     cell: (w) => (
       <span className="block">
         <span className="block font-medium">{w.seller.displayName}</span>
-        <span className="block text-white/65">{w.seller.email}</span>
+        <span className="block text-ink-soft">{w.seller.email}</span>
       </span>
     ),
   },
@@ -92,16 +92,16 @@ const COLUMNS: Column<AdminWithdrawal>[] = [
     header: 'admin.wd.colBreakdown',
     cell: (w) => (
       <span className="block font-mono text-xs">
-        <span className="text-white/75">{formatMoney(w.grossAmountCents, w.currency)}</span>
-        <span className="text-amber"> (-{formatMoney(w.platformFeeCents, w.currency)})</span>
-        <span className="block font-semibold text-hud">{formatMoney(w.netAmountCents, w.currency)}</span>
+        <span className="text-ink/75">{formatMoney(w.grossAmountCents, w.currency)}</span>
+        <span className="text-warn"> (-{formatMoney(w.platformFeeCents, w.currency)})</span>
+        <span className="block font-semibold text-accent">{formatMoney(w.netAmountCents, w.currency)}</span>
       </span>
     ),
   },
   {
     header: 'admin.wd.colDestination',
     cell: (w) => (
-      <span className="font-mono text-xs text-white/75">
+      <span className="font-mono text-xs text-ink/75">
         {w.payoutMethod.toUpperCase()} · {w.payoutAccount}
       </span>
     ),

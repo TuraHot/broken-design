@@ -40,7 +40,7 @@ const COPY: Record<Step, { title: MessageKey; lead: MessageKey; submit: MessageK
 };
 
 const PRIMARY =
-  'mt-1 h-10 w-full rounded-lg bg-white text-[15px] font-medium text-black transition-colors hover:bg-white/85 disabled:opacity-60';
+  'mt-1 h-10 w-full rounded-lg bg-ink text-[15px] font-medium text-canvas transition-colors hover:bg-ink/85 disabled:opacity-60';
 
 export default function AuthForm() {
   const router = useRouter();
@@ -119,7 +119,7 @@ export default function AuthForm() {
   };
 
   const fieldClass = (key: keyof Values) =>
-    `${FIELD} ${errors[key] ? 'border-red-400/70 focus:border-red-300' : 'border-white/15 focus:border-white/50'}`;
+    `${FIELD} ${errors[key] ? 'border-danger/70 focus:border-danger' : 'border-line focus:border-ink/50'}`;
   const described = (key: keyof Values) => (errors[key] ? `${key}-error` : undefined);
 
   const passwordField = (
@@ -143,7 +143,7 @@ export default function AuthForm() {
           onClick={() => setShowPassword((v) => !v)}
           aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
           aria-pressed={showPassword}
-          className="absolute right-1 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-md text-white/65 transition-colors hover:text-white"
+          className="absolute right-1 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-md text-ink-soft transition-colors hover:text-ink"
         >
           {showPassword ? <EyeOff aria-hidden className="h-4 w-4" /> : <Eye aria-hidden className="h-4 w-4" />}
         </button>
@@ -153,26 +153,26 @@ export default function AuthForm() {
 
   return (
     <div className="w-full max-w-[420px]">
-      <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70">{t('auth.label')}</p>
-      <h1 className="mt-4 whitespace-nowrap font-display text-[clamp(12px,calc((100vw_-_32px)/23),18px)] uppercase leading-[1.05] text-white">
+      <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-accent">{t('auth.label')}</p>
+      <h1 className="mt-4 whitespace-nowrap font-display text-[clamp(12px,calc((100vw_-_32px)/23),18px)] uppercase leading-[1.05] text-ink">
         {t(copy.title)}
       </h1>
-      <p className="mt-3 text-[15px] leading-relaxed text-white/65">{t(copy.lead)}</p>
+      <p className="mt-3 text-[15px] leading-relaxed text-ink-soft">{t(copy.lead)}</p>
 
       {registeredNotice && (
-        <p role="status" className="mt-6 rounded-lg border border-hud/40 bg-hud/10 px-3 py-2 text-sm text-hud">
+        <p role="status" className="mt-6 rounded-lg border border-accent/40 bg-accent/10 px-3 py-2 text-sm text-accent">
           {t('auth.createdNotice')}
         </p>
       )}
 
-      <div className="mt-8 rounded-lg border border-white/10 bg-white/5 p-5 sm:p-6">
+      <div className="mt-8 rounded-lg border border-line bg-ink/5 p-5 sm:p-6">
         {step !== 'email' && (
-          <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-white/10 px-3 py-2 text-sm">
-            <span className="truncate text-white">{values.email.trim()}</span>
+          <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-line px-3 py-2 text-sm">
+            <span className="truncate text-ink">{values.email.trim()}</span>
             <button
               type="button"
               onClick={() => goTo('email')}
-              className="shrink-0 text-white/65 underline-offset-4 transition-colors hover:text-white hover:underline"
+              className="shrink-0 text-ink-soft underline-offset-4 transition-colors hover:text-ink hover:underline"
             >
               {t('auth.change')}
             </button>
@@ -201,7 +201,7 @@ export default function AuthForm() {
 
           {step === 'login' && (
             <div className="-mt-2 text-right">
-              <Link href="/forgot-password" className="text-sm text-white/65 underline-offset-4 transition-colors hover:text-white hover:underline">
+              <Link href="/forgot-password" className="text-sm text-ink-soft underline-offset-4 transition-colors hover:text-ink hover:underline">
                 {t('auth.forgotLink')}
               </Link>
             </div>
@@ -212,12 +212,12 @@ export default function AuthForm() {
           </button>
         </form>
 
-        <div className="mt-5 border-t border-white/10 pt-4 text-center">
-          <p className="text-sm text-white/65">
+        <div className="mt-5 border-t border-line pt-4 text-center">
+          <p className="text-sm text-ink-soft">
             {t('auth.noAccount')}{' '}
             <Link
               href="/register"
-              className="text-white underline-offset-4 transition-colors hover:underline hover:text-hud"
+              className="text-ink underline-offset-4 transition-colors hover:underline hover:text-accent"
             >
               {t('auth.createLink')}
             </Link>

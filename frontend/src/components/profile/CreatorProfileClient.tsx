@@ -75,6 +75,7 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [deletedIds, setDeletedIds] = useState<Set<string>>(() => new Set());
 
   const [editingModel, setEditingModel] = useState<SellerModelItem | null>(null);
   const [deletingModel, setDeletingModel] = useState<SellerModelItem | null>(null);
@@ -200,7 +201,8 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
       setBusyAction(`delete-${modelId}`);
       setStatusMsg(null);
       await deleteModel(modelId, token);
-      setModels((prev) => prev.map((m) => (m.id === modelId ? { ...m, isDeleted: true } : m)));
+      setModels((prev) => prev.filter((m) => m.id !== modelId));
+      setDeletedIds((prev) => new Set(prev).add(modelId));
       setStatusMsg(t('profile.deletedMsg', { title }));
       setDeletingModel(null);
     } catch (err: any) {
@@ -240,8 +242,8 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
 
   const displayName = creatorName || handle;
   const avatarUrl = (isOwnerCreator ? user?.avatar_url : null) ?? initialCreator?.avatarUrl ?? null;
-  const publicModels = initialCreator?.models ?? [];
-  const activeSellerModels = models.filter((m) => !m.isDeleted);
+  const publicModels = (initialCreator?.models ?? []).filter((m) => !deletedIds.has(m.id));
+  const activeSellerModels = models.filter((m) => !m.isDeleted && !deletedIds.has(m.id));
   const modelCount = initialCreator ? publicModels.length : activeSellerModels.length;
   const totalDownloads = initialCreator
     ? initialCreator.totalDownloads
@@ -456,7 +458,7 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                 <div>
                   <div className="flex items-center justify-between border-b border-white/10 pb-3">
                     <h2 className="font-display text-base uppercase text-white">
-                      {t('seller.myModels')} <span className="ml-1 font-mono text-xs text-white/50">({models.length})</span>
+                      {t('seller.myModels')} <span className="ml-1 font-mono text-xs text-white/50">({activeSellerModels.length})</span>
                     </h2>
                     <button
                       type="button"
@@ -467,7 +469,7 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                     </button>
                   </div>
 
-                  {models.length === 0 ? (
+                  {activeSellerModels.length === 0 ? (
                     <div className={`${CARD} mt-4 text-center py-8`}>
                       <p className="text-sm text-white/55">{t('profile.noUploadedModels')}</p>
                     </div>
@@ -484,37 +486,28 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-white/5">
-                          {models.map((m) => (
+                          {activeSellerModels.map((m) => (
                             <tr key={m.id} className="hover:bg-white/[0.02]">
                               <td className="px-4 py-3 font-medium text-white">
-                                {m.isDeleted ? (
-                                  <div className="flex items-center gap-3 opacity-60">
-                                    <div className="relative flex h-11 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10 bg-white/5">
-                                      <ImageIcon className="h-4 w-4 text-white/30" />
-                                    </div>
-                                    <span className="truncate">{m.title}</span>
+                                <Link
+                                  href={`/models/${m.id}`}
+                                  className="group flex items-center gap-3 transition-colors hover:text-hud"
+                                >
+                                  <div className="relative flex h-11 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10 bg-white/5 group-hover:border-hud/40">
+                                    <ImageIcon className="h-4 w-4 text-white/30" />
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img
+                                      src={m.posterUrl || `${CDN_SERVICE_URL}/cdn/models/${m.id}/poster.webp`}
+                                      alt=""
+                                      loading="lazy"
+                                      onError={(e) => {
+                                        e.currentTarget.style.display = 'none';
+                                      }}
+                                      className="absolute inset-0 h-full w-full object-cover"
+                                    />
                                   </div>
-                                ) : (
-                                  <Link
-                                    href={`/models/${m.id}`}
-                                    className="group flex items-center gap-3 transition-colors hover:text-hud"
-                                  >
-                                    <div className="relative flex h-11 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10 bg-white/5 group-hover:border-hud/40">
-                                      <ImageIcon className="h-4 w-4 text-white/30" />
-                                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                                      <img
-                                        src={m.posterUrl || `${CDN_SERVICE_URL}/cdn/models/${m.id}/poster.webp`}
-                                        alt=""
-                                        loading="lazy"
-                                        onError={(e) => {
-                                          e.currentTarget.style.display = 'none';
-                                        }}
-                                        className="absolute inset-0 h-full w-full object-cover"
-                                      />
-                                    </div>
-                                    <span className="truncate group-hover:underline">{m.title}</span>
-                                  </Link>
-                                )}
+                                  <span className="truncate group-hover:underline">{m.title}</span>
+                                </Link>
                               </td>
                               <td className="px-4 py-3 font-mono text-xs text-white/75">
                                 {m.priceCents === 0 ? t('acct.free') : formatPrice(m.priceCents)}
@@ -526,9 +519,7 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                                 </span>
                               </td>
                               <td className="px-4 py-3 font-mono text-[11px] uppercase">
-                                {m.isDeleted ? (
-                                  <span className="text-red-400">{t('seller.statusDeleted')}</span>
-                                ) : m.isHidden ? (
+                                {m.isHidden ? (
                                   <span className="text-amber">{t('seller.statusHidden')}</span>
                                 ) : (
                                   <span className="text-emerald-400">{t('seller.statusLive')}</span>
@@ -536,29 +527,25 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                               </td>
                               <td className="px-4 py-3 text-right">
                                 <div className="flex items-center justify-end gap-2">
-                                  {!m.isDeleted && (
-                                    <button
-                                      type="button"
-                                      onClick={() => openEditModal(m)}
-                                      className="rounded border border-white/15 px-2 py-1 text-xs text-white/75 hover:bg-white/10 hover:text-white"
-                                      title={t('profile.editBtn')}
-                                      aria-label={t('profile.editBtn')}
-                                    >
-                                      <Pencil className="inline h-3 w-3" />
-                                    </button>
-                                  )}
-                                  {!m.isDeleted && (
-                                    <button
-                                      type="button"
-                                      disabled={busyAction === `delete-${m.id}`}
-                                      onClick={() => setDeletingModel(m)}
-                                      className="rounded border border-red-500/30 bg-red-500/10 px-2 py-1 text-xs text-red-400 hover:bg-red-500/20 disabled:opacity-50"
-                                      title={t('profile.deleteBtn')}
-                                      aria-label={t('profile.deleteBtn')}
-                                    >
-                                      <Trash2 className="inline h-3 w-3" />
-                                    </button>
-                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => openEditModal(m)}
+                                    className="rounded border border-white/15 px-2 py-1 text-xs text-white/75 hover:bg-white/10 hover:text-white"
+                                    title={t('profile.editBtn')}
+                                    aria-label={t('profile.editBtn')}
+                                  >
+                                    <Pencil className="inline h-3 w-3" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={busyAction === `delete-${m.id}`}
+                                    onClick={() => setDeletingModel(m)}
+                                    className="rounded border border-red-500/30 bg-red-500/10 px-2 py-1 text-xs text-red-400 hover:bg-red-500/20 disabled:opacity-50"
+                                    title={t('profile.deleteBtn')}
+                                    aria-label={t('profile.deleteBtn')}
+                                  >
+                                    <Trash2 className="inline h-3 w-3" />
+                                  </button>
                                 </div>
                               </td>
                             </tr>

@@ -182,6 +182,34 @@ paymentsRouter.post('/models/:id/checkout', requireAuth, requireBuyer, async (re
   });
 });
 
+// ─── 1b. GET /api/models/:id/purchase ────────────────────────────────────────
+// ตรวจสอบว่าผู้ใช้ปัจจุบันได้ซื้อโมเดลนี้ไปแล้วหรือยัง (เฉพาะ status = 'paid')
+paymentsRouter.get('/models/:id/purchase', requireAuth, async (req, res) => {
+  const userId = req.user!.id;
+  const modelId = String(req.params.id);
+  requireUuid(modelId);
+
+  const result = await db.query(
+    `SELECT id, status, embed_key, paid_at, created_at
+     FROM purchases
+     WHERE user_id = $1 AND model_id = $2 AND status = 'paid'`,
+    [userId, modelId],
+  );
+
+  const purchased = (result.rowCount ?? 0) > 0;
+  res.json({
+    purchased,
+    purchase: purchased
+      ? {
+          id: result.rows[0].id,
+          modelId,
+          embedKey: result.rows[0].embed_key,
+          paidAt: result.rows[0].paid_at ?? result.rows[0].created_at,
+        }
+      : null,
+  });
+});
+
 // ─── 2. POST /api/purchases/:id/confirm-mock ────────────────────────────────
 // กดจ่ายจำลอง → เปลี่ยน status เป็น paid, บันทึก paid_at = NOW(), embed_key พร้อมใช้ทันที
 // เปิดได้เฉพาะเมื่อ PAYMENT_PROVIDER=mock

@@ -4,8 +4,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { Loader2 } from "lucide-react";
-import { CORE_API_URL } from "@/lib/api";
+import { CheckCircle2, Download, Loader2 } from "lucide-react";
+import { checkModelPurchased, CORE_API_URL } from "@/lib/api";
 import { useT } from "@/lib/i18n/client";
 import type { MessageKey } from "@/lib/i18n/messages";
 import { DownloadError, downloadModelGlb } from "@/lib/model-assets";
@@ -50,25 +50,49 @@ export default function ModelActions({
   const [ready, setReady] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
+  const [hasPurchased, setHasPurchased] = useState(false);
+  const [checkingPurchased, setCheckingPurchased] = useState(false);
   const busyRef = useRef(false);
 
+  const isRealModel = Boolean(modelId && UUID_RE.test(modelId));
+
   useEffect(() => {
-    const syncSession = () => {
+    let active = true;
+    const syncSession = async () => {
       const s = readSession();
       setSession(s);
-      setSignedIn(s !== null);
+      const isAuth = s !== null;
+      setSignedIn(isAuth);
       setReady(true);
+
+      if (s?.token && isRealModel && modelId && !free) {
+        setCheckingPurchased(true);
+        try {
+          const res = await checkModelPurchased(modelId, s.token);
+          if (active && res.purchased) {
+            setHasPurchased(true);
+          } else if (active) {
+            setHasPurchased(false);
+          }
+        } catch {
+          // Keep current state on transient failure
+        } finally {
+          if (active) setCheckingPurchased(false);
+        }
+      } else {
+        setHasPurchased(false);
+      }
     };
+
     syncSession();
     window.addEventListener("storage", syncSession);
     window.addEventListener(SESSION_UPDATED_EVENT, syncSession);
     return () => {
+      active = false;
       window.removeEventListener("storage", syncSession);
       window.removeEventListener(SESSION_UPDATED_EVENT, syncSession);
     };
-  }, []);
-
-  const isRealModel = Boolean(modelId && UUID_RE.test(modelId));
+  }, [modelId, isRealModel, free]);
 
   const isOwner = Boolean(
     session?.user &&
@@ -136,6 +160,10 @@ export default function ModelActions({
       setStatus({ key: "model.ownerNote" });
       return;
     }
+    if (hasPurchased) {
+      setStatus({ key: "model.alreadyPurchased" });
+      return;
+    }
     if (!isRealModel || !modelId) {
       setStatus({ key: "model.buySample" });
       return;
@@ -162,8 +190,8 @@ export default function ModelActions({
       const checkoutData = await checkoutRes.json().catch(() => null);
 
       if (checkoutData?.error?.code === "ALREADY_PURCHASED") {
-        setStatus({ key: "model.alreadyOwn" });
-        await performDownload(modelId, session.token);
+        setHasPurchased(true);
+        setStatus({ key: "model.alreadyPurchased" });
         return;
       }
 
@@ -189,35 +217,64 @@ export default function ModelActions({
 
   return (
     <div className="space-y-2">
-      <button
-        type="button"
-        disabled={!ready || !signedIn || busy || isOwner}
-        onClick={free ? handleDownload : handleBuy}
-        className={`inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg px-3.5 text-[15px] font-medium transition-colors ${
-          isOwner
-            ? "border border-white/15 bg-white/5 text-white/40 cursor-not-allowed"
-            : "bg-white text-black hover:bg-white/85 disabled:cursor-not-allowed disabled:opacity-50"
-        }`}
-      >
-        {busy && <Loader2 aria-hidden className="h-4 w-4 animate-spin motion-reduce:animate-none" />}
-        {busy
-          ? t("model.processing")
-          : isOwner
-            ? t("model.ownerDisabled")
-            : free
-              ? t("model.getFree")
-              : t("model.buy", { price: priceLabel })}
-      </button>
+      {hasPurchased ? (
+        <>
+          <button
+            type="button"
+            disabled
+            className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-hud/30 bg-hud/10 px-3.5 text-[15px] font-medium text-hud cursor-not-allowed"
+          >
+            <CheckCircle2 aria-hidden className="h-4 w-4 shrink-0 text-hud" />
+            <span>{t("model.alreadyPurchased")}</span>
+          </button>
 
-      {!free && isRealModel && !isOwner && (
-        <button
-          type="button"
-          disabled={!ready || !signedIn || busy}
-          onClick={handleDownload}
-          className="h-9 w-full rounded-lg border border-white/20 bg-white/5 px-3 text-xs font-mono uppercase tracking-wider text-white/80 transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {t("model.alreadyBought")}
-        </button>
+          <button
+            type="button"
+            disabled={!ready || !signedIn || busy}
+            onClick={handleDownload}
+            className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-white px-3.5 text-[15px] font-medium text-black transition-colors hover:bg-white/85 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {busy ? (
+              <Loader2 aria-hidden className="h-4 w-4 animate-spin motion-reduce:animate-none" />
+            ) : (
+              <Download aria-hidden className="h-4 w-4" />
+            )}
+            {busy ? t("model.processing") : t("model.downloadGlb")}
+          </button>
+        </>
+      ) : (
+        <>
+          <button
+            type="button"
+            disabled={!ready || !signedIn || busy || isOwner || checkingPurchased}
+            onClick={free ? handleDownload : handleBuy}
+            className={`inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg px-3.5 text-[15px] font-medium transition-colors ${
+              isOwner
+                ? "border border-white/15 bg-white/5 text-white/40 cursor-not-allowed"
+                : "bg-white text-black hover:bg-white/85 disabled:cursor-not-allowed disabled:opacity-50"
+            }`}
+          >
+            {busy && <Loader2 aria-hidden className="h-4 w-4 animate-spin motion-reduce:animate-none" />}
+            {busy
+              ? t("model.processing")
+              : isOwner
+                ? t("model.ownerDisabled")
+                : free
+                  ? t("model.getFree")
+                  : t("model.buy", { price: priceLabel })}
+          </button>
+
+          {!free && isRealModel && !isOwner && (
+            <button
+              type="button"
+              disabled={!ready || !signedIn || busy || checkingPurchased}
+              onClick={handleDownload}
+              className="h-9 w-full rounded-lg border border-white/20 bg-white/5 px-3 text-xs font-mono uppercase tracking-wider text-white/80 transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {t("model.alreadyBought")}
+            </button>
+          )}
+        </>
       )}
 
       {ready && !signedIn && (

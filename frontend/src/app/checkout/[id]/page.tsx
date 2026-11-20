@@ -166,6 +166,7 @@ export default function CheckoutPage() {
           <CheckCircle2 className="mx-auto h-10 w-10 text-hud" />
           <h1 className="mt-3 font-display text-xl uppercase text-white">{t('pay.paidTitle')}</h1>
           <p className="mt-1.5 text-sm text-white/65">{purchase.title}</p>
+          <p className="mt-2 text-sm font-medium text-hud">{t('pay.alreadyOwned')}</p>
           <Link
             href={`/checkout/success?purchaseId=${encodeURIComponent(purchase.id)}`}
             className="mt-6 inline-flex h-11 w-full items-center justify-center rounded-full bg-white text-sm font-medium text-black transition-colors hover:bg-white/85"

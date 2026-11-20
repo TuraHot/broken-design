@@ -6,9 +6,192 @@ import AdminList, { type Column, type RowApi } from '@/components/admin/AdminLis
 import SuspendDialog from '@/components/admin/SuspendDialog';
 import { Badge } from '@/components/admin/ui';
 import type { AdminUser } from '@/lib/admin-api';
+import { CORE_API_URL } from '@/lib/api';
 import { formatDate } from '@/lib/format';
 import { useT } from '@/lib/i18n/client';
 import { readSession } from '@/lib/session';
+
+interface AdminCreatorApp {
+  id: string;
+  userId: string;
+  email: string;
+  displayName: string;
+  note: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+}
+
+interface AdminInviteCode {
+  id: string;
+  code: string;
+  maxUses: number;
+  usedCount: number;
+  createdAt: string;
+}
+
+function CreatorApplicationsPanel() {
+  const [apps, setApps] = useState<AdminCreatorApp[]>([]);
+  const [codes, setCodes] = useState<AdminInviteCode[]>([]);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [creatingCode, setCreatingCode] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const loadData = async () => {
+    const token = readSession()?.token;
+    if (!token) return;
+    try {
+      const [appsRes, codesRes] = await Promise.all([
+        fetch(`${CORE_API_URL}/api/admin/creator-applications?status=pending`, {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: 'no-store',
+        }),
+        fetch(`${CORE_API_URL}/api/admin/invite-codes`, {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: 'no-store',
+        }),
+      ]);
+      if (appsRes.ok) {
+        const data = await appsRes.json();
+        setApps(Array.isArray(data.applications) ? data.applications : []);
+      }
+      if (codesRes.ok) {
+        const data = await codesRes.json();
+        setCodes(Array.isArray(data.codes) ? data.codes : []);
+      }
+    } catch {
+      // Ignore load error
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const handleGenerateCode = async () => {
+    const token = readSession()?.token;
+    if (!token || creatingCode) return;
+    try {
+      setCreatingCode(true);
+      const res = await fetch(`${CORE_API_URL}/api/admin/invite-codes`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ maxUses: 1 }),
+      });
+      if (!res.ok) throw new Error('Failed to generate invite code');
+      const data = await res.json();
+      if (data.code) setCodes((prev) => [data.code, ...prev]);
+    } catch (err: any) {
+      setMsg(err?.message || 'Unable to generate code.');
+    } finally {
+      setCreatingCode(false);
+    }
+  };
+
+  const handleReview = async (id: string, status: 'approved' | 'rejected') => {
+    const token = readSession()?.token;
+    if (!token || busyId) return;
+    try {
+      setBusyId(id);
+      setMsg(null);
+      const res = await fetch(`${CORE_API_URL}/api/admin/creator-applications/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) throw new Error('Failed to update application');
+      setApps((prev) => prev.filter((a) => a.id !== id));
+      setMsg(`Application ${status}.`);
+    } catch (err: any) {
+      setMsg(err?.message || 'Action failed.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  return (
+    <section className="mb-8 space-y-4">
+      <div className="rounded-xl border border-hud/30 bg-hud/5 p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud">[ Creator Approvals ]</p>
+            <h2 className="mt-1 font-display text-lg uppercase text-white">
+              Pending Creator Applications ({apps.length})
+            </h2>
+          </div>
+          <button
+            type="button"
+            disabled={creatingCode}
+            onClick={handleGenerateCode}
+            className="h-9 rounded-lg border border-hud/40 bg-hud/10 px-3.5 font-mono text-xs uppercase tracking-wider text-hud transition-colors hover:bg-hud/20 disabled:opacity-50"
+          >
+            {creatingCode ? 'Generating…' : '+ Generate Invite Code'}
+          </button>
+        </div>
+
+        {msg && <p className="mt-2 text-xs text-hud">{msg}</p>}
+
+        {codes.length > 0 && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {codes.slice(0, 6).map((c) => (
+              <span
+                key={c.id}
+                className="rounded-md border border-white/15 bg-black/60 px-2.5 py-1 font-mono text-xs text-white/85 select-all"
+              >
+                {c.code}{' '}
+                <span className="text-white/45">
+                  ({c.usedCount}/{c.maxUses})
+                </span>
+              </span>
+            ))}
+          </div>
+        )}
+
+        {apps.length > 0 && (
+          <ul className="mt-4 space-y-3">
+            {apps.map((app) => (
+              <li
+                key={app.id}
+                className="flex flex-col justify-between gap-3 rounded-lg border border-white/10 bg-black/50 p-4 sm:flex-row sm:items-center"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-white">
+                    {app.displayName} <span className="font-mono text-xs text-white/55">({app.email})</span>
+                  </p>
+                  {app.note && <p className="mt-1 text-xs text-white/70">{app.note}</p>}
+                  <p className="mt-1 font-mono text-[11px] text-white/45">Applied: {formatDate(app.createdAt)}</p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={busyId === app.id}
+                    onClick={() => handleReview(app.id, 'approved')}
+                    className="h-8 rounded-lg bg-white px-3 text-xs font-semibold text-black transition-colors hover:bg-white/85 disabled:opacity-50"
+                  >
+                    Approve
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busyId === app.id}
+                    onClick={() => handleReview(app.id, 'rejected')}
+                    className="h-8 rounded-lg border border-red-500/40 bg-red-500/10 px-3 text-xs text-red-300 transition-colors hover:bg-red-500/20 disabled:opacity-50"
+                  >
+                    Reject
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </section>
+  );
+}
 
 // One button per row. It opens the dialog where the admin picks how long and writes the reason.
 function SuspendAction({ user, api }: { user: AdminUser; api: RowApi<AdminUser> }) {
@@ -86,11 +269,14 @@ export default function AdminUsersPage() {
   useEffect(() => setMyId(readSession()?.user.id ?? null), []);
 
   return (
-    <AdminList<AdminUser>
-      path="/users"
-      heading="admin.nav.users"
-      searchLabel="admin.search.users"
-      columns={buildColumns(myId)}
-    />
+    <>
+      <CreatorApplicationsPanel />
+      <AdminList<AdminUser>
+        path="/users"
+        heading="admin.nav.users"
+        searchLabel="admin.search.users"
+        columns={buildColumns(myId)}
+      />
+    </>
   );
 }

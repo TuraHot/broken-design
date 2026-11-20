@@ -126,6 +126,34 @@ CREATE TABLE IF NOT EXISTS creator_withdrawals (
 
 CREATE INDEX IF NOT EXISTS idx_creator_withdrawals_seller ON creator_withdrawals (seller_id, created_at DESC);
 
+-- 6.3 Creator Applications Table (คำขอสมัครเป็น Creator รอแอดมินอนุมัติ)
+CREATE TABLE IF NOT EXISTS creator_applications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    note TEXT DEFAULT '',
+    status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+    admin_note TEXT,
+    reviewed_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    reviewed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_creator_applications_status ON creator_applications (status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_creator_applications_user ON creator_applications (user_id, created_at DESC);
+ALTER TABLE creator_applications ENABLE ROW LEVEL SECURITY;
+
+-- 6.4 Creator Invite Codes Table (โค้ดเชิญสำหรับเป็น Creator ทันทีโดยไม่ต้องรอแอดมินอนุมัติ)
+CREATE TABLE IF NOT EXISTS creator_invite_codes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    code VARCHAR(64) UNIQUE NOT NULL,
+    max_uses INTEGER NOT NULL DEFAULT 1 CHECK (max_uses > 0),
+    used_count INTEGER NOT NULL DEFAULT 0 CHECK (used_count >= 0),
+    created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    expires_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ALTER TABLE creator_invite_codes ENABLE ROW LEVEL SECURITY;
+
 -- 7. Seed Initial Accounts (Admin must be set in DB, cannot register via UI)
 INSERT INTO users (email, password_hash, display_name, role, is_seller)
 VALUES (

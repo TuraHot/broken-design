@@ -17,8 +17,8 @@ import { useT } from '@/lib/i18n/client';
 import type { MessageKey } from '@/lib/i18n/messages';
 import { readSession } from '@/lib/session';
 
-const FIELD = 'w-full rounded-lg border border-white/15 bg-white/5 px-3 text-sm text-white placeholder:text-white/40 focus:border-white/50 focus:outline-none';
-const PRIMARY = 'inline-flex h-10 items-center justify-center rounded-lg bg-white px-4 text-[15px] font-medium text-black transition-colors hover:bg-white/85 disabled:cursor-not-allowed disabled:opacity-50';
+const FIELD = 'w-full rounded-lg border border-line bg-ink/5 px-3 text-sm text-ink placeholder:text-ink/40 focus:border-ink/50 focus:outline-none';
+const PRIMARY = 'inline-flex h-10 items-center justify-center rounded-lg bg-ink px-4 text-[15px] font-medium text-canvas transition-colors hover:bg-ink/85 disabled:cursor-not-allowed disabled:opacity-50';
 
 const CATEGORY_KEYS: Record<ComplaintCategoryValue, MessageKey> = {
   model: 'report.cat.model',
@@ -73,12 +73,12 @@ export default function ReportForm({ initialModelRef = '', onClose }: { initialM
     }
   };
 
-  if (!ready) return <p role="status" className="text-sm text-white/65">{t('report.loading')}</p>;
+  if (!ready) return <p role="status" className="text-sm text-ink-soft">{t('report.loading')}</p>;
 
   if (!signedIn) {
     return (
-      <div className="rounded-lg border border-white/10 bg-white/5 p-10 text-center">
-        <p className="text-white/65">{t('report.loginPrompt')}</p>
+      <div className="rounded-lg border border-line bg-ink/5 p-10 text-center">
+        <p className="text-ink-soft">{t('report.loginPrompt')}</p>
         <div className="mt-6 flex justify-center">
           <Link href="/login" onClick={onClose} className={PRIMARY}>{t('report.login')}</Link>
         </div>
@@ -88,10 +88,10 @@ export default function ReportForm({ initialModelRef = '', onClose }: { initialM
 
   if (sent) {
     return (
-      <div role="status" className="rounded-lg border border-white/10 bg-white/5 p-10 text-center">
-        <CheckCircle2 aria-hidden className="mx-auto h-6 w-6 text-hud" />
-        <p className="mt-3 font-medium text-white">{t('report.thanks')}</p>
-        <p className="mt-2 text-white/65">{t('report.thanksNote')}</p>
+      <div role="status" className="rounded-lg border border-line bg-ink/5 p-10 text-center">
+        <CheckCircle2 aria-hidden className="mx-auto h-6 w-6 text-accent" />
+        <p className="mt-3 font-medium text-ink">{t('report.thanks')}</p>
+        <p className="mt-2 text-ink-soft">{t('report.thanksNote')}</p>
         <div className="mt-6 flex justify-center">
           <button type="button" onClick={onClose} className={PRIMARY}>{t('report.close')}</button>
         </div>
@@ -100,16 +100,16 @@ export default function ReportForm({ initialModelRef = '', onClose }: { initialM
   }
 
   return (
-    <form onSubmit={submit} noValidate className="rounded-lg border border-white/10 bg-white/5 p-5 sm:p-6">
+    <form onSubmit={submit} noValidate className="rounded-lg border border-line bg-ink/5 p-5 sm:p-6">
       <div className="grid gap-5">
         <div>
-          <label htmlFor="report-category" className="text-sm text-white/65">{t('report.about')}</label>
+          <label htmlFor="report-category" className="text-sm text-ink-soft">{t('report.about')}</label>
           <select
             id="report-category"
             autoFocus
             value={category}
             onChange={(e) => setCategory(e.target.value as ComplaintCategoryValue)}
-            className="mt-1.5 h-10 w-full rounded-lg border border-white/15 bg-black px-3 text-sm text-white focus:border-white/50 focus:outline-none"
+            className="mt-1.5 h-10 w-full rounded-lg border border-line bg-canvas px-3 text-sm text-ink focus:border-ink/50 focus:outline-none"
           >
             {COMPLAINT_CATEGORIES.map((c) => (
               <option key={c.value} value={c.value}>{t(CATEGORY_KEYS[c.value])}</option>
@@ -118,7 +118,7 @@ export default function ReportForm({ initialModelRef = '', onClose }: { initialM
         </div>
 
         <div>
-          <label htmlFor="report-model" className="text-sm text-white/65">
+          <label htmlFor="report-model" className="text-sm text-ink-soft">
             {category === 'model' ? t('report.modelLink') : t('report.modelLinkOptional')}
           </label>
           <input
@@ -133,7 +133,7 @@ export default function ReportForm({ initialModelRef = '', onClose }: { initialM
         </div>
 
         <div>
-          <label htmlFor="report-message" className="text-sm text-white/65">{t('report.whatHappened')}</label>
+          <label htmlFor="report-message" className="text-sm text-ink-soft">{t('report.whatHappened')}</label>
           <textarea
             id="report-message"
             value={message}
@@ -144,13 +144,13 @@ export default function ReportForm({ initialModelRef = '', onClose }: { initialM
             aria-describedby="report-count"
             className={`${FIELD} mt-1.5 py-2`}
           />
-          <p id="report-count" className="mt-1.5 text-right font-mono text-[12px] text-white/65">
+          <p id="report-count" className="mt-1.5 text-right font-mono text-[12px] text-ink-soft">
             {message.trim().length} / {COMPLAINT_MAX}
           </p>
         </div>
 
         {error && (
-          <p role="alert" className="flex items-start gap-2 text-sm text-red-300">
+          <p role="alert" className="flex items-start gap-2 text-sm text-danger">
             <AlertCircle aria-hidden className="mt-0.5 h-4 w-4 shrink-0" />
             {error}
           </p>

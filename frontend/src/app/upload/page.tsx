@@ -373,78 +373,78 @@ export default function UploadPage() {
   };
 
   return (
-    <main className="min-h-screen bg-black pt-24 pb-16 text-white">
+    <main className="min-h-screen bg-canvas pt-24 pb-16 text-ink">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         {/* Header */}
-        <div className="mb-8 border-b border-white/10 pb-6">
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-mono tracking-wider text-white/70 uppercase mb-3">
-            <Sparkles className="h-3.5 w-3.5 text-blue-400" /> {t('upload.badge')}
+        <div className="mb-8 border-b border-line pb-6">
+          <div className="inline-flex items-center gap-2 rounded-full border border-line bg-ink/5 px-3 py-1 text-xs font-mono tracking-wider text-ink/70 uppercase mb-3">
+            <Sparkles className="h-3.5 w-3.5 text-accent" /> {t('upload.badge')}
           </div>
-          <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">{t('upload.title')}</h1>
-          <p className="mt-2 text-sm text-white/60">
+          <h1 className="text-3xl font-bold tracking-tight text-ink sm:text-4xl">{t('upload.title')}</h1>
+          <p className="mt-2 text-sm text-ink/60">
             {t('upload.lead')}
           </p>
         </div>
 
         {/* Auth & Seller Access Gates / Upload State */}
         {!authReady ? (
-          <div className="rounded-lg border border-white/10 bg-white/5 p-8 text-center text-sm text-white/60">
+          <div className="rounded-lg border border-line bg-ink/5 p-8 text-center text-sm text-ink/60">
             {t('upload.checkingSession')}
           </div>
         ) : !session ? (
-          <div className="mx-auto max-w-[800px] rounded-lg border border-white/10 bg-white/5 p-6 text-center">
-            <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70">{t('seller.needLabel')}</p>
-            <h2 className="mt-4 font-display text-2xl uppercase tracking-wide text-white">{t('upload.needTitle')}</h2>
-            <p className="mt-3 text-[15px] leading-relaxed text-white/65">
+          <div className="mx-auto max-w-[800px] rounded-lg border border-line bg-ink/5 p-6 text-center">
+            <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-accent">{t('seller.needLabel')}</p>
+            <h2 className="mt-4 font-display text-2xl uppercase tracking-wide text-ink">{t('upload.needTitle')}</h2>
+            <p className="mt-3 text-[15px] leading-relaxed text-ink-soft">
               {t('upload.needBody')}
             </p>
             <Link
               href="/login"
-              className="mt-6 inline-block rounded-lg bg-white px-5 py-2 text-sm font-medium text-black transition-colors hover:bg-white/85"
+              className="mt-6 inline-block rounded-lg bg-ink px-5 py-2 text-sm font-medium text-canvas transition-colors hover:bg-ink/85"
             >
               {t('seller.needLogin')}
             </Link>
           </div>
         ) : !canUpload ? (
-          <div className="mx-auto max-w-[800px] rounded-lg border border-white/10 bg-white/5 p-6 text-center">
-            <Store className="mx-auto h-12 w-12 text-hud" />
-            <p className="mt-4 font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70">{t('seller.offLabel')}</p>
-            <h2 className="mt-2 font-display text-2xl uppercase tracking-wide text-white">
+          <div className="mx-auto max-w-[800px] rounded-lg border border-line bg-ink/5 p-6 text-center">
+            <Store className="mx-auto h-12 w-12 text-accent" />
+            <p className="mt-4 font-mono text-[11px] uppercase tracking-[0.16em] text-accent">{t('seller.offLabel')}</p>
+            <h2 className="mt-2 font-display text-2xl uppercase tracking-wide text-ink">
               {t('seller.offTitle')}
             </h2>
-            <p className="mt-3 text-[15px] leading-relaxed text-white/65">
+            <p className="mt-3 text-[15px] leading-relaxed text-ink-soft">
               {t('upload.offBody')}
             </p>
             <Link
               href="/seller"
-              className="mt-6 inline-block rounded-lg bg-white px-5 py-2 text-sm font-medium text-black transition-colors hover:bg-white/85"
+              className="mt-6 inline-block rounded-lg bg-ink px-5 py-2 text-sm font-medium text-canvas transition-colors hover:bg-ink/85"
             >
               {t('upload.toSellerDash')}
             </Link>
           </div>
         ) : uploadSuccess ? (
-          <div className="rounded-2xl border border-emerald-500/30 bg-emerald-950/20 p-8 text-center backdrop-blur">
-            <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-emerald-500/20 text-emerald-400">
+          <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-8 text-center backdrop-blur">
+            <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-emerald-500/20 text-emerald-500">
               <CheckCircle2 className="h-8 w-8" />
             </div>
-            <h2 className="mt-4 text-2xl font-bold text-white">{t('upload.okTitle')}</h2>
-            <p className="mt-2 text-sm text-white/70">
+            <h2 className="mt-4 text-2xl font-bold text-ink">{t('upload.okTitle')}</h2>
+            <p className="mt-2 text-sm text-ink/70">
               {t('upload.okBody')}
             </p>
-            <div className="mx-auto mt-4 max-w-md rounded-lg border border-white/10 bg-black/60 p-3 font-mono text-xs text-white/80 select-all">
+            <div className="mx-auto mt-4 max-w-md rounded-lg border border-line bg-canvas/60 p-3 font-mono text-xs text-ink/80 select-all">
               {uploadSuccess.file_hash}
             </div>
 
             <div className="mt-6 flex flex-wrap items-center justify-center gap-4">
               <button
                 onClick={resetForm}
-                className="inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/5 px-4 py-2 text-sm font-medium hover:bg-white/10 transition-colors"
+                className="inline-flex items-center gap-2 rounded-lg border border-line bg-ink/5 px-4 py-2 text-sm font-medium hover:bg-ink/10 transition-colors"
               >
                 <RefreshCw className="h-4 w-4" /> {t('upload.another')}
               </button>
               <Link
                 href={`/models/${uploadSuccess.id}`}
-                className="inline-flex items-center gap-2 rounded-lg bg-white px-5 py-2 text-sm font-semibold text-black hover:bg-white/85 transition-colors"
+                className="inline-flex items-center gap-2 rounded-lg bg-ink px-5 py-2 text-sm font-semibold text-canvas hover:bg-ink/85 transition-colors"
               >
                 {t('upload.viewGallery')} <ArrowRight className="h-4 w-4" />
               </Link>
@@ -464,10 +464,10 @@ export default function UploadPage() {
                 onDrop={handleDrop}
                 className={`relative flex min-h-[380px] flex-col items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed transition-all ${
                   isDragging
-                    ? 'border-blue-500 bg-blue-500/10'
+                    ? 'border-accent bg-accent/10'
                     : fileUrl
-                    ? 'border-white/20 bg-black/60'
-                    : 'border-white/15 bg-white/[0.02] hover:border-white/30'
+                    ? 'border-line bg-canvas/60'
+                    : 'border-line bg-ink/[0.02] hover:border-ink/30'
                 }`}
               >
                 {fileUrl ? (
@@ -480,20 +480,20 @@ export default function UploadPage() {
                         auto-rotate
                         camera-controls
                         shadow-intensity="1"
-                        style={{ width: '100%', height: '100%', backgroundColor: '#050505' }}
+                        style={{ width: '100%', height: '100%', backgroundColor: 'rgb(var(--c-canvas))' }}
                       />
                     ) : (
-                      <div className="grid h-full place-items-center text-sm text-white/50">
+                      <div className="grid h-full place-items-center text-sm text-ink/50">
                         {t('upload.loadingCanvas')}
                       </div>
                     )}
 
                     {/* Action buttons overlay inside 3D viewer */}
-                    <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between gap-2 rounded-lg bg-black/80 px-3 py-2 backdrop-blur border border-white/10">
-                      <div className="flex items-center gap-2 truncate text-xs text-white/80">
-                        <FileCheck className="h-4 w-4 text-emerald-400 shrink-0" />
+                    <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between gap-2 rounded-lg bg-canvas/80 px-3 py-2 backdrop-blur border border-line">
+                      <div className="flex items-center gap-2 truncate text-xs text-ink/80">
+                        <FileCheck className="h-4 w-4 text-emerald-500 shrink-0" />
                         <span className="truncate">{file?.name}</span>
-                        <span className="text-white/40">({(file?.size! / (1024 * 1024)).toFixed(2)} MB)</span>
+                        <span className="text-ink/40">({(file?.size! / (1024 * 1024)).toFixed(2)} MB)</span>
                       </div>
 
                       <div className="flex items-center gap-2">
@@ -502,7 +502,7 @@ export default function UploadPage() {
                           onClick={handleCapturePoster}
                           disabled={capturingPoster}
                           title={t('upload.captureTip')}
-                          className="inline-flex items-center gap-1 rounded bg-white/10 px-2 py-1 text-xs text-white hover:bg-white/20 transition-colors"
+                          className="inline-flex items-center gap-1 rounded bg-ink/10 px-2 py-1 text-xs text-ink hover:bg-ink/20 transition-colors"
                         >
                           <Camera className="h-3 w-3" />
                           {capturingPoster ? t('upload.capturing') : t('upload.capture')}
@@ -513,7 +513,7 @@ export default function UploadPage() {
                             setFile(null);
                             setFileUrl(null);
                           }}
-                          className="rounded bg-red-500/20 px-2 py-1 text-xs text-red-300 hover:bg-red-500/30 transition-colors"
+                          className="rounded bg-danger/20 px-2 py-1 text-xs text-danger hover:bg-danger/30 transition-colors"
                         >
                           {t('upload.change')}
                         </button>
@@ -532,12 +532,12 @@ export default function UploadPage() {
                         }
                       }}
                     />
-                    <div className="grid h-16 w-16 place-items-center rounded-2xl border border-white/15 bg-white/5 text-white/80 group-hover:scale-105 transition-transform">
-                      <Box className="h-8 w-8 text-blue-400" />
+                    <div className="grid h-16 w-16 place-items-center rounded-2xl border border-line bg-ink/5 text-ink/80 group-hover:scale-105 transition-transform">
+                      <Box className="h-8 w-8 text-accent" />
                     </div>
-                    <span className="mt-4 text-base font-medium text-white">{t('upload.dropTitle')}</span>
-                    <span className="mt-1 text-xs text-white/50">{t('upload.dropHint')}</span>
-                    <div className="mt-4 rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/70">
+                    <span className="mt-4 text-base font-medium text-ink">{t('upload.dropTitle')}</span>
+                    <span className="mt-1 text-xs text-ink/50">{t('upload.dropHint')}</span>
+                    <div className="mt-4 rounded-md border border-line bg-ink/5 px-3 py-1.5 text-xs text-ink/70">
                       {t('upload.browse')}
                     </div>
                   </label>
@@ -547,16 +547,16 @@ export default function UploadPage() {
               {/* Poster & Preview Model Configuration */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Poster Snapshot / Upload */}
-                <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
-                  <div className="flex items-center justify-between text-xs font-medium text-white/80 mb-2">
+                <div className="rounded-xl border border-line bg-ink/[0.02] p-4">
+                  <div className="flex items-center justify-between text-xs font-medium text-ink/80 mb-2">
                     <span className="flex items-center gap-1.5">
-                      <ImageIcon className="h-4 w-4 text-purple-400" /> {t('upload.posterCover')}
+                      <ImageIcon className="h-4 w-4 text-accent" /> {t('upload.posterCover')}
                     </span>
-                    <span className="text-[11px] text-white/40">&lt; 1 MB</span>
+                    <span className="text-[11px] text-ink/40">&lt; 1 MB</span>
                   </div>
 
                   {posterPreviewUrl ? (
-                    <div className="relative h-28 w-full overflow-hidden rounded-lg border border-white/15 bg-black">
+                    <div className="relative h-28 w-full overflow-hidden rounded-lg border border-line bg-canvas">
                       <img src={posterPreviewUrl} alt={t('upload.posterAlt')} className="h-full w-full object-cover" />
                       <button
                         type="button"
@@ -564,13 +564,13 @@ export default function UploadPage() {
                           setPosterFile(null);
                           setPosterPreviewUrl(null);
                         }}
-                        className="absolute top-1 right-1 rounded bg-black/70 p-1 text-xs text-white/70 hover:text-white"
+                        className="absolute top-1 right-1 rounded bg-canvas/70 p-1 text-xs text-ink/70 hover:text-ink"
                       >
                         ✕
                       </button>
                     </div>
                   ) : (
-                    <label className="flex h-28 w-full cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-white/15 bg-white/5 p-2 text-center hover:bg-white/10 transition-colors">
+                    <label className="flex h-28 w-full cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-line bg-ink/5 p-2 text-center hover:bg-ink/10 transition-colors">
                       <input
                         type="file"
                         accept="image/webp,image/png,image/jpeg"
@@ -587,35 +587,35 @@ export default function UploadPage() {
                           }
                         }}
                       />
-                      <Camera className="h-5 w-5 text-white/40 mb-1" />
-                      <span className="text-xs text-white/70">{t('upload.posterHint')}</span>
+                      <Camera className="h-5 w-5 text-ink/40 mb-1" />
+                      <span className="text-xs text-ink/70">{t('upload.posterHint')}</span>
                     </label>
                   )}
                 </div>
 
                 {/* Optional Lightweight Preview Model (for Paid assets) */}
-                <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
-                  <div className="flex items-center justify-between text-xs font-medium text-white/80 mb-2">
+                <div className="rounded-xl border border-line bg-ink/[0.02] p-4">
+                  <div className="flex items-center justify-between text-xs font-medium text-ink/80 mb-2">
                     <span className="flex items-center gap-1.5">
-                      <Layers className="h-4 w-4 text-emerald-400" /> {t('upload.previewGlb')}
+                      <Layers className="h-4 w-4 text-emerald-500" /> {t('upload.previewGlb')}
                     </span>
-                    <span className="text-[11px] text-white/40">&lt; 5 MB</span>
+                    <span className="text-[11px] text-ink/40">&lt; 5 MB</span>
                   </div>
 
                   {previewFile ? (
-                    <div className="flex h-28 w-full flex-col justify-center rounded-lg border border-white/15 bg-black/60 p-3 text-xs">
-                      <span className="truncate font-medium text-white">{previewFile.name}</span>
-                      <span className="text-white/40">{(previewFile.size / (1024 * 1024)).toFixed(2)} MB</span>
+                    <div className="flex h-28 w-full flex-col justify-center rounded-lg border border-line bg-canvas/60 p-3 text-xs">
+                      <span className="truncate font-medium text-ink">{previewFile.name}</span>
+                      <span className="text-ink/40">{(previewFile.size / (1024 * 1024)).toFixed(2)} MB</span>
                       <button
                         type="button"
                         onClick={() => setPreviewFile(null)}
-                        className="mt-2 text-left text-xs text-red-400 hover:underline"
+                        className="mt-2 text-left text-xs text-danger hover:underline"
                       >
                         {t('upload.removeFile')}
                       </button>
                     </div>
                   ) : (
-                    <label className="flex h-28 w-full cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-white/15 bg-white/5 p-2 text-center hover:bg-white/10 transition-colors">
+                    <label className="flex h-28 w-full cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-line bg-ink/5 p-2 text-center hover:bg-ink/10 transition-colors">
                       <input
                         type="file"
                         accept=".glb,model/gltf-binary"
@@ -631,9 +631,9 @@ export default function UploadPage() {
                           }
                         }}
                       />
-                      <Upload className="h-5 w-5 text-white/40 mb-1" />
-                      <span className="text-xs text-white/70">{t('upload.previewHint1')}</span>
-                      <span className="text-[11px] text-white/40">{t('upload.previewHint2')}</span>
+                      <Upload className="h-5 w-5 text-ink/40 mb-1" />
+                      <span className="text-xs text-ink/70">{t('upload.previewHint1')}</span>
+                      <span className="text-[11px] text-ink/40">{t('upload.previewHint2')}</span>
                     </label>
                   )}
                 </div>
@@ -644,13 +644,13 @@ export default function UploadPage() {
             <div className="space-y-5 lg:col-span-6">
               {/* Validation / Submit Alerts */}
               {validationError && (
-                <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-300">
+                <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-warn">
                   <AlertCircle className="h-4 w-4 shrink-0" />
                   <span>{msgText(validationError)}</span>
                 </div>
               )}
               {submitError && (
-                <div role="alert" className="flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-300">
+                <div role="alert" className="flex items-center gap-2 rounded-lg border border-danger/30 bg-danger/10 p-3 text-xs text-danger">
                   <AlertCircle className="h-4 w-4 shrink-0" />
                   <span>{msgText(submitError)}</span>
                 </div>
@@ -658,8 +658,8 @@ export default function UploadPage() {
 
               {/* Title Input */}
               <div>
-                <label className="block text-xs font-mono uppercase tracking-wider text-white/60 mb-1.5">
-                  {t('upload.fTitle')} <span className="text-red-400">*</span>
+                <label className="block text-xs font-mono uppercase tracking-wider text-ink/60 mb-1.5">
+                  {t('upload.fTitle')} <span className="text-danger">*</span>
                 </label>
                 <input
                   type="text"
@@ -667,13 +667,13 @@ export default function UploadPage() {
                   placeholder={t('upload.phTitle')}
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="w-full rounded-lg border border-white/15 bg-white/5 px-3.5 py-2.5 text-sm text-white placeholder:text-white/30 focus:border-white/50 focus:outline-none"
+                  className="w-full rounded-lg border border-line bg-ink/5 px-3.5 py-2.5 text-sm text-ink placeholder:text-ink/30 focus:border-ink/50 focus:outline-none"
                 />
               </div>
 
               {/* Description Input */}
               <div>
-                <label className="block text-xs font-mono uppercase tracking-wider text-white/60 mb-1.5">
+                <label className="block text-xs font-mono uppercase tracking-wider text-ink/60 mb-1.5">
                   {t('upload.fDescription')}
                 </label>
                 <textarea
@@ -681,33 +681,33 @@ export default function UploadPage() {
                   placeholder={t('upload.phDescription')}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  className="w-full rounded-lg border border-white/15 bg-white/5 px-3.5 py-2.5 text-sm text-white placeholder:text-white/30 focus:border-white/50 focus:outline-none"
+                  className="w-full rounded-lg border border-line bg-ink/5 px-3.5 py-2.5 text-sm text-ink placeholder:text-ink/30 focus:border-ink/50 focus:outline-none"
                 />
               </div>
 
               {/* Tags Dropdown & Selection */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-mono uppercase tracking-wider text-white/60">
+                  <label className="block text-xs font-mono uppercase tracking-wider text-ink/60">
                     {t('upload.tagLabel')}
                   </label>
-                  <span className="text-[11px] text-white/40">{t('upload.tagHint')}</span>
+                  <span className="text-[11px] text-ink/40">{t('upload.tagHint')}</span>
                 </div>
 
                 {/* Selected Tag Badges */}
                 {tags.length > 0 && (
-                  <div className="mb-2 flex flex-wrap gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] p-2">
+                  <div className="mb-2 flex flex-wrap gap-1.5 rounded-lg border border-line bg-ink/[0.03] p-2">
                     {tags.map((tag) => (
                       <span
                         key={tag}
-                        className="inline-flex items-center gap-1.5 rounded-md border border-white/20 bg-white/10 px-2.5 py-1 text-xs text-white"
+                        className="inline-flex items-center gap-1.5 rounded-md border border-line bg-ink/10 px-2.5 py-1 text-xs text-ink"
                       >
-                        <Tag className="h-3 w-3 text-hud" />
+                        <Tag className="h-3 w-3 text-accent" />
                         <span className="capitalize">{tagLabel(t, tag)}</span>
                         <button
                           type="button"
                           onClick={() => removeTag(tag)}
-                          className="ml-0.5 text-white/50 hover:text-white transition-colors"
+                          className="ml-0.5 text-ink/50 hover:text-ink transition-colors"
                           title={t('upload.tagRemove')}
                         >
                           <X className="h-3 w-3" />
@@ -726,27 +726,27 @@ export default function UploadPage() {
                       onClick={() => setIsTagDropdownOpen((prev) => !prev)}
                       aria-expanded={isTagDropdownOpen}
                       aria-haspopup="listbox"
-                      className="flex h-10 w-full items-center justify-between rounded-lg border border-white/15 bg-white/5 px-3.5 text-sm text-white hover:border-white/30 focus:border-white/50 focus:outline-none transition-colors"
+                      className="flex h-10 w-full items-center justify-between rounded-lg border border-line bg-ink/5 px-3.5 text-sm text-ink hover:border-ink/30 focus:border-ink/50 focus:outline-none transition-colors"
                     >
                       <span className="flex items-center gap-2 truncate">
-                        <Tag className="h-4 w-4 text-white/40 shrink-0" />
-                        <span className={tags.length === 0 ? 'text-white/40' : 'text-white'}>
+                        <Tag className="h-4 w-4 text-ink/40 shrink-0" />
+                        <span className={tags.length === 0 ? 'text-ink/40' : 'text-ink'}>
                           {tags.length === 0
                             ? t('upload.tagChoose')
                             : t(tags.length === 1 ? 'upload.tagSelectedOne' : 'upload.tagSelectedMany', { n: tags.length })}
                         </span>
                       </span>
                       <ChevronDown
-                        className={`h-4 w-4 text-white/60 transition-transform ${isTagDropdownOpen ? 'rotate-180' : ''}`}
+                        className={`h-4 w-4 text-ink/60 transition-transform ${isTagDropdownOpen ? 'rotate-180' : ''}`}
                       />
                     </button>
 
                     {isTagDropdownOpen && (
                       <ul
                         role="listbox"
-                        className="absolute left-0 top-full z-30 mt-1.5 max-h-64 w-full overflow-y-auto rounded-lg border border-white/15 bg-black/95 p-1.5 shadow-2xl backdrop-blur"
+                        className="absolute left-0 top-full z-30 mt-1.5 max-h-64 w-full overflow-y-auto rounded-lg border border-line bg-canvas/95 p-1.5 shadow-2xl backdrop-blur"
                       >
-                        <li className="px-2 py-1 text-[11px] font-mono uppercase tracking-wider text-hud/70 border-b border-white/10 mb-1">
+                        <li className="px-2 py-1 text-[11px] font-mono uppercase tracking-wider text-accent border-b border-line mb-1">
                           {t('upload.tagAvailable', { n: availableTags.length })}
                         </li>
                         {availableTags.map((opt) => {
@@ -760,12 +760,12 @@ export default function UploadPage() {
                                 onClick={() => toggleTag(opt)}
                                 className={`flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-left text-sm transition-colors ${
                                   isSelected
-                                    ? 'bg-white/15 text-white font-medium'
-                                    : 'text-white/70 hover:bg-white/10 hover:text-white'
+                                    ? 'bg-ink/15 text-ink font-medium'
+                                    : 'text-ink/70 hover:bg-ink/10 hover:text-ink'
                                 }`}
                               >
                                 <span className="capitalize">{tagLabel(t, opt)}</span>
-                                {isSelected && <Check className="h-4 w-4 text-emerald-400" />}
+                                {isSelected && <Check className="h-4 w-4 text-emerald-500" />}
                               </button>
                             </li>
                           );
@@ -787,13 +787,13 @@ export default function UploadPage() {
                           handleAddNewTag();
                         }
                       }}
-                      className="h-10 w-full sm:w-44 rounded-lg border border-white/15 bg-white/5 px-3 text-xs text-white placeholder:text-white/30 focus:border-white/50 focus:outline-none"
+                      className="h-10 w-full sm:w-44 rounded-lg border border-line bg-ink/5 px-3 text-xs text-ink placeholder:text-ink/30 focus:border-ink/50 focus:outline-none"
                     />
                     <button
                       type="button"
                       onClick={() => handleAddNewTag()}
                       disabled={!tagsInput.trim()}
-                      className="inline-flex h-10 items-center gap-1 rounded-lg border border-white/20 bg-white/10 px-3 text-xs font-medium text-white hover:bg-white/20 disabled:opacity-40 disabled:hover:bg-white/10 transition-colors"
+                      className="inline-flex h-10 items-center gap-1 rounded-lg border border-line bg-ink/10 px-3 text-xs font-medium text-ink hover:bg-ink/20 disabled:opacity-40 disabled:hover:bg-ink/10 transition-colors"
                     >
                       <Plus className="h-3.5 w-3.5" />
                       {t('upload.tagAdd')}
@@ -804,13 +804,13 @@ export default function UploadPage() {
 
               {/* License Selection */}
               <div>
-                <label className="block text-xs font-mono uppercase tracking-wider text-white/60 mb-1.5">
+                <label className="block text-xs font-mono uppercase tracking-wider text-ink/60 mb-1.5">
                   {t('upload.fLicense')}
                 </label>
                 <select
                   value={license}
                   onChange={(e) => setLicense(e.target.value)}
-                  className="w-full rounded-lg border border-white/15 bg-zinc-950 px-3.5 py-2.5 text-sm text-white focus:border-white/50 focus:outline-none"
+                  className="w-full rounded-lg border border-line bg-card px-3.5 py-2.5 text-sm text-ink focus:border-ink/50 focus:outline-none"
                 >
                   {LICENSES.map((lic) => (
                     <option key={lic.value} value={lic.value}>
@@ -818,24 +818,24 @@ export default function UploadPage() {
                     </option>
                   ))}
                 </select>
-                <p className="mt-1 text-xs text-white/40">
+                <p className="mt-1 text-xs text-ink/40">
                   {t(LICENSES.find((l) => l.value === license)?.desc ?? 'upload.lic.cc0d')}
                 </p>
               </div>
 
               {/* Pricing: Free vs Paid */}
-              <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+              <div className="rounded-xl border border-line bg-ink/[0.02] p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <span className="text-sm font-semibold text-white">{t('upload.pricing')}</span>
-                    <p className="text-xs text-white/50">{t('upload.pricingHint')}</p>
+                    <span className="text-sm font-semibold text-ink">{t('upload.pricing')}</span>
+                    <p className="text-xs text-ink/50">{t('upload.pricingHint')}</p>
                   </div>
-                  <div className="inline-flex rounded-lg border border-white/15 bg-white/5 p-1">
+                  <div className="inline-flex rounded-lg border border-line bg-ink/5 p-1">
                     <button
                       type="button"
                       onClick={() => setIsPaid(false)}
                       className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
-                        !isPaid ? 'bg-white text-black' : 'text-white/70 hover:text-white'
+                        !isPaid ? 'bg-ink text-canvas' : 'text-ink/70 hover:text-ink'
                       }`}
                     >
                       {t('upload.free')}
@@ -844,7 +844,7 @@ export default function UploadPage() {
                       type="button"
                       onClick={() => setIsPaid(true)}
                       className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
-                        isPaid ? 'bg-white text-black' : 'text-white/70 hover:text-white'
+                        isPaid ? 'bg-ink text-canvas' : 'text-ink/70 hover:text-ink'
                       }`}
                     >
                       {t('upload.paid')}
@@ -853,20 +853,20 @@ export default function UploadPage() {
                 </div>
 
                 {isPaid && (
-                  <div className="mt-3 border-t border-white/10 pt-3">
-                    <label className="block text-xs text-white/60 mb-1">{t('upload.priceUsd')}</label>
+                  <div className="mt-3 border-t border-line pt-3">
+                    <label className="block text-xs text-ink/60 mb-1">{t('upload.priceUsd')}</label>
                     <div className="relative">
-                      <DollarSign className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
+                      <DollarSign className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink/40" />
                       <input
                         type="number"
                         step="0.01"
                         min="0.50"
                         value={priceUsd}
                         onChange={(e) => setPriceUsd(e.target.value)}
-                        className="w-full rounded-lg border border-white/15 bg-white/5 pl-9 pr-3 py-2 text-sm text-white focus:border-white/50 focus:outline-none"
+                        className="w-full rounded-lg border border-line bg-ink/5 pl-9 pr-3 py-2 text-sm text-ink focus:border-ink/50 focus:outline-none"
                       />
                     </div>
-                    <p className="mt-1 text-[11px] text-white/40">
+                    <p className="mt-1 text-[11px] text-ink/40">
                       {t('upload.priceHint')}
                     </p>
                   </div>
@@ -877,7 +877,7 @@ export default function UploadPage() {
               <button
                 type="submit"
                 disabled={isSubmitting || !file}
-                className="w-full rounded-xl bg-white py-3.5 text-sm font-semibold text-black transition-all hover:bg-white/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg"
+                className="w-full rounded-xl bg-ink py-3.5 text-sm font-semibold text-canvas transition-all hover:bg-ink/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg"
               >
                 {isSubmitting ? (
                   <>

@@ -18,8 +18,8 @@ import {
   type Session,
 } from '@/lib/session';
 
-const CARD = 'rounded-lg border border-white/10 bg-white/5 p-5 sm:p-6';
-const LABEL = 'font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70';
+const CARD = 'rounded-lg border border-line bg-ink/5 p-5 sm:p-6';
+const LABEL = 'font-mono text-[11px] uppercase tracking-[0.16em] text-accent';
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = new Set(['image/webp', 'image/png', 'image/jpeg']);
 const ALLOWED_IMAGE_EXTS = new Set(['webp', 'png', 'jpg', 'jpeg']);
@@ -62,8 +62,8 @@ function svgDataUrlToPngBlob(svgDataUrl: string): Promise<Blob> {
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="grid gap-1 py-3 sm:grid-cols-[160px_minmax(0,1fr)] sm:items-center sm:gap-4">
-      <dt className="text-sm text-white/65">{label}</dt>
-      <dd className="min-w-0 break-words text-sm text-white">{children}</dd>
+      <dt className="text-sm text-ink-soft">{label}</dt>
+      <dd className="min-w-0 break-words text-sm text-ink">{children}</dd>
     </div>
   );
 }
@@ -243,15 +243,15 @@ export default function SettingsPage() {
 
   return (
     <main className="mx-auto max-w-[720px] px-4 pb-16 pt-24 md:px-6">
-      <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud">[ {t('settings.label')} ]</p>
+      <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-accent">[ {t('settings.label')} ]</p>
       <h1 className="mt-3 font-display text-[clamp(28px,4vw,48px)] uppercase leading-[1.02]">{t('settings.title')}</h1>
 
       {!ready ? (
-        <p role="status" className="mt-8 text-sm text-white/65">{t('settings.loading')}</p>
+        <p role="status" className="mt-8 text-sm text-ink-soft">{t('settings.loading')}</p>
       ) : !session ? (
         <div className={`${CARD} mt-8 text-center`}>
-          <p className="text-white/65">{t('settings.loginPrompt')}</p>
-          <Link href="/login" className="mt-6 inline-flex h-10 items-center rounded-lg bg-white px-4 text-[15px] font-medium text-black hover:bg-white/85">
+          <p className="text-ink-soft">{t('settings.loginPrompt')}</p>
+          <Link href="/login" className="mt-6 inline-flex h-10 items-center rounded-lg bg-ink px-4 text-[15px] font-medium text-canvas hover:bg-ink/85">
             {t('settings.login')}
           </Link>
         </div>
@@ -262,7 +262,7 @@ export default function SettingsPage() {
 
             <form onSubmit={handleSaveProfile} noValidate className="mt-4 space-y-6">
               <div>
-                <p className="text-sm text-white/65">{t('settings.avatar')}</p>
+                <p className="text-sm text-ink-soft">{t('settings.avatar')}</p>
                 <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-start">
                   <UserAvatar
                     name={draftName.trim() || session.user.email}
@@ -276,7 +276,7 @@ export default function SettingsPage() {
                         type="button"
                         disabled={saving}
                         onClick={() => fileInputRef.current?.click()}
-                        className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 text-sm text-white transition-colors hover:border-white/40 hover:bg-white/10 disabled:opacity-50"
+                        className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-ink/5 px-3 text-sm text-ink transition-colors hover:border-ink/40 hover:bg-ink/10 disabled:opacity-50"
                       >
                         <Upload aria-hidden className="h-4 w-4" />
                         <span>{t('settings.changeAvatar')}</span>
@@ -287,7 +287,7 @@ export default function SettingsPage() {
                           type="button"
                           disabled={saving}
                           onClick={handleRemoveAvatar}
-                          className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-white/10 px-3 text-sm text-red-300 transition-colors hover:border-red-500/30 hover:bg-red-500/10 disabled:opacity-50"
+                          className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line px-3 text-sm text-danger transition-colors hover:border-danger/30 hover:bg-danger/10 disabled:opacity-50"
                         >
                           <Trash2 aria-hidden className="h-4 w-4" />
                           <span>{t('settings.removeAvatar')}</span>
@@ -303,10 +303,10 @@ export default function SettingsPage() {
                       />
                     </div>
 
-                    <p className="text-xs text-white/50">{t('settings.avatarHint')}</p>
+                    <p className="text-xs text-ink/50">{t('settings.avatarHint')}</p>
 
                     <div>
-                      <p className="text-xs text-white/50">{t('settings.presets')}</p>
+                      <p className="text-xs text-ink/50">{t('settings.presets')}</p>
                       <div className="mt-2 flex items-center gap-2.5">
                         {PRESET_AVATARS.map((preset, index) => {
                           const active = avatarMode === 'preset' && selectedPresetIndex === index;
@@ -319,7 +319,7 @@ export default function SettingsPage() {
                               aria-pressed={active}
                               onClick={() => handleSelectPreset(index)}
                               className={`h-9 w-9 overflow-hidden rounded-full border-2 transition-all hover:scale-105 disabled:opacity-50 ${
-                                active ? 'border-hud ring-2 ring-hud/30' : 'border-white/20 hover:border-white/50'
+                                active ? 'border-accent ring-2 ring-accent/30' : 'border-line hover:border-ink/50'
                               }`}
                             >
                               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -333,9 +333,9 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <dl className="divide-y divide-white/10 border-t border-white/10">
+              <dl className="divide-y divide-line border-t border-line">
                 <div className="grid gap-1 py-3 sm:grid-cols-[160px_minmax(0,1fr)] sm:items-center sm:gap-4">
-                  <dt className="text-sm text-white/65">
+                  <dt className="text-sm text-ink-soft">
                     <label htmlFor="settings-display-name">{t('settings.displayName')}</label>
                   </dt>
                   <dd className="min-w-0">
@@ -350,7 +350,7 @@ export default function SettingsPage() {
                         setSaveError(null);
                         setSaveSuccess(false);
                       }}
-                      className="h-10 w-full max-w-sm rounded-lg border border-white/15 bg-black/40 px-3 text-sm text-white placeholder:text-white/40 focus:border-white/50 focus:outline-none disabled:opacity-60"
+                      className="h-10 w-full max-w-sm rounded-lg border border-line bg-canvas/40 px-3 text-sm text-ink placeholder:text-ink/40 focus:border-ink/50 focus:outline-none disabled:opacity-60"
                     />
                   </dd>
                 </div>
@@ -358,13 +358,13 @@ export default function SettingsPage() {
                 <Row label={t('settings.accountType')}>{session.user.is_seller ? t('settings.buyerSeller') : t('settings.buyer')}</Row>
               </dl>
 
-              <p className="text-sm text-white/65">{t('settings.profileNote')}</p>
+              <p className="text-sm text-ink-soft">{t('settings.profileNote')}</p>
 
               <div className="flex flex-wrap items-center gap-3">
                 <button
                   type="submit"
                   disabled={saving || !hasChanges || !draftName.trim()}
-                  className="inline-flex h-10 items-center gap-2 rounded-lg bg-white px-4 text-sm font-medium text-black transition-colors hover:bg-white/85 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex h-10 items-center gap-2 rounded-lg bg-ink px-4 text-sm font-medium text-canvas transition-colors hover:bg-ink/85 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {saving ? (
                     <>
@@ -380,14 +380,14 @@ export default function SettingsPage() {
                 </button>
 
                 {saveSuccess && (
-                  <p role="status" className="inline-flex items-center gap-1.5 text-sm text-emerald-400">
+                  <p role="status" className="inline-flex items-center gap-1.5 text-sm text-emerald-500">
                     <Check aria-hidden className="h-4 w-4 shrink-0" />
                     <span>{t('settings.profileSaved')}</span>
                   </p>
                 )}
 
                 {saveError && (
-                  <p role="alert" className="inline-flex items-center gap-1.5 text-sm text-red-300">
+                  <p role="alert" className="inline-flex items-center gap-1.5 text-sm text-danger">
                     <AlertCircle aria-hidden className="h-4 w-4 shrink-0" />
                     <span>{'key' in saveError ? t(saveError.key) : authErrorText(saveError.err, t, 'settings.errSave')}</span>
                   </p>
@@ -398,16 +398,16 @@ export default function SettingsPage() {
 
           <section aria-labelledby="security-title" className={CARD}>
             <h2 id="security-title" className={LABEL}>{t('settings.password')}</h2>
-            <p className="mt-3 text-sm text-white/65">{t('settings.passwordNote')}</p>
+            <p className="mt-3 text-sm text-ink-soft">{t('settings.passwordNote')}</p>
           </section>
 
           <section aria-labelledby="session-title" className={CARD}>
             <h2 id="session-title" className={LABEL}>{t('settings.device')}</h2>
-            <p className="mt-3 text-sm text-white/65">{t('settings.deviceNote')}</p>
+            <p className="mt-3 text-sm text-ink-soft">{t('settings.deviceNote')}</p>
             <button
               type="button"
               onClick={logOut}
-              className="mt-4 inline-flex h-10 items-center gap-2 rounded-lg border border-white/15 px-4 text-sm text-white transition-colors hover:bg-white/10"
+              className="mt-4 inline-flex h-10 items-center gap-2 rounded-lg border border-line px-4 text-sm text-ink transition-colors hover:bg-ink/10"
             >
               <LogOut aria-hidden className="h-4 w-4" />
               {t('settings.logout')}
@@ -416,9 +416,9 @@ export default function SettingsPage() {
 
           <section aria-labelledby="delete-title" className={CARD}>
             <h2 id="delete-title" className={LABEL}>{t('settings.delete')}</h2>
-            <p className="mt-3 text-sm text-white/65">
+            <p className="mt-3 text-sm text-ink-soft">
               {t('settings.deleteBefore')}{' '}
-              <Link href="/contact" className="text-white underline underline-offset-4">{t('settings.deleteLink')}</Link>
+              <Link href="/contact" className="text-ink underline underline-offset-4">{t('settings.deleteLink')}</Link>
             </p>
           </section>
         </div>

@@ -12,7 +12,7 @@ export async function generateMetadata(): Promise<Metadata> {
     : { title: 'Contact · Lixyte', description: 'How to reach the Lixyte team: report a problem, ask about a license, or request a takedown.' };
 }
 
-const LINK = 'text-white underline underline-offset-4';
+const LINK = 'text-ink underline underline-offset-4';
 
 export default async function ContactPage() {
   const { t } = await getT();

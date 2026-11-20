@@ -44,8 +44,8 @@ function DocsEn() {
       <DocLayout toc={TOC}>
         <Section id="quick-start" title="Quick start">
           <OL>
-            <li>Find a model in the <Link href="/gallery" className="text-white underline underline-offset-4">gallery</Link> and open its page.</li>
-            <li>Copy the code from the <strong className="font-medium text-white/80">How to use</strong> box. It already contains the right addresses for this site.</li>
+            <li>Find a model in the <Link href="/gallery" className="text-ink underline underline-offset-4">gallery</Link> and open its page.</li>
+            <li>Copy the code from the <strong className="font-medium text-ink">How to use</strong> box. It already contains the right addresses for this site.</li>
             <li>Paste it into your page. The model loads from our CDN.</li>
           </OL>
           <P>
@@ -55,7 +55,7 @@ function DocsEn() {
           <CodeBlock label="<vm-model> web component" code={COMPONENT_SAMPLE} />
           <Callout title="Free models need nothing else">
             A free model works as soon as you paste the code. Paid models also need an embed key, see{' '}
-            <a href="#paid-models" className="text-white underline underline-offset-4">Paid models and embed keys</a>.
+            <a href="#paid-models" className="text-ink underline underline-offset-4">Paid models and embed keys</a>.
           </Callout>
         </Section>
 
@@ -106,11 +106,11 @@ function DocsEn() {
 
         <Section id="paid-models" title="Paid models and embed keys">
           <P>
-            Before you buy, a paid model streams only a short <strong className="font-medium text-white/80">preview file</strong>. The full file
+            Before you buy, a paid model streams only a short <strong className="font-medium text-ink">preview file</strong>. The full file
             never leaves our servers without a valid key.
           </P>
           <OL>
-            <li>Buy the model. You get an <strong className="font-medium text-white/80">embed key</strong>, shown in your <Link href="/me" className="text-white underline underline-offset-4">Library</Link>.</li>
+            <li>Buy the model. You get an <strong className="font-medium text-ink">embed key</strong>, shown in your <Link href="/me" className="text-ink underline underline-offset-4">Library</Link>.</li>
             <li>Add it to the code: the <C>key</C> attribute on <C>&lt;vm-model&gt;</C>, or <C>?key=</C> on the iframe address.</li>
           </OL>
           <CodeBlock label="Paid model" code={PAID_SAMPLE} />
@@ -127,21 +127,21 @@ function DocsEn() {
 
         <Section id="download" title="Downloading a file">
           <UL>
-            <li><strong className="font-medium text-white/80">Free models:</strong> anyone can download them, with no account.</li>
-            <li><strong className="font-medium text-white/80">Paid models:</strong> log in with the account that bought the model (or the account that owns it).</li>
+            <li><strong className="font-medium text-ink">Free models:</strong> anyone can download them, with no account.</li>
+            <li><strong className="font-medium text-ink">Paid models:</strong> log in with the account that bought the model (or the account that owns it).</li>
             <li>
               Every file you download from a paid model carries a hidden mark that records your purchase and licence. Please do not remove it or
-              share the file; see the <Link href="/licenses" className="text-white underline underline-offset-4">licenses</Link> and the{' '}
-              <Link href="/terms" className="text-white underline underline-offset-4">terms</Link>.
+              share the file; see the <Link href="/licenses" className="text-ink underline underline-offset-4">licenses</Link> and the{' '}
+              <Link href="/terms" className="text-ink underline underline-offset-4">terms</Link>.
             </li>
           </UL>
         </Section>
 
         <Section id="selling" title="Selling a model">
           <OL>
-            <li>Log in and turn on <strong className="font-medium text-white/80">seller mode</strong> in your <Link href="/me" className="text-white underline underline-offset-4">Library</Link>. It is the same account; nothing else changes.</li>
-            <li>Open <Link href="/upload" className="text-white underline underline-offset-4">Upload</Link>, choose your <C>.glb</C> file and fill in the title, description, tags, licence and price. A price of 0 means free.</li>
-            <li>Your model appears in the gallery. Follow sales and downloads in your <Link href="/seller" className="text-white underline underline-offset-4">Seller dashboard</Link>.</li>
+            <li>Log in and turn on <strong className="font-medium text-ink">seller mode</strong> in your <Link href="/me" className="text-ink underline underline-offset-4">Library</Link>. It is the same account; nothing else changes.</li>
+            <li>Open <Link href="/upload" className="text-ink underline underline-offset-4">Upload</Link>, choose your <C>.glb</C> file and fill in the title, description, tags, licence and price. A price of 0 means free.</li>
+            <li>Your model appears in the gallery. Follow sales and downloads in your <Link href="/seller" className="text-ink underline underline-offset-4">Seller dashboard</Link>.</li>
           </OL>
           <DataTable
             caption="Upload limits"
@@ -156,7 +156,7 @@ function DocsEn() {
             <li>We check every file before it is saved. A file that is not a valid <C>.glb</C> is rejected.</li>
             <li>We mark every uploaded file with a hidden signature that identifies the model, and mark each paid download with the buyer&apos;s purchase.</li>
             <li>Removing a model hides it from the gallery. People who already bought it keep their access.</li>
-            <li>The admins can hide a model or suspend an account that breaks the rules. A hidden model stops working for everyone, including buyers. See the <Link href="/seller-terms" className="text-white underline underline-offset-4">seller terms</Link>.</li>
+            <li>The admins can hide a model or suspend an account that breaks the rules. A hidden model stops working for everyone, including buyers. See the <Link href="/seller-terms" className="text-ink underline underline-offset-4">seller terms</Link>.</li>
           </UL>
         </Section>
 
@@ -200,7 +200,7 @@ function DocsEn() {
 
         <Section id="help" title="Still stuck?">
           <P>
-            Log in and use <strong className="font-medium text-white/80">Report a problem</strong> in the account menu or at the bottom of any page. Choose
+            Log in and use <strong className="font-medium text-ink">Report a problem</strong> in the account menu or at the bottom of any page. Choose
             the type, paste the model address if there is one, and tell us what happened.
           </P>
         </Section>

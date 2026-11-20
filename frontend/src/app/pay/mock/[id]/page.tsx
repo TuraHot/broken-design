@@ -21,8 +21,8 @@ import type { MessageKey } from '@/lib/i18n/messages';
 import { fromErr, msgText, type Msg } from '@/lib/i18n/msg';
 import type { License, PurchaseDetail } from '@/lib/types';
 
-const CARD = 'rounded-lg border border-white/10 bg-white/5 p-5 sm:p-6';
-const LABEL = 'font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70';
+const CARD = 'rounded-lg border border-line bg-ink/5 p-5 sm:p-6';
+const LABEL = 'font-mono text-[11px] uppercase tracking-[0.16em] text-accent';
 
 export default function MockPayPage() {
   const { id } = useParams<{ id: string }>();
@@ -80,8 +80,8 @@ export default function MockPayPage() {
   if (!ready || loading) {
     return (
       <main className="mx-auto max-w-[920px] px-4 pb-16 pt-28 md:px-6">
-        <div className={`${CARD} flex items-center gap-3 text-white/70`}>
-          <Loader2 className="h-5 w-5 animate-spin text-hud" />
+        <div className={`${CARD} flex items-center gap-3 text-ink/70`}>
+          <Loader2 className="h-5 w-5 animate-spin text-accent" />
           <span className="font-mono text-xs uppercase tracking-wider">{t('pay.loadingCheckout')}</span>
         </div>
       </main>
@@ -93,20 +93,20 @@ export default function MockPayPage() {
       <main className="mx-auto max-w-[680px] px-4 pb-16 pt-28 md:px-6">
         <div className={CARD}>
           <p className={LABEL}>{t('pay.crumb')}</p>
-          <h1 className="mt-2 font-display text-2xl uppercase text-white">{t('pay.signInTitle')}</h1>
-          <p className="mt-2 text-sm text-white/65">
+          <h1 className="mt-2 font-display text-2xl uppercase text-ink">{t('pay.signInTitle')}</h1>
+          <p className="mt-2 text-sm text-ink-soft">
             {t('pay.signInOrder')}
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link
               href="/login"
-              className="rounded-lg bg-white px-4 py-2 text-sm font-medium text-black transition-colors hover:bg-white/85"
+              className="rounded-lg bg-ink px-4 py-2 text-sm font-medium text-canvas transition-colors hover:bg-ink/85"
             >
               {t('pay.login')}
             </Link>
             <Link
               href="/gallery"
-              className="rounded-lg border border-white/20 px-4 py-2 text-sm text-white/80 transition-colors hover:bg-white/10"
+              className="rounded-lg border border-line px-4 py-2 text-sm text-ink/80 transition-colors hover:bg-ink/10"
             >
               {t('pay.backGallery')}
             </Link>
@@ -121,11 +121,11 @@ export default function MockPayPage() {
       <main className="mx-auto max-w-[680px] px-4 pb-16 pt-28 md:px-6">
         <div className={CARD}>
           <p className={LABEL}>{t('pay.crumb')}</p>
-          <h1 className="mt-2 font-display text-2xl uppercase text-white">{t('pay.orderNotFound')}</h1>
-          <p className="mt-2 text-sm text-amber">{errorMsg ? msgText(errorMsg, t) : t('pay.errOrderOther')}</p>
+          <h1 className="mt-2 font-display text-2xl uppercase text-ink">{t('pay.orderNotFound')}</h1>
+          <p className="mt-2 text-sm text-warn">{errorMsg ? msgText(errorMsg, t) : t('pay.errOrderOther')}</p>
           <Link
             href="/gallery"
-            className="mt-6 inline-flex items-center gap-2 rounded-lg border border-white/20 px-4 py-2 text-sm text-white/80 transition-colors hover:bg-white/10"
+            className="mt-6 inline-flex items-center gap-2 rounded-lg border border-line px-4 py-2 text-sm text-ink/80 transition-colors hover:bg-ink/10"
           >
             <ArrowLeft className="h-4 w-4" />
             {t('pay.backGallery')}
@@ -146,24 +146,24 @@ export default function MockPayPage() {
     return (
       <main className="mx-auto max-w-[680px] px-4 pb-16 pt-28 md:px-6">
         <div className={CARD}>
-          <div className="flex items-center gap-2 text-hud">
+          <div className="flex items-center gap-2 text-accent">
             <CheckCircle2 className="h-5 w-5" />
             <span className="font-mono text-xs uppercase tracking-wider">{t('pay.mock.alreadyPaid')}</span>
           </div>
-          <h1 className="mt-3 font-display text-2xl uppercase text-white">{purchase.title}</h1>
-          <p className="mt-2 text-sm text-white/65">
+          <h1 className="mt-3 font-display text-2xl uppercase text-ink">{purchase.title}</h1>
+          <p className="mt-2 text-sm text-ink-soft">
             {t('pay.mock.alreadyBody', { amount: priceText, date: formatDate(purchase.paidAt) })}
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link
               href={`/checkout/success?purchaseId=${encodeURIComponent(purchase.id)}`}
-              className="rounded-lg bg-white px-4 py-2 text-sm font-medium text-black transition-colors hover:bg-white/85"
+              className="rounded-lg bg-ink px-4 py-2 text-sm font-medium text-canvas transition-colors hover:bg-ink/85"
             >
               {t('pay.mock.viewKey')}
             </Link>
             <Link
               href="/me"
-              className="rounded-lg border border-white/20 px-4 py-2 text-sm text-white/80 transition-colors hover:bg-white/10"
+              className="rounded-lg border border-line px-4 py-2 text-sm text-ink/80 transition-colors hover:bg-ink/10"
             >
               {t('pay.goLibrary')}
             </Link>
@@ -177,7 +177,7 @@ export default function MockPayPage() {
     <main className="mx-auto max-w-[920px] px-4 pb-16 pt-24 md:px-6">
       <Link
         href={`/models/${purchase.modelId}`}
-        className="inline-flex items-center gap-1.5 text-sm text-white/65 transition-colors hover:text-white"
+        className="inline-flex items-center gap-1.5 text-sm text-ink-soft transition-colors hover:text-ink"
       >
         <ArrowLeft className="h-4 w-4" />
         {t('pay.mock.back')}
@@ -187,44 +187,44 @@ export default function MockPayPage() {
         {/* Left: Mock Payment Form */}
         <section className={CARD}>
           <p className={LABEL}>{t('pay.mock.label')}</p>
-          <h1 className="mt-2 font-display text-2xl uppercase text-white">{t('pay.mock.title')}</h1>
-          <p className="mt-1.5 text-sm text-white/65">
+          <h1 className="mt-2 font-display text-2xl uppercase text-ink">{t('pay.mock.title')}</h1>
+          <p className="mt-1.5 text-sm text-ink-soft">
             {t('pay.mock.lead')}
           </p>
 
-          <div className="mt-6 rounded-lg border border-hud/30 bg-hud/5 p-4">
+          <div className="mt-6 rounded-lg border border-accent/30 bg-accent/5 p-4">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5 text-sm font-medium text-white">
-                <CreditCard className="h-4 w-4 text-hud" />
+              <div className="flex items-center gap-2.5 text-sm font-medium text-ink">
+                <CreditCard className="h-4 w-4 text-accent" />
                 {t('pay.mock.testPay')}
               </div>
-              <span className="rounded border border-hud/40 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-hud">
+              <span className="rounded border border-accent/40 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-accent">
                 {t('pay.mock.testMode')}
               </span>
             </div>
-            <p className="mt-2 font-mono text-xs text-white/60">
-              {t('pay.mock.unlock1')} <span className="text-hud">embed_key</span> {t('pay.mock.unlock2')}{' '}
-              <span className="text-white">.glb</span> {t('pay.mock.unlock3')}
+            <p className="mt-2 font-mono text-xs text-ink/60">
+              {t('pay.mock.unlock1')} <span className="text-accent">embed_key</span> {t('pay.mock.unlock2')}{' '}
+              <span className="text-ink">.glb</span> {t('pay.mock.unlock3')}
             </p>
           </div>
 
-          <dl className="mt-5 space-y-2 border-t border-white/10 pt-4 font-mono text-xs text-white/65">
+          <dl className="mt-5 space-y-2 border-t border-line pt-4 font-mono text-xs text-ink-soft">
             <div className="flex justify-between gap-4">
               <dt>{t('pay.mock.orderId')}</dt>
-              <dd className="truncate text-white/85">{purchase.id}</dd>
+              <dd className="truncate text-ink/85">{purchase.id}</dd>
             </div>
             <div className="flex justify-between gap-4">
               <dt>{t('pay.mock.created')}</dt>
-              <dd className="text-white/85">{formatDate(purchase.createdAt)}</dd>
+              <dd className="text-ink/85">{formatDate(purchase.createdAt)}</dd>
             </div>
             <div className="flex justify-between gap-4">
               <dt>{t('pay.mock.status')}</dt>
-              <dd className="uppercase text-amber">{statusLabel}</dd>
+              <dd className="uppercase text-warn">{statusLabel}</dd>
             </div>
           </dl>
 
           {errorMsg && (
-            <p role="alert" className="mt-4 rounded border border-amber/40 bg-amber/10 px-3 py-2 text-sm text-amber">
+            <p role="alert" className="mt-4 rounded border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-warn">
               {msgText(errorMsg, t)}
             </p>
           )}
@@ -234,7 +234,7 @@ export default function MockPayPage() {
               type="button"
               disabled={paying}
               onClick={handleConfirmPay}
-              className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-white px-4 text-[15px] font-medium text-black transition-colors hover:bg-white/85 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-ink px-4 text-[15px] font-medium text-canvas transition-colors hover:bg-ink/85 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {paying ? (
                 <>
@@ -250,7 +250,7 @@ export default function MockPayPage() {
             </button>
             <Link
               href={`/models/${purchase.modelId}`}
-              className="inline-flex h-11 items-center justify-center rounded-lg border border-white/20 px-4 text-sm text-white/80 transition-colors hover:bg-white/10"
+              className="inline-flex h-11 items-center justify-center rounded-lg border border-line px-4 text-sm text-ink/80 transition-colors hover:bg-ink/10"
             >
               {t('pay.mock.cancel')}
             </Link>
@@ -260,31 +260,31 @@ export default function MockPayPage() {
         {/* Right: Order Summary */}
         <aside className={CARD}>
           <p className={LABEL}>{t('pay.mock.summary')}</p>
-          <h2 className="mt-2 font-display text-lg uppercase text-white">{purchase.title}</h2>
-          <div className="mt-2 inline-block rounded border border-white/20 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-white/80">
+          <h2 className="mt-2 font-display text-lg uppercase text-ink">{purchase.title}</h2>
+          <div className="mt-2 inline-block rounded border border-line px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink/80">
             {purchase.licenseType}
           </div>
 
           {licenseInfo && (
-            <div className="mt-4 rounded-lg border border-white/10 bg-black/40 p-3.5 text-xs text-white/70">
-              <p className="font-medium text-white">{licenseInfo.name}</p>
-              <p className="mt-1 text-white/60">{licenseInfo.summary}</p>
+            <div className="mt-4 rounded-lg border border-line bg-canvas/40 p-3.5 text-xs text-ink/70">
+              <p className="font-medium text-ink">{licenseInfo.name}</p>
+              <p className="mt-1 text-ink/60">{licenseInfo.summary}</p>
             </div>
           )}
 
-          <div className="mt-5 space-y-2 border-t border-white/10 pt-4 text-sm">
-            <div className="flex items-center justify-between text-white/70">
+          <div className="mt-5 space-y-2 border-t border-line pt-4 text-sm">
+            <div className="flex items-center justify-between text-ink/70">
               <span>{t('pay.mock.single')}</span>
               <span className="font-mono">{priceText}</span>
             </div>
-            <div className="flex items-center justify-between border-t border-white/10 pt-3 text-base font-medium text-white">
+            <div className="flex items-center justify-between border-t border-line pt-3 text-base font-medium text-ink">
               <span>{t('pay.total')}</span>
-              <span className="font-mono text-hud">{priceText}</span>
+              <span className="font-mono text-accent">{priceText}</span>
             </div>
           </div>
 
-          <div className="mt-4 flex items-center gap-2 font-mono text-[11px] text-white/50">
-            <ShieldCheck className="h-4 w-4 shrink-0 text-hud/70" />
+          <div className="mt-4 flex items-center gap-2 font-mono text-[11px] text-ink/50">
+            <ShieldCheck className="h-4 w-4 shrink-0 text-accent" />
             <span>{t('pay.mock.locked')}</span>
           </div>
         </aside>

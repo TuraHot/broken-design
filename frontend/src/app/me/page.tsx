@@ -32,8 +32,8 @@ import { readSession, updateSessionUser } from '@/lib/session';
 import type { AuthUser, PurchaseItem } from '@/lib/types';
 
 
-const CARD = 'rounded-lg border border-white/10 bg-white/5 p-5 sm:p-6';
-const LABEL = 'font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70';
+const CARD = 'rounded-lg border border-line bg-ink/5 p-5 sm:p-6';
+const LABEL = 'font-mono text-[11px] uppercase tracking-[0.16em] text-accent';
 
 export default function MePage() {
   const t = useT();
@@ -175,7 +175,7 @@ export default function MePage() {
   if (loading) {
     return (
       <main className="mx-auto max-w-[1200px] px-4 pb-16 pt-24 md:px-6">
-        <p className="font-mono text-sm text-white/50">{t('me.loading')}</p>
+        <p className="font-mono text-sm text-ink/50">{t('me.loading')}</p>
       </main>
     );
   }
@@ -186,20 +186,20 @@ export default function MePage() {
       <main className="mx-auto max-w-[800px] px-4 pb-16 pt-28 md:px-6">
         <div className={`${CARD} text-center`}>
           <p className={LABEL}>{t('me.needLabel')}</p>
-          <h1 className="mt-4 font-display text-2xl uppercase tracking-wide text-white">{t('me.needTitle')}</h1>
-          <p className="mt-3 text-[15px] leading-relaxed text-white/65">
+          <h1 className="mt-4 font-display text-2xl uppercase tracking-wide text-ink">{t('me.needTitle')}</h1>
+          <p className="mt-3 text-[15px] leading-relaxed text-ink-soft">
             {t('me.needBody')}
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-4">
             <Link
               href="/login"
-              className="h-10 rounded-lg bg-white px-5 text-sm font-medium leading-10 text-black transition-colors hover:bg-white/85"
+              className="h-10 rounded-lg bg-ink px-5 text-sm font-medium leading-10 text-canvas transition-colors hover:bg-ink/85"
             >
               {t('me.needLogin')}
             </Link>
             <Link
               href="/gallery"
-              className="h-10 rounded-lg border border-white/20 px-5 text-sm font-mono uppercase tracking-wider leading-10 text-white/80 transition-colors hover:bg-white/10"
+              className="h-10 rounded-lg border border-line px-5 text-sm font-mono uppercase tracking-wider leading-10 text-ink/80 transition-colors hover:bg-ink/10"
             >
               {t('me.browse')}
             </Link>
@@ -219,7 +219,7 @@ export default function MePage() {
 
       {/* Toast / Notification */}
       {statusMsg && (
-        <div className="mb-6 flex items-center justify-between rounded-lg border border-hud/30 bg-hud/10 px-4 py-3 text-sm text-hud">
+        <div className="mb-6 flex items-center justify-between rounded-lg border border-accent/30 bg-accent/10 px-4 py-3 text-sm text-accent">
           <span>{'key' in statusMsg ? t(statusMsg.key, statusMsg.vars) : statusMsg.text}</span>
           <button
             type="button"
@@ -244,18 +244,18 @@ export default function MePage() {
           />
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="break-words font-display text-2xl uppercase text-white">{displayName}</h1>
+              <h1 className="break-words font-display text-2xl uppercase text-ink">{displayName}</h1>
               <span
                 className={`rounded border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider ${
                   user?.is_seller
-                    ? 'border-hud/40 bg-hud/15 text-hud'
-                    : 'border-white/20 bg-white/5 text-white/70'
+                    ? 'border-accent/40 bg-accent/15 text-accent'
+                    : 'border-line bg-ink/5 text-ink/70'
                 }`}
               >
                 {user?.is_seller ? t('me.creator') : t('me.buyer')}
               </span>
             </div>
-            <p className="mt-1 break-all font-mono text-xs text-white/50">{user?.email}</p>
+            <p className="mt-1 break-all font-mono text-xs text-ink/50">{user?.email}</p>
           </div>
         </div>
 
@@ -265,14 +265,14 @@ export default function MePage() {
             <>
               <Link
                 href={`/creators/${handle}`}
-                className="flex h-9 items-center gap-2 rounded-lg border border-hud/30 bg-hud/10 px-3.5 text-xs font-mono uppercase tracking-wider text-hud transition-colors hover:bg-hud/20"
+                className="flex h-9 items-center gap-2 rounded-lg border border-accent/30 bg-accent/10 px-3.5 text-xs font-mono uppercase tracking-wider text-accent transition-colors hover:bg-accent/20"
               >
                 <UserIcon className="h-4 w-4" />
                 {t('me.creatorProfile')}
               </Link>
               <Link
                 href="/upload"
-                className="flex h-9 items-center gap-2 rounded-lg bg-white px-3.5 text-xs font-mono uppercase tracking-wider text-black transition-colors hover:bg-white/85"
+                className="flex h-9 items-center gap-2 rounded-lg bg-ink px-3.5 text-xs font-mono uppercase tracking-wider text-canvas transition-colors hover:bg-ink/85"
               >
                 <Layers className="h-4 w-4" />
                 {t('me.uploadGlb')}
@@ -283,7 +283,7 @@ export default function MePage() {
               type="button"
               disabled={busyAction === 'enable-seller'}
               onClick={handleEnableSeller}
-              className="flex h-9 items-center gap-2 rounded-lg bg-white px-4 text-xs font-mono uppercase tracking-wider text-black transition-colors hover:bg-white/85 disabled:opacity-60"
+              className="flex h-9 items-center gap-2 rounded-lg bg-ink px-4 text-xs font-mono uppercase tracking-wider text-canvas transition-colors hover:bg-ink/85 disabled:opacity-60"
             >
               <Sparkles className="h-4 w-4" />
               {busyAction === 'enable-seller' ? t('me.activating') : t('me.becomeCreator')}
@@ -294,12 +294,12 @@ export default function MePage() {
 
       {/* Become a Creator Banner (if not seller) */}
       {!user?.is_seller && (
-        <div className="mt-6 rounded-lg border border-hud/30 bg-gradient-to-r from-hud/10 via-transparent to-transparent p-5 sm:p-6">
+        <div className="mt-6 rounded-lg border border-accent/30 bg-gradient-to-r from-accent/10 via-transparent to-transparent p-5 sm:p-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className={LABEL}>{t('me.oppLabel')}</p>
-              <h2 className="mt-1 font-display text-lg uppercase text-white">{t('me.oppTitle')}</h2>
-              <p className="mt-1 text-sm text-white/65">
+              <h2 className="mt-1 font-display text-lg uppercase text-ink">{t('me.oppTitle')}</h2>
+              <p className="mt-1 text-sm text-ink-soft">
                 {t('me.oppBody')}
               </p>
             </div>
@@ -307,7 +307,7 @@ export default function MePage() {
               type="button"
               disabled={busyAction === 'enable-seller'}
               onClick={handleEnableSeller}
-              className="whitespace-nowrap rounded-lg bg-hud px-4 py-2 font-mono text-xs uppercase tracking-wider text-black font-semibold transition-colors hover:bg-hud/85 disabled:opacity-60"
+              className="whitespace-nowrap rounded-lg bg-accent px-4 py-2 font-mono text-xs uppercase tracking-wider text-canvas font-semibold transition-colors hover:bg-accent/85 disabled:opacity-60"
             >
               {t('me.enableSeller')}
             </button>
@@ -317,14 +317,14 @@ export default function MePage() {
 
       {/* Purchases Section */}
       <section className="mt-10">
-        <div className="flex items-center justify-between border-b border-white/10 pb-3">
-          <h2 className="font-display text-lg uppercase text-white">
+        <div className="flex items-center justify-between border-b border-line pb-3">
+          <h2 className="font-display text-lg uppercase text-ink">
             {t('me.purchasesTitle')}
-            <span className="ml-2 font-mono text-xs text-white/50">({purchases.length})</span>
+            <span className="ml-2 font-mono text-xs text-ink/50">({purchases.length})</span>
           </h2>
           <Link
             href="/gallery"
-            className="font-mono text-xs text-hud transition-colors hover:underline"
+            className="font-mono text-xs text-accent transition-colors hover:underline"
           >
             {t('me.explore')}
           </Link>
@@ -332,14 +332,14 @@ export default function MePage() {
 
         {purchases.length === 0 ? (
           <div className={`${CARD} mt-6 text-center py-12`}>
-            <KeyRound className="mx-auto h-8 w-8 text-white/30" />
-            <h3 className="mt-3 font-display text-base uppercase text-white">{t('me.noneTitle')}</h3>
-            <p className="mt-1 text-sm text-white/50">
+            <KeyRound className="mx-auto h-8 w-8 text-ink/30" />
+            <h3 className="mt-3 font-display text-base uppercase text-ink">{t('me.noneTitle')}</h3>
+            <p className="mt-1 text-sm text-ink/50">
               {t('me.noneBody')}
             </p>
             <Link
               href="/gallery"
-              className="mt-5 inline-block rounded-lg bg-white px-4 py-2 text-xs font-mono uppercase tracking-wider text-black transition-colors hover:bg-white/85"
+              className="mt-5 inline-block rounded-lg bg-ink px-4 py-2 text-xs font-mono uppercase tracking-wider text-canvas transition-colors hover:bg-ink/85"
             >
               {t('me.noneButton')}
             </Link>
@@ -358,15 +358,15 @@ export default function MePage() {
                       <div className="flex items-center gap-2">
                         <Link
                           href={`/models/${item.modelId}`}
-                          className="font-display text-lg uppercase text-white transition-colors hover:text-hud"
+                          className="font-display text-lg uppercase text-ink transition-colors hover:text-accent"
                         >
                           {item.title}
                         </Link>
-                        <span className="rounded border border-white/20 px-1.5 py-0.5 font-mono text-[10px] uppercase text-white/65">
+                        <span className="rounded border border-line px-1.5 py-0.5 font-mono text-[10px] uppercase text-ink-soft">
                           {item.licenseType}
                         </span>
                       </div>
-                      <p className="mt-1 font-mono text-xs text-white/40">
+                      <p className="mt-1 font-mono text-xs text-ink/40">
                         {t('me.purchasedFor', { price: formatPrice(item.amountCents || item.priceCents), id: item.modelId })}
                       </p>
                     </div>
@@ -376,7 +376,7 @@ export default function MePage() {
                         type="button"
                         disabled={busyAction === `dl-${item.modelId}`}
                         onClick={() => handleDownload(item.modelId, item.title)}
-                        className="flex h-8 items-center gap-1.5 rounded-lg border border-white/20 bg-white/5 px-3 font-mono text-xs uppercase tracking-wider text-white transition-colors hover:bg-white/10 disabled:opacity-60"
+                        className="flex h-8 items-center gap-1.5 rounded-lg border border-line bg-ink/5 px-3 font-mono text-xs uppercase tracking-wider text-ink transition-colors hover:bg-ink/10 disabled:opacity-60"
                       >
                         <Download className="h-3.5 w-3.5" />
                         {t('me.download')}
@@ -385,14 +385,14 @@ export default function MePage() {
                   </div>
 
                   {/* Embed Key Box */}
-                  <div className="rounded-lg border border-white/10 bg-black/60 p-4">
+                  <div className="rounded-lg border border-line bg-canvas/60 p-4">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                       <div className="flex min-w-0 flex-wrap items-center gap-2">
-                        <KeyRound className="h-4 w-4 text-hud" />
-                        <span className="font-mono text-xs uppercase tracking-wider text-white/80">
+                        <KeyRound className="h-4 w-4 text-accent" />
+                        <span className="font-mono text-xs uppercase tracking-wider text-ink/80">
                           {t('me.keyLabel')}
                         </span>
-                        <code className="break-all rounded bg-white/10 px-2 py-0.5 font-mono text-xs text-hud">
+                        <code className="break-all rounded bg-ink/10 px-2 py-0.5 font-mono text-xs text-accent">
                           {item.embedKey}
                         </code>
                       </div>
@@ -401,11 +401,11 @@ export default function MePage() {
                         <button
                           type="button"
                           onClick={() => copyText(item.embedKey, `key-${item.id}`)}
-                          className="flex h-7 items-center gap-1 rounded border border-white/15 px-2 font-mono text-[11px] text-white/70 hover:text-white"
+                          className="flex h-7 items-center gap-1 rounded border border-line px-2 font-mono text-[11px] text-ink/70 hover:text-ink"
                         >
                           {copiedKey === `key-${item.id}` ? (
                             <>
-                              <Check className="h-3 w-3 text-emerald-400" /> {t('me.copied')}
+                              <Check className="h-3 w-3 text-emerald-500" /> {t('me.copied')}
                             </>
                           ) : (
                             <>
@@ -418,7 +418,7 @@ export default function MePage() {
                           type="button"
                           disabled={busyAction === `regen-${item.id}`}
                           onClick={() => handleRegenerateKey(item.id)}
-                          className="flex h-7 items-center gap-1 rounded border border-red-500/30 px-2 font-mono text-[11px] text-red-400/80 transition-colors hover:bg-red-500/10 hover:text-red-300 disabled:opacity-50"
+                          className="flex h-7 items-center gap-1 rounded border border-danger/30 px-2 font-mono text-[11px] text-danger/80 transition-colors hover:bg-danger/10 hover:text-danger disabled:opacity-50"
                           title={t('me.regenerateTip')}
                         >
                           <RefreshCw className={`h-3 w-3 ${busyAction === `regen-${item.id}` ? 'animate-spin' : ''}`} />
@@ -428,20 +428,20 @@ export default function MePage() {
                     </div>
 
                     {/* Code Snippets for web developers */}
-                    <div className="mt-3 pt-3 border-t border-white/5 flex flex-col gap-2 text-xs">
+                    <div className="mt-3 pt-3 border-t border-ink/5 flex flex-col gap-2 text-xs">
                       <div className="flex items-center justify-between">
-                        <span className="font-mono text-[11px] text-white/50 flex items-center gap-1">
+                        <span className="font-mono text-[11px] text-ink/50 flex items-center gap-1">
                           <Code2 className="h-3.5 w-3.5" /> {t('me.snippet')}
                         </span>
                         <button
                           type="button"
                           onClick={() => copyText(vmSnippet, `vm-${item.id}`)}
-                          className="font-mono text-[11px] text-hud/80 hover:text-hud"
+                          className="font-mono text-[11px] text-accent hover:text-accent"
                         >
                           {copiedKey === `vm-${item.id}` ? t('me.snippetCopied') : t('me.snippetCopy')}
                         </button>
                       </div>
-                      <pre className="overflow-x-auto rounded bg-black/40 p-2 font-mono text-[11px] text-white/70">
+                      <pre className="overflow-x-auto rounded bg-canvas/40 p-2 font-mono text-[11px] text-ink/70">
                         {vmSnippet}
                       </pre>
                     </div>

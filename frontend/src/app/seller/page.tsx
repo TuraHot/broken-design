@@ -41,8 +41,8 @@ import type {
   SellerWalletResponse,
 } from '@/lib/types';
 
-const CARD = 'rounded-lg border border-white/10 bg-white/5 p-5 sm:p-6';
-const LABEL = 'font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70';
+const CARD = 'rounded-lg border border-line bg-ink/5 p-5 sm:p-6';
+const LABEL = 'font-mono text-[11px] uppercase tracking-[0.16em] text-accent';
 
 export default function SellerPage() {
   const t = useT();
@@ -153,7 +153,7 @@ export default function SellerPage() {
   if (loading) {
     return (
       <main className="mx-auto max-w-[1200px] px-4 pb-16 pt-24 md:px-6">
-        <p className="font-mono text-sm text-white/50">{t('seller.loading')}</p>
+        <p className="font-mono text-sm text-ink/50">{t('seller.loading')}</p>
       </main>
     );
   }
@@ -164,13 +164,13 @@ export default function SellerPage() {
       <main className="mx-auto max-w-[800px] px-4 pb-16 pt-28 md:px-6">
         <div className={`${CARD} text-center`}>
           <p className={LABEL}>{t('seller.needLabel')}</p>
-          <h1 className="mt-4 font-display text-2xl uppercase tracking-wide text-white">{t('seller.needTitle')}</h1>
-          <p className="mt-3 text-[15px] leading-relaxed text-white/65">
+          <h1 className="mt-4 font-display text-2xl uppercase tracking-wide text-ink">{t('seller.needTitle')}</h1>
+          <p className="mt-3 text-[15px] leading-relaxed text-ink-soft">
             {t('seller.needBody')}
           </p>
           <Link
             href="/login"
-            className="mt-6 inline-block rounded-lg bg-white px-5 py-2 text-sm font-medium text-black transition-colors hover:bg-white/85"
+            className="mt-6 inline-block rounded-lg bg-ink px-5 py-2 text-sm font-medium text-canvas transition-colors hover:bg-ink/85"
           >
             {t('seller.needLogin')}
           </Link>
@@ -184,19 +184,19 @@ export default function SellerPage() {
     return (
       <main className="mx-auto max-w-[800px] px-4 pb-16 pt-28 md:px-6">
         <div className={`${CARD} text-center`}>
-          <Store className="mx-auto h-12 w-12 text-hud" />
+          <Store className="mx-auto h-12 w-12 text-accent" />
           <p className={`${LABEL} mt-4`}>{t('seller.offLabel')}</p>
-          <h1 className="mt-2 font-display text-2xl uppercase tracking-wide text-white">
+          <h1 className="mt-2 font-display text-2xl uppercase tracking-wide text-ink">
             {t('seller.offTitle')}
           </h1>
-          <p className="mt-3 text-[15px] leading-relaxed text-white/65">
+          <p className="mt-3 text-[15px] leading-relaxed text-ink-soft">
             {t('seller.offBody')}
           </p>
           <button
             type="button"
             disabled={busyAction === 'enable'}
             onClick={handleEnableSeller}
-            className="mt-6 inline-flex items-center gap-2 rounded-lg bg-hud px-6 py-2.5 font-mono text-xs uppercase tracking-wider text-black font-semibold transition-colors hover:bg-hud/85 disabled:opacity-60"
+            className="mt-6 inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-2.5 font-mono text-xs uppercase tracking-wider text-canvas font-semibold transition-colors hover:bg-accent/85 disabled:opacity-60"
           >
             <Plus className="h-4 w-4" />
             {busyAction === 'enable' ? t('seller.activating') : t('seller.offButton')}
@@ -214,7 +214,7 @@ export default function SellerPage() {
     <main className="mx-auto max-w-[1200px] px-4 pb-16 pt-24 md:px-6">
       {/* Toast Notification */}
       {statusMsg && (
-        <div className="mb-6 flex items-center justify-between rounded-lg border border-hud/30 bg-hud/10 px-4 py-3 text-sm text-hud">
+        <div className="mb-6 flex items-center justify-between rounded-lg border border-accent/30 bg-accent/10 px-4 py-3 text-sm text-accent">
           <span>{'key' in statusMsg ? t(statusMsg.key, statusMsg.vars) : statusMsg.text}</span>
           <button
             type="button"
@@ -230,15 +230,15 @@ export default function SellerPage() {
       {token && <NoticeBox token={token} />}
 
       {/* Top Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-white/10 pb-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-line pb-6">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="font-display text-2xl uppercase text-white">{t('seller.title')}</h1>
-            <span className="rounded border border-hud/40 bg-hud/15 px-2 py-0.5 font-mono text-[10px] uppercase text-hud">
+            <h1 className="font-display text-2xl uppercase text-ink">{t('seller.title')}</h1>
+            <span className="rounded border border-accent/40 bg-accent/15 px-2 py-0.5 font-mono text-[10px] uppercase text-accent">
               {t('seller.active')}
             </span>
           </div>
-          <p className="mt-1 font-mono text-xs text-white/50">
+          <p className="mt-1 font-mono text-xs text-ink/50">
             {t('seller.welcome', { name: displayName, handle })}
           </p>
         </div>
@@ -246,15 +246,15 @@ export default function SellerPage() {
         <div className="flex flex-wrap items-center gap-2">
           <Link
             href={`/creators/${handle}`}
-            className="flex h-9 items-center gap-1.5 rounded-lg border border-white/20 bg-white/5 px-3.5 font-mono text-xs uppercase tracking-wider text-white transition-colors hover:bg-white/10"
+            className="flex h-9 items-center gap-1.5 rounded-lg border border-line bg-ink/5 px-3.5 font-mono text-xs uppercase tracking-wider text-ink transition-colors hover:bg-ink/10"
           >
             <User className="h-4 w-4" />
             {t('seller.publicProfile')}
-            <ArrowUpRight className="h-3.5 w-3.5 text-white/50" />
+            <ArrowUpRight className="h-3.5 w-3.5 text-ink/50" />
           </Link>
           <Link
             href="/upload"
-            className="flex h-9 items-center gap-1.5 rounded-lg bg-white px-3.5 font-mono text-xs uppercase tracking-wider text-black transition-colors hover:bg-white/85"
+            className="flex h-9 items-center gap-1.5 rounded-lg bg-ink px-3.5 font-mono text-xs uppercase tracking-wider text-canvas transition-colors hover:bg-ink/85"
           >
             <Plus className="h-4 w-4" />
             {t('seller.uploadNew')}
@@ -265,53 +265,53 @@ export default function SellerPage() {
       {/* Stats Cards */}
       <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className={CARD}>
-          <div className="flex items-center justify-between text-white/50">
+          <div className="flex items-center justify-between text-ink/50">
             <span className={LABEL}>{t('seller.revenue')}</span>
-            <Coins className="h-4 w-4 text-hud" />
+            <Coins className="h-4 w-4 text-accent" />
           </div>
-          <p className="mt-3 font-display text-2xl uppercase text-white">
+          <p className="mt-3 font-display text-2xl uppercase text-ink">
             {formatPrice(salesSummary?.totalRevenue || 0)}
           </p>
-          <p className="mt-1 font-mono text-[11px] text-white/40">{t('seller.revenueNote')}</p>
+          <p className="mt-1 font-mono text-[11px] text-ink/40">{t('seller.revenueNote')}</p>
         </div>
 
         <div className={CARD}>
-          <div className="flex items-center justify-between text-white/50">
+          <div className="flex items-center justify-between text-ink/50">
             <span className={LABEL}>{t('seller.sales')}</span>
-            <ShoppingBag className="h-4 w-4 text-emerald-400" />
+            <ShoppingBag className="h-4 w-4 text-emerald-500" />
           </div>
-          <p className="mt-3 font-display text-2xl uppercase text-white">
+          <p className="mt-3 font-display text-2xl uppercase text-ink">
             {t('seller.orders', { n: salesSummary?.totalSales ?? 0 })}
           </p>
-          <p className="mt-1 font-mono text-[11px] text-white/40">{t('seller.salesNote')}</p>
+          <p className="mt-1 font-mono text-[11px] text-ink/40">{t('seller.salesNote')}</p>
         </div>
 
         <div className={CARD}>
-          <div className="flex items-center justify-between text-white/50">
+          <div className="flex items-center justify-between text-ink/50">
             <span className={LABEL}>{t('seller.activeModels')}</span>
-            <Layers className="h-4 w-4 text-purple-400" />
+            <Layers className="h-4 w-4 text-accent" />
           </div>
-          <p className="mt-3 font-display text-2xl uppercase text-white">
+          <p className="mt-3 font-display text-2xl uppercase text-ink">
             {t('seller.modelsCount', { n: activeModels.length })}
           </p>
-          <p className="mt-1 font-mono text-[11px] text-white/40">{t('seller.activeNote')}</p>
+          <p className="mt-1 font-mono text-[11px] text-ink/40">{t('seller.activeNote')}</p>
         </div>
       </div>
 
       {/* Platform Wallet & Withdrawal (with Fee / Difference Calculation) */}
       <section className="mt-10">
-        <div className="flex items-center gap-2 border-b border-white/10 pb-3">
-          <Wallet className="h-4 w-4 text-hud" />
-          <h2 className="font-display text-lg uppercase text-white">{t('seller.walletTitle')}</h2>
+        <div className="flex items-center gap-2 border-b border-line pb-3">
+          <Wallet className="h-4 w-4 text-accent" />
+          <h2 className="font-display text-lg uppercase text-ink">{t('seller.walletTitle')}</h2>
         </div>
 
         <div className="mt-5 grid gap-6 lg:grid-cols-[1fr_1.2fr]">
           <div className={CARD}>
             <span className={LABEL}>{t('seller.held')}</span>
-            <p className="mt-2 font-display text-3xl uppercase text-white">
+            <p className="mt-2 font-display text-3xl uppercase text-ink">
               {formatMoney(walletData?.wallet.availableGrossCents ?? 0, 'USD')}
             </p>
-            <p className="mt-1 text-xs text-white/55">
+            <p className="mt-1 text-xs text-ink/55">
               {t('seller.heldNote')}
             </p>
 
@@ -324,16 +324,16 @@ export default function SellerPage() {
               const previewNet = Math.max(0, previewGross - previewFee);
 
               return (
-                <dl className="mt-5 space-y-2 border-t border-white/10 pt-4 font-mono text-xs">
-                  <div className="flex justify-between text-white/70">
+                <dl className="mt-5 space-y-2 border-t border-line pt-4 font-mono text-xs">
+                  <div className="flex justify-between text-ink/70">
                     <dt>{t('seller.gross')}</dt>
                     <dd>{formatMoney(previewGross, 'USD')}</dd>
                   </div>
-                  <div className="flex justify-between text-amber">
+                  <div className="flex justify-between text-warn">
                     <dt>{t('seller.fee', { pct: feeBps / 100 })}</dt>
                     <dd>-{formatMoney(previewFee, 'USD')}</dd>
                   </div>
-                  <div className="flex justify-between border-t border-white/10 pt-2 text-sm font-semibold text-hud">
+                  <div className="flex justify-between border-t border-line pt-2 text-sm font-semibold text-accent">
                     <dt>{t('seller.net')}</dt>
                     <dd>{formatMoney(previewNet, 'USD')}</dd>
                   </div>
@@ -369,7 +369,7 @@ export default function SellerPage() {
             <span className={LABEL}>{t('seller.withdrawLabel')}</span>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <div>
-                <label htmlFor="withdraw-amount" className="block text-xs text-white/75">
+                <label htmlFor="withdraw-amount" className="block text-xs text-ink/75">
                   {t('seller.amountUsd')}
                 </label>
                 <input
@@ -380,18 +380,18 @@ export default function SellerPage() {
                   value={withdrawAmountUsd}
                   onChange={(e) => setWithdrawAmountUsd(e.target.value)}
                   placeholder="0.00"
-                  className="mt-1.5 h-10 w-full rounded-lg border border-white/15 bg-black/50 px-3 font-mono text-sm text-white focus:border-hud/60 focus:outline-none"
+                  className="mt-1.5 h-10 w-full rounded-lg border border-line bg-canvas/50 px-3 font-mono text-sm text-ink focus:border-accent/60 focus:outline-none"
                 />
               </div>
               <div>
-                <label htmlFor="payout-method" className="block text-xs text-white/75">
+                <label htmlFor="payout-method" className="block text-xs text-ink/75">
                   {t('seller.payoutMethod')}
                 </label>
                 <select
                   id="payout-method"
                   value={payoutMethod}
                   onChange={(e) => setPayoutMethod(e.target.value as 'promptpay' | 'bank')}
-                  className="mt-1.5 h-10 w-full rounded-lg border border-white/15 bg-black/50 px-3 text-sm text-white focus:border-hud/60 focus:outline-none"
+                  className="mt-1.5 h-10 w-full rounded-lg border border-line bg-canvas/50 px-3 text-sm text-ink focus:border-accent/60 focus:outline-none"
                 >
                   <option value="promptpay">{t('seller.promptpay')}</option>
                   <option value="bank">{t('seller.bank')}</option>
@@ -400,7 +400,7 @@ export default function SellerPage() {
             </div>
 
             <div className="mt-4">
-              <label htmlFor="payout-account" className="block text-xs text-white/75">
+              <label htmlFor="payout-account" className="block text-xs text-ink/75">
                 {payoutMethod === 'promptpay' ? t('seller.accountPromptpay') : t('seller.accountBank')}
               </label>
               <input
@@ -410,14 +410,14 @@ export default function SellerPage() {
                 value={payoutAccount}
                 onChange={(e) => setPayoutAccount(e.target.value)}
                 placeholder={payoutMethod === 'promptpay' ? t('seller.phPromptpay') : t('seller.phBank')}
-                className="mt-1.5 h-10 w-full rounded-lg border border-white/15 bg-black/50 px-3 text-sm text-white focus:border-hud/60 focus:outline-none"
+                className="mt-1.5 h-10 w-full rounded-lg border border-line bg-canvas/50 px-3 text-sm text-ink focus:border-accent/60 focus:outline-none"
               />
             </div>
 
             <button
               type="submit"
               disabled={busyAction === 'withdraw' || (walletData?.wallet.availableGrossCents ?? 0) <= 0}
-              className="mt-5 inline-flex h-10 items-center justify-center rounded-lg bg-white px-5 font-mono text-xs font-semibold uppercase tracking-wider text-black transition-colors hover:bg-white/85 disabled:cursor-not-allowed disabled:opacity-50"
+              className="mt-5 inline-flex h-10 items-center justify-center rounded-lg bg-ink px-5 font-mono text-xs font-semibold uppercase tracking-wider text-canvas transition-colors hover:bg-ink/85 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {busyAction === 'withdraw' ? t('seller.processing') : t('seller.withdrawButton')}
             </button>
@@ -425,9 +425,9 @@ export default function SellerPage() {
         </div>
 
         {walletData && walletData.withdrawals.length > 0 && (
-          <div className="mt-5 overflow-x-auto rounded-lg border border-white/10">
+          <div className="mt-5 overflow-x-auto rounded-lg border border-line">
             <table className="w-full text-left font-mono text-xs">
-              <thead className="border-b border-white/10 bg-white/5 text-[11px] uppercase tracking-wider text-white/50">
+              <thead className="border-b border-line bg-ink/5 text-[11px] uppercase tracking-wider text-ink/50">
                 <tr>
                   <th className="px-4 py-3">{t('seller.thGross')}</th>
                   <th className="px-4 py-3">{t('seller.thFee')}</th>
@@ -437,17 +437,17 @@ export default function SellerPage() {
                   <th className="px-4 py-3">{t('seller.thDate')}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/5">
+              <tbody className="divide-y divide-line">
                 {walletData.withdrawals.map((w) => (
-                  <tr key={w.id} className="hover:bg-white/[0.02]">
-                    <td className="px-4 py-3 text-white">{formatMoney(w.grossAmountCents, w.currency)}</td>
-                    <td className="px-4 py-3 text-amber">-{formatMoney(w.platformFeeCents, w.currency)}</td>
-                    <td className="px-4 py-3 font-medium text-hud">{formatMoney(w.netAmountCents, w.currency)}</td>
-                    <td className="px-4 py-3 text-white/70">
+                  <tr key={w.id} className="hover:bg-ink/[0.02]">
+                    <td className="px-4 py-3 text-ink">{formatMoney(w.grossAmountCents, w.currency)}</td>
+                    <td className="px-4 py-3 text-warn">-{formatMoney(w.platformFeeCents, w.currency)}</td>
+                    <td className="px-4 py-3 font-medium text-accent">{formatMoney(w.netAmountCents, w.currency)}</td>
+                    <td className="px-4 py-3 text-ink/70">
                       {w.payoutMethod.toUpperCase()} · {w.payoutAccount}
                     </td>
-                    <td className="px-4 py-3 uppercase text-white/80">{w.status}</td>
-                    <td className="px-4 py-3 text-white/40">{dateFmt(w.createdAt)}</td>
+                    <td className="px-4 py-3 uppercase text-ink/80">{w.status}</td>
+                    <td className="px-4 py-3 text-ink/40">{dateFmt(w.createdAt)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -458,15 +458,15 @@ export default function SellerPage() {
 
       {/* Uploaded Models Table */}
       <section className="mt-10">
-        <div className="flex items-center justify-between border-b border-white/10 pb-3">
-          <h2 className="font-display text-lg uppercase text-white">
+        <div className="flex items-center justify-between border-b border-line pb-3">
+          <h2 className="font-display text-lg uppercase text-ink">
             {t('seller.myModels')}
-            <span className="ml-2 font-mono text-xs text-white/50">({models.length})</span>
+            <span className="ml-2 font-mono text-xs text-ink/50">({models.length})</span>
           </h2>
           <button
             type="button"
             onClick={() => token && loadData(token)}
-            className="flex items-center gap-1 font-mono text-xs text-white/65 hover:text-white"
+            className="flex items-center gap-1 font-mono text-xs text-ink-soft hover:text-ink"
           >
             <RefreshCw className="h-3 w-3" /> {t('seller.refresh')}
           </button>
@@ -474,22 +474,22 @@ export default function SellerPage() {
 
         {models.length === 0 ? (
           <div className={`${CARD} mt-6 text-center py-12`}>
-            <Layers className="mx-auto h-8 w-8 text-white/30" />
-            <h3 className="mt-3 font-display text-base uppercase text-white">{t('seller.noneTitle')}</h3>
-            <p className="mt-1 text-sm text-white/50">
+            <Layers className="mx-auto h-8 w-8 text-ink/30" />
+            <h3 className="mt-3 font-display text-base uppercase text-ink">{t('seller.noneTitle')}</h3>
+            <p className="mt-1 text-sm text-ink/50">
               {t('seller.noneBody')}
             </p>
             <Link
               href="/upload"
-              className="mt-5 inline-block rounded-lg bg-white px-4 py-2 text-xs font-mono uppercase tracking-wider text-black transition-colors hover:bg-white/85"
+              className="mt-5 inline-block rounded-lg bg-ink px-4 py-2 text-xs font-mono uppercase tracking-wider text-canvas transition-colors hover:bg-ink/85"
             >
               {t('seller.noneButton')}
             </Link>
           </div>
         ) : (
-          <div className="mt-6 overflow-x-auto rounded-lg border border-white/10">
+          <div className="mt-6 overflow-x-auto rounded-lg border border-line">
             <table className="w-full text-left text-sm">
-              <thead className="border-b border-white/10 bg-white/5 font-mono text-[11px] uppercase tracking-wider text-white/50">
+              <thead className="border-b border-line bg-ink/5 font-mono text-[11px] uppercase tracking-wider text-ink/50">
                 <tr>
                   <th className="px-4 py-3">{t('seller.thTitle')}</th>
                   <th className="px-4 py-3">{t('seller.thPrice')}</th>
@@ -499,42 +499,42 @@ export default function SellerPage() {
                   <th className="px-4 py-3 text-right">{t('seller.thActions')}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/5 font-mono text-xs">
+              <tbody className="divide-y divide-line font-mono text-xs">
                 {models.map((m) => (
-                  <tr key={m.id} className="hover:bg-white/[0.02]">
+                  <tr key={m.id} className="hover:bg-ink/[0.02]">
                     <td className="px-4 py-3.5">
                       <Link
                         href={`/models/${m.id}`}
-                        className="font-medium text-white transition-colors hover:text-hud"
+                        className="font-medium text-ink transition-colors hover:text-accent"
                       >
                         {m.title}
                       </Link>
-                      <span className="block text-[11px] text-white/40">{m.id}</span>
+                      <span className="block text-[11px] text-ink/40">{m.id}</span>
                     </td>
-                    <td className="px-4 py-3.5 text-white/80">
+                    <td className="px-4 py-3.5 text-ink/80">
                       {m.priceCents === 0 ? t('acct.free') : formatPrice(m.priceCents)}
                     </td>
-                    <td className="px-4 py-3.5 text-white/60">
+                    <td className="px-4 py-3.5 text-ink/60">
                       <span className="flex items-center gap-1">
                         <Eye className="h-3.5 w-3.5" /> {m.viewCount ?? 0}
                       </span>
                     </td>
-                    <td className="px-4 py-3.5 text-white/60">
+                    <td className="px-4 py-3.5 text-ink/60">
                       <span className="flex items-center gap-1">
                         <Download className="h-3.5 w-3.5" /> {m.downloadCount ?? 0}
                       </span>
                     </td>
                     <td className="px-4 py-3.5">
                       {m.isDeleted ? (
-                        <span className="rounded bg-red-500/10 px-2 py-0.5 text-red-400 border border-red-500/20">
+                        <span className="rounded bg-danger/10 px-2 py-0.5 text-danger border border-danger/20">
                           {t('seller.statusDeleted')}
                         </span>
                       ) : m.isHidden ? (
-                        <span className="rounded bg-amber-500/10 px-2 py-0.5 text-amber-400 border border-amber-500/20">
+                        <span className="rounded bg-amber-500/10 px-2 py-0.5 text-warn border border-amber-500/20">
                           {t('seller.statusHidden')}
                         </span>
                       ) : (
-                        <span className="rounded bg-emerald-500/10 px-2 py-0.5 text-emerald-400 border border-emerald-500/20">
+                        <span className="rounded bg-emerald-500/10 px-2 py-0.5 text-emerald-500 border border-emerald-500/20">
                           {t('seller.statusLive')}
                         </span>
                       )}
@@ -543,7 +543,7 @@ export default function SellerPage() {
                       <div className="flex items-center justify-end gap-2">
                         <Link
                           href={`/models/${m.id}`}
-                          className="rounded border border-white/10 px-2 py-1 text-[11px] text-white/70 hover:text-white"
+                          className="rounded border border-line px-2 py-1 text-[11px] text-ink/70 hover:text-ink"
                         >
                           {t('acct.view')}
                         </Link>
@@ -552,7 +552,7 @@ export default function SellerPage() {
                             type="button"
                             disabled={busyAction === `del-${m.id}`}
                             onClick={() => handleDeleteModel(m.id, m.title)}
-                            className="rounded border border-red-500/30 px-2 py-1 text-[11px] text-red-400/80 hover:bg-red-500/10 hover:text-red-300 disabled:opacity-50"
+                            className="rounded border border-danger/30 px-2 py-1 text-[11px] text-danger/80 hover:bg-danger/10 hover:text-danger disabled:opacity-50"
                             title={t('seller.softDelete')}
                           >
                             <Trash2 className="h-3 w-3 inline" />
@@ -571,12 +571,12 @@ export default function SellerPage() {
       {/* Recent Sales History */}
       {salesSummary && salesSummary.sales && salesSummary.sales.length > 0 && (
         <section className="mt-12">
-          <h2 className="font-display text-lg uppercase text-white border-b border-white/10 pb-3">
+          <h2 className="font-display text-lg uppercase text-ink border-b border-line pb-3">
             {t('seller.ordersTitle')}
           </h2>
-          <div className="mt-4 overflow-x-auto rounded-lg border border-white/10">
+          <div className="mt-4 overflow-x-auto rounded-lg border border-line">
             <table className="w-full text-left text-sm font-mono text-xs">
-              <thead className="border-b border-white/10 bg-white/5 text-[11px] uppercase tracking-wider text-white/50">
+              <thead className="border-b border-line bg-ink/5 text-[11px] uppercase tracking-wider text-ink/50">
                 <tr>
                   <th className="px-4 py-3">{t('seller.thModel')}</th>
                   <th className="px-4 py-3">{t('seller.thBuyer')}</th>
@@ -584,15 +584,15 @@ export default function SellerPage() {
                   <th className="px-4 py-3">{t('seller.thDate')}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/5">
+              <tbody className="divide-y divide-line">
                 {salesSummary.sales.map((s) => (
-                  <tr key={s.purchaseId} className="hover:bg-white/[0.02]">
-                    <td className="px-4 py-3 text-white">{s.title}</td>
-                    <td className="px-4 py-3 text-white/70">{s.buyerName || t('seller.buyerFallback')}</td>
-                    <td className="px-4 py-3 text-emerald-400 font-medium">
+                  <tr key={s.purchaseId} className="hover:bg-ink/[0.02]">
+                    <td className="px-4 py-3 text-ink">{s.title}</td>
+                    <td className="px-4 py-3 text-ink/70">{s.buyerName || t('seller.buyerFallback')}</td>
+                    <td className="px-4 py-3 text-emerald-500 font-medium">
                       +{formatPrice(s.priceCents)}
                     </td>
-                    <td className="px-4 py-3 text-white/40">
+                    <td className="px-4 py-3 text-ink/40">
                       {dateFmt(s.soldAt)}
                     </td>
                   </tr>

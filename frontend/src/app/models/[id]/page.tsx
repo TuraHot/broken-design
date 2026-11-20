@@ -24,8 +24,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return { title: model ? `${model.title} — Lixyte` : t('model.metaNotFound') };
 }
 
-const CARD = 'rounded-lg border border-white/10 bg-white/5 p-5';
-const LABEL = 'font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70';
+const CARD = 'rounded-lg border border-line bg-ink/5 p-5';
+const LABEL = 'font-mono text-[11px] uppercase tracking-[0.16em] text-accent';
 
 export default async function ModelDetailPage({ params }: Props) {
   const { t } = await getT();
@@ -38,14 +38,14 @@ export default async function ModelDetailPage({ params }: Props) {
 
   return (
     <main className="mx-auto max-w-[1400px] px-4 pb-16 pt-24 md:px-6">
-      <nav aria-label={t('model.breadcrumb')} className="text-sm text-white/65">
-        <Link href="/gallery" className="transition-colors hover:text-white">
+      <nav aria-label={t('model.breadcrumb')} className="text-sm text-ink-soft">
+        <Link href="/gallery" className="transition-colors hover:text-ink">
           {t('nav.gallery')}
         </Link>
-        <span aria-hidden className="mx-2 text-white/40">
+        <span aria-hidden className="mx-2 text-ink/40">
           /
         </span>
-        <span className="text-white">{model.title}</span>
+        <span className="text-ink">{model.title}</span>
       </nav>
 
       <div className="mt-6 grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] lg:items-start">
@@ -54,18 +54,18 @@ export default async function ModelDetailPage({ params }: Props) {
         <aside className="lg:sticky lg:top-24 lg:col-start-2 lg:row-span-3 lg:row-start-1">
           <div className={`${CARD} space-y-5`}>
             <div>
-              <h1 className="font-display text-[clamp(20px,2.4vw,28px)] uppercase leading-[1.1] text-white">
+              <h1 className="font-display text-[clamp(20px,2.4vw,28px)] uppercase leading-[1.1] text-ink">
                 {model.title}
               </h1>
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <span
                   className={`rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em] ${
-                    free ? 'border-hud/40 text-hud' : 'border-white/25 text-white'
+                    free ? 'border-accent/40 text-accent' : 'border-ink/25 text-ink'
                   }`}
                 >
                   {free ? t('gallery.free') : formatPrice(model.priceCents)}
                 </span>
-                <span className="rounded border border-white/15 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-white/65">
+                <span className="rounded border border-line px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
                   {model.license}
                 </span>
               </div>
@@ -80,20 +80,20 @@ export default async function ModelDetailPage({ params }: Props) {
               creator={model.creator}
             />
 
-            <div className="flex items-center gap-3 border-t border-white/10 pt-5">
+            <div className="flex items-center gap-3 border-t border-line pt-5">
               <UserAvatar name={model.creator} avatarUrl={model.creatorAvatarUrl} size="md" />
               <div className="min-w-0">
                 <Link
                   href={`/creators/${creatorHandle(model.creator)}`}
-                  className="block truncate text-sm font-medium text-white transition-colors hover:text-hud"
+                  className="block truncate text-sm font-medium text-ink transition-colors hover:text-accent"
                 >
                   {model.creator}
                 </Link>
-                <p className="text-sm text-white/65">{t('model.owner')}</p>
+                <p className="text-sm text-ink-soft">{t('model.owner')}</p>
               </div>
             </div>
 
-            <dl className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-white/10 pt-5 font-mono text-[12px] text-white/65">
+            <dl className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-line pt-5 font-mono text-[12px] text-ink-soft">
               <ModelLikeButton modelId={model.id} initialCount={model.likeCount} />
               <div className="flex items-center gap-1.5">
                 <Download aria-hidden className="h-4 w-4" />
@@ -106,7 +106,7 @@ export default async function ModelDetailPage({ params }: Props) {
               </div>
             </dl>
 
-            <div className="border-t border-white/10 pt-5">
+            <div className="border-t border-line pt-5">
               <LicenseRules license={model.license} />
             </div>
           </div>
@@ -116,11 +116,11 @@ export default async function ModelDetailPage({ params }: Props) {
           <h2 id="description" className={LABEL}>
             {t('loader.description')}
           </h2>
-          <p className="mt-3 text-[15px] leading-relaxed text-white/80">{model.description ?? t('model.noDescription')}</p>
+          <p className="mt-3 text-[15px] leading-relaxed text-ink/80">{model.description ?? t('model.noDescription')}</p>
           {model.tags.length > 0 && (
             <ul className="mt-4 flex flex-wrap gap-2">
               {model.tags.map((tag) => (
-                <li key={tag} className="rounded border border-white/15 px-2 py-0.5 font-mono text-[11px] text-white/65">
+                <li key={tag} className="rounded border border-line px-2 py-0.5 font-mono text-[11px] text-ink-soft">
                   {tagLabel(t, tag)}
                 </li>
               ))}
@@ -140,9 +140,9 @@ export default async function ModelDetailPage({ params }: Props) {
 
       {more.length > 0 && (
         <section aria-labelledby="more-from" className="mt-16">
-          <h2 id="more-from" className="font-display text-[clamp(18px,2.2vw,24px)] uppercase leading-snug text-white">
+          <h2 id="more-from" className="font-display text-[clamp(18px,2.2vw,24px)] uppercase leading-snug text-ink">
             {t('model.moreFrom')}{' '}
-            <Link href={`/creators/${creatorHandle(model.creator)}`} className="transition-colors hover:text-hud">
+            <Link href={`/creators/${creatorHandle(model.creator)}`} className="transition-colors hover:text-accent">
               {model.creator}
             </Link>
           </h2>

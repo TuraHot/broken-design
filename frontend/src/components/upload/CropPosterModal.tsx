@@ -224,19 +224,19 @@ export default function CropPosterModal({
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-md"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-canvas/85 p-4 backdrop-blur-md"
       onPointerUp={handlePointerUp}
     >
-      <div className="relative flex max-h-[92vh] w-full max-w-3xl flex-col rounded-2xl border border-white/20 bg-zinc-950 shadow-2xl overflow-hidden">
+      <div className="relative flex max-h-[92vh] w-full max-w-3xl flex-col rounded-2xl border border-line bg-zinc-950 shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-white/10 px-5 py-3.5">
+        <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
           <div className="flex items-center gap-2">
-            <Crop className="h-5 w-5 text-hud" />
+            <Crop className="h-5 w-5 text-accent" />
             <div>
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-white">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-ink">
                 Select Poster Area / ครอบตัดภาพโปสเตอร์
               </h2>
-              <p className="text-[11px] text-white/50">
+              <p className="text-[11px] text-ink/50">
                 ลากหรือปรับกรอบเพื่อเลือกส่วนของโมเดลที่ต้องการใช้เป็นรูปโปสเตอร์
               </p>
             </div>
@@ -244,21 +244,21 @@ export default function CropPosterModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-white/50 hover:bg-white/10 hover:text-white transition-colors"
+            className="rounded-lg p-1.5 text-ink/50 hover:bg-ink/10 hover:text-ink transition-colors"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* Toolbar: Aspect ratio presets */}
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 bg-white/[0.02] px-5 py-2 text-xs">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-ink/[0.02] px-5 py-2 text-xs">
           <div className="flex items-center gap-1.5">
-            <span className="font-mono text-[10px] uppercase text-white/40 mr-1">Aspect:</span>
+            <span className="font-mono text-[10px] uppercase text-ink/40 mr-1">Aspect:</span>
             <button
               type="button"
               onClick={() => applyAspect('free')}
               className={`rounded px-2.5 py-1 text-xs transition-colors ${
-                aspect === 'free' ? 'bg-white text-black font-medium' : 'bg-white/5 text-white/70 hover:bg-white/10'
+                aspect === 'free' ? 'bg-ink text-canvas font-medium' : 'bg-ink/5 text-ink/70 hover:bg-ink/10'
               }`}
             >
               Free
@@ -267,7 +267,7 @@ export default function CropPosterModal({
               type="button"
               onClick={() => applyAspect('1:1')}
               className={`inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs transition-colors ${
-                aspect === '1:1' ? 'bg-white text-black font-medium' : 'bg-white/5 text-white/70 hover:bg-white/10'
+                aspect === '1:1' ? 'bg-ink text-canvas font-medium' : 'bg-ink/5 text-ink/70 hover:bg-ink/10'
               }`}
             >
               <Square className="h-3 w-3" /> 1:1
@@ -276,7 +276,7 @@ export default function CropPosterModal({
               type="button"
               onClick={() => applyAspect('4:5')}
               className={`inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs transition-colors ${
-                aspect === '4:5' ? 'bg-white text-black font-medium' : 'bg-white/5 text-white/70 hover:bg-white/10'
+                aspect === '4:5' ? 'bg-ink text-canvas font-medium' : 'bg-ink/5 text-ink/70 hover:bg-ink/10'
               }`}
             >
               <RectangleVertical className="h-3 w-3" /> 4:5
@@ -285,7 +285,7 @@ export default function CropPosterModal({
               type="button"
               onClick={() => applyAspect('16:9')}
               className={`inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs transition-colors ${
-                aspect === '16:9' ? 'bg-white text-black font-medium' : 'bg-white/5 text-white/70 hover:bg-white/10'
+                aspect === '16:9' ? 'bg-ink text-canvas font-medium' : 'bg-ink/5 text-ink/70 hover:bg-ink/10'
               }`}
             >
               <RectangleHorizontal className="h-3 w-3" /> 16:9
@@ -295,14 +295,14 @@ export default function CropPosterModal({
           <button
             type="button"
             onClick={handleFullImage}
-            className="inline-flex items-center gap-1 rounded bg-white/5 px-2.5 py-1 text-xs text-white/70 hover:bg-white/10 hover:text-white transition-colors"
+            className="inline-flex items-center gap-1 rounded bg-ink/5 px-2.5 py-1 text-xs text-ink/70 hover:bg-ink/10 hover:text-ink transition-colors"
           >
             <Maximize2 className="h-3 w-3" /> Full Frame
           </button>
         </div>
 
         {/* Crop Canvas Display Area */}
-        <div className="relative flex-1 overflow-auto bg-black p-4 flex items-center justify-center min-h-[320px] max-h-[55vh] select-none">
+        <div className="relative flex-1 overflow-auto bg-canvas p-4 flex items-center justify-center min-h-[320px] max-h-[55vh] select-none">
           <div
             ref={containerRef}
             onPointerDown={handleContainerPointerDown}
@@ -321,17 +321,17 @@ export default function CropPosterModal({
 
             {/* Dark Mask Top */}
             <div
-              className="absolute left-0 right-0 top-0 bg-black/65 pointer-events-none"
+              className="absolute left-0 right-0 top-0 bg-canvas/65 pointer-events-none"
               style={{ height: `${crop.y}%` }}
             />
             {/* Dark Mask Bottom */}
             <div
-              className="absolute left-0 right-0 bottom-0 bg-black/65 pointer-events-none"
+              className="absolute left-0 right-0 bottom-0 bg-canvas/65 pointer-events-none"
               style={{ height: `${Math.max(0, 100 - (crop.y + crop.height))}%` }}
             />
             {/* Dark Mask Left */}
             <div
-              className="absolute left-0 bg-black/65 pointer-events-none"
+              className="absolute left-0 bg-canvas/65 pointer-events-none"
               style={{
                 top: `${crop.y}%`,
                 height: `${crop.height}%`,
@@ -340,7 +340,7 @@ export default function CropPosterModal({
             />
             {/* Dark Mask Right */}
             <div
-              className="absolute right-0 bg-black/65 pointer-events-none"
+              className="absolute right-0 bg-canvas/65 pointer-events-none"
               style={{
                 top: `${crop.y}%`,
                 height: `${crop.height}%`,
@@ -351,7 +351,7 @@ export default function CropPosterModal({
             {/* The Crop Box Overlay */}
             <div
               onPointerDown={(e) => handlePointerDown(e, 'move')}
-              className="absolute cursor-move border-2 border-hud shadow-lg"
+              className="absolute cursor-move border-2 border-accent shadow-lg"
               style={{
                 left: `${crop.x}%`,
                 top: `${crop.y}%`,
@@ -361,59 +361,59 @@ export default function CropPosterModal({
             >
               {/* Rule of thirds grid lines */}
               <div className="pointer-events-none absolute inset-0 grid grid-cols-3 grid-rows-3 opacity-30">
-                <div className="border-b border-r border-white/60" />
-                <div className="border-b border-r border-white/60" />
-                <div className="border-b border-white/60" />
-                <div className="border-b border-r border-white/60" />
-                <div className="border-b border-r border-white/60" />
-                <div className="border-b border-white/60" />
-                <div className="border-r border-white/60" />
-                <div className="border-r border-white/60" />
+                <div className="border-b border-r border-ink/60" />
+                <div className="border-b border-r border-ink/60" />
+                <div className="border-b border-ink/60" />
+                <div className="border-b border-r border-ink/60" />
+                <div className="border-b border-r border-ink/60" />
+                <div className="border-b border-ink/60" />
+                <div className="border-r border-ink/60" />
+                <div className="border-r border-ink/60" />
                 <div />
               </div>
 
               {/* Corner Handles */}
               <div
                 onPointerDown={(e) => handlePointerDown(e, 'nw')}
-                className="absolute -left-1.5 -top-1.5 h-3.5 w-3.5 cursor-nwse-resize rounded-sm border border-black bg-white shadow"
+                className="absolute -left-1.5 -top-1.5 h-3.5 w-3.5 cursor-nwse-resize rounded-sm border border-canvas bg-ink shadow"
               />
               <div
                 onPointerDown={(e) => handlePointerDown(e, 'ne')}
-                className="absolute -right-1.5 -top-1.5 h-3.5 w-3.5 cursor-nesw-resize rounded-sm border border-black bg-white shadow"
+                className="absolute -right-1.5 -top-1.5 h-3.5 w-3.5 cursor-nesw-resize rounded-sm border border-canvas bg-ink shadow"
               />
               <div
                 onPointerDown={(e) => handlePointerDown(e, 'se')}
-                className="absolute -right-1.5 -bottom-1.5 h-3.5 w-3.5 cursor-nwse-resize rounded-sm border border-black bg-white shadow"
+                className="absolute -right-1.5 -bottom-1.5 h-3.5 w-3.5 cursor-nwse-resize rounded-sm border border-canvas bg-ink shadow"
               />
               <div
                 onPointerDown={(e) => handlePointerDown(e, 'sw')}
-                className="absolute -left-1.5 -bottom-1.5 h-3.5 w-3.5 cursor-nesw-resize rounded-sm border border-black bg-white shadow"
+                className="absolute -left-1.5 -bottom-1.5 h-3.5 w-3.5 cursor-nesw-resize rounded-sm border border-canvas bg-ink shadow"
               />
 
               {/* Edge Handles */}
               <div
                 onPointerDown={(e) => handlePointerDown(e, 'n')}
-                className="absolute left-1/2 -top-1.5 h-3 w-6 -translate-x-1/2 cursor-ns-resize rounded-full border border-black bg-white/80 shadow"
+                className="absolute left-1/2 -top-1.5 h-3 w-6 -translate-x-1/2 cursor-ns-resize rounded-full border border-canvas bg-ink/80 shadow"
               />
               <div
                 onPointerDown={(e) => handlePointerDown(e, 's')}
-                className="absolute left-1/2 -bottom-1.5 h-3 w-6 -translate-x-1/2 cursor-ns-resize rounded-full border border-black bg-white/80 shadow"
+                className="absolute left-1/2 -bottom-1.5 h-3 w-6 -translate-x-1/2 cursor-ns-resize rounded-full border border-canvas bg-ink/80 shadow"
               />
               <div
                 onPointerDown={(e) => handlePointerDown(e, 'w')}
-                className="absolute top-1/2 -left-1.5 h-6 w-3 -translate-y-1/2 cursor-ew-resize rounded-full border border-black bg-white/80 shadow"
+                className="absolute top-1/2 -left-1.5 h-6 w-3 -translate-y-1/2 cursor-ew-resize rounded-full border border-canvas bg-ink/80 shadow"
               />
               <div
                 onPointerDown={(e) => handlePointerDown(e, 'e')}
-                className="absolute top-1/2 -right-1.5 h-6 w-3 -translate-y-1/2 cursor-ew-resize rounded-full border border-black bg-white/80 shadow"
+                className="absolute top-1/2 -right-1.5 h-6 w-3 -translate-y-1/2 cursor-ew-resize rounded-full border border-canvas bg-ink/80 shadow"
               />
             </div>
           </div>
         </div>
 
         {/* Footer actions */}
-        <div className="flex items-center justify-between border-t border-white/10 bg-zinc-900 px-5 py-3">
-          <span className="text-xs text-white/50 font-mono">
+        <div className="flex items-center justify-between border-t border-line bg-zinc-900 px-5 py-3">
+          <span className="text-xs text-ink/50 font-mono">
             Size: {Math.round(crop.width)}% × {Math.round(crop.height)}%
           </span>
 
@@ -421,7 +421,7 @@ export default function CropPosterModal({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-white/15 px-4 py-2 text-xs font-medium text-white/70 hover:bg-white/10 hover:text-white transition-colors"
+              className="rounded-lg border border-line px-4 py-2 text-xs font-medium text-ink/70 hover:bg-ink/10 hover:text-ink transition-colors"
             >
               Cancel
             </button>
@@ -429,7 +429,7 @@ export default function CropPosterModal({
               type="button"
               disabled={isProcessing}
               onClick={handleConfirm}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-white px-4 py-2 text-xs font-semibold text-black hover:bg-white/90 disabled:opacity-50 transition-colors shadow-lg"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-ink px-4 py-2 text-xs font-semibold text-canvas hover:bg-ink/90 disabled:opacity-50 transition-colors shadow-lg"
             >
               <Check className="h-4 w-4" />
               {isProcessing ? 'Processing…' : 'Crop & Save Poster'}

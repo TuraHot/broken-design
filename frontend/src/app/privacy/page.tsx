@@ -11,7 +11,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: locale === 'th' ? 'นโยบายความเป็นส่วนตัว · Lixyte' : 'Privacy Policy · Lixyte' };
 }
 
-const link = 'text-white underline underline-offset-4';
+const link = 'text-ink underline underline-offset-4';
 
 export default async function PrivacyPage() {
   const { locale } = await getT();
@@ -73,10 +73,10 @@ function PrivacyPageEn() {
           body: (
             <>
               <UL>
-                <li><strong className="font-medium text-white/80">Sellers</strong> see the display name of the people who bought their models, the price and the date.</li>
-                <li><strong className="font-medium text-white/80">Administrators</strong> can see accounts, models, purchases (including the buyer&apos;s email) and reports. The admin pages do not show passwords or embed keys.</li>
-                <li><strong className="font-medium text-white/80">The public</strong> sees your display name on models you publish, and your published models.</li>
-                <li><strong className="font-medium text-white/80">Service providers</strong> that run Lixyte for us see the data they host: the database and file storage provider, and the payment provider once real payments start. <C>[TO DECIDE: list the providers and their countries]</C></li>
+                <li><strong className="font-medium text-ink">Sellers</strong> see the display name of the people who bought their models, the price and the date.</li>
+                <li><strong className="font-medium text-ink">Administrators</strong> can see accounts, models, purchases (including the buyer&apos;s email) and reports. The admin pages do not show passwords or embed keys.</li>
+                <li><strong className="font-medium text-ink">The public</strong> sees your display name on models you publish, and your published models.</li>
+                <li><strong className="font-medium text-ink">Service providers</strong> that run Lixyte for us see the data they host: the database and file storage provider, and the payment provider once real payments start. <C>[TO DECIDE: list the providers and their countries]</C></li>
               </UL>
               <P>We do not sell your information. We may share it when the law requires it.</P>
             </>
@@ -98,7 +98,7 @@ function PrivacyPageEn() {
           body: (
             <>
               <P>You can ask to see, correct or delete the information we hold about you. Account deletion and a settings page are not built yet, so for now make the request by contacting us. <C>[TO DECIDE: contact email address and the law that applies, for example Thailand&apos;s PDPA]</C></P>
-              <P>To report something about your data or an account, use <strong className="font-medium text-white/80">Report a problem</strong> in the account menu or the footer.</P>
+              <P>To report something about your data or an account, use <strong className="font-medium text-ink">Report a problem</strong> in the account menu or the footer.</P>
             </>
           ),
         },

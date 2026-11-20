@@ -3,7 +3,7 @@ import Link from 'next/link';
 import LegalPage from '@/components/content/LegalPage';
 import { C, DataTable, P, UL } from '@/components/content/prose';
 
-const link = 'text-white underline underline-offset-4';
+const link = 'text-ink underline underline-offset-4';
 
 export default function SellerTermsTh() {
   return (

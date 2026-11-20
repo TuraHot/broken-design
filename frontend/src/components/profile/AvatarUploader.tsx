@@ -80,7 +80,7 @@ export default function AvatarUploader({
             disabled={busy}
             onClick={pickFile}
             aria-label={avatarUrl ? t('avatar.change') : t('avatar.upload')}
-            className="absolute -bottom-1 -right-1 grid h-7 w-7 place-items-center rounded-full border border-hud/60 bg-black text-hud transition-colors hover:border-white hover:text-white disabled:cursor-wait disabled:opacity-60"
+            className="absolute -bottom-1 -right-1 grid h-7 w-7 place-items-center rounded-full border border-accent/60 bg-canvas text-accent transition-colors hover:border-ink hover:text-ink disabled:cursor-wait disabled:opacity-60"
           >
             {busy ? (
               <Loader2
@@ -105,7 +105,7 @@ export default function AvatarUploader({
       {error && (
         <p
           role="alert"
-          className="inline-flex items-center gap-1.5 text-xs text-red-300"
+          className="inline-flex items-center gap-1.5 text-xs text-danger"
         >
           <AlertCircle aria-hidden className="h-3.5 w-3.5 shrink-0" />
           <span>{'key' in error ? t(error.key) : authErrorText(error.err, t, 'avatar.errUpload')}</span>

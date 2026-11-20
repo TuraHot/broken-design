@@ -70,13 +70,13 @@ export default function FilterDropdown({
         aria-expanded={open}
         aria-haspopup="true"
         className={`inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm transition-colors disabled:cursor-wait disabled:opacity-60 ${
-          chosen ? 'border-white text-white' : 'border-white/15 text-white/65 hover:border-white/30 hover:text-white'
-        } bg-white/5`}
+          chosen ? 'border-ink text-ink' : 'border-line text-ink-soft hover:border-ink/40 hover:text-ink'
+        } bg-ink/5`}
       >
-        <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70">{label}</span>
+        <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-accent">{label}</span>
         <span>{current.label}</span>
         {isPending ? (
-          <Loader2 aria-hidden className="h-4 w-4 animate-spin text-hud motion-reduce:animate-none" />
+          <Loader2 aria-hidden className="h-4 w-4 animate-spin text-accent motion-reduce:animate-none" />
         ) : (
           <ChevronDown aria-hidden className={`h-4 w-4 transition-transform ${open ? 'rotate-180' : ''}`} />
         )}
@@ -85,7 +85,7 @@ export default function FilterDropdown({
       {open && (
         <ul
           aria-label={label}
-          className="absolute right-0 top-full z-20 mt-2 max-h-72 min-w-[160px] overflow-auto rounded-lg border border-white/15 bg-black/95 p-1 backdrop-blur"
+          className="absolute right-0 top-full z-20 mt-2 max-h-72 min-w-[160px] overflow-auto rounded-lg border border-line bg-canvas/95 p-1 backdrop-blur"
         >
           {options.map((o) => (
             <li key={o.value}>
@@ -93,8 +93,8 @@ export default function FilterDropdown({
                 type="button"
                 aria-pressed={o === current}
                 onClick={() => selectOption(o)}
-                className={`flex w-full items-center justify-between gap-3 rounded-md px-3 py-1.5 text-left text-sm transition-colors hover:bg-white/10 ${
-                  o === current ? 'text-white' : 'text-white/65 hover:text-white'
+                className={`flex w-full items-center justify-between gap-3 rounded-md px-3 py-1.5 text-left text-sm transition-colors hover:bg-ink/10 ${
+                  o === current ? 'text-ink' : 'text-ink-soft hover:text-ink'
                 }`}
               >
                 {o.label}

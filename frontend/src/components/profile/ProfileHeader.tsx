@@ -19,7 +19,7 @@ export default async function ProfileHeader({ name, handle, avatarUrl, bio, mode
   const { t } = await getT();
   return (
     <header>
-      <div className="relative h-32 overflow-hidden rounded-lg border border-white/10 bg-black sm:h-44">
+      <div className="relative h-32 overflow-hidden rounded-lg border border-line bg-canvas sm:h-44">
         <svg aria-hidden viewBox="0 0 680 120" preserveAspectRatio="none" className="h-full w-full">
           <defs>
             <linearGradient id="cover-holo" x1="0" x2="1" y1="0" y2="0">
@@ -44,27 +44,27 @@ export default async function ProfileHeader({ name, handle, avatarUrl, bio, mode
         <div className="min-w-0 flex-1 pt-3">
           <Link
             href="/creator"
-            className="inline-block font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70 transition-colors hover:text-hud"
+            className="inline-block font-mono text-[11px] uppercase tracking-[0.16em] text-accent transition-colors hover:text-accent"
           >
             {t('creators.label')}
           </Link>
-          <h1 className="mt-1 font-display text-[clamp(22px,3vw,32px)] uppercase leading-[1.05] text-white">{name}</h1>
-          <p className="mt-1 text-sm text-white/65">@{handle}</p>
+          <h1 className="mt-1 font-display text-[clamp(22px,3vw,32px)] uppercase leading-[1.05] text-ink">{name}</h1>
+          <p className="mt-1 text-sm text-ink-soft">@{handle}</p>
         </div>
       </div>
 
-      <p className="mt-4 max-w-[60ch] px-1 text-[15px] leading-relaxed text-white/80 sm:px-4">{bio}</p>
-      <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1 px-1 font-mono text-[12px] text-white/65 sm:px-4">
+      <p className="mt-4 max-w-[60ch] px-1 text-[15px] leading-relaxed text-ink/80 sm:px-4">{bio}</p>
+      <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1 px-1 font-mono text-[12px] text-ink-soft sm:px-4">
         <div className="flex gap-1.5">
-          <dd className="text-white">{formatCount(modelCount)}</dd>
+          <dd className="text-ink">{formatCount(modelCount)}</dd>
           <dt>{modelCount === 1 ? t('creators.modelOne') : t('creators.modelMany')}</dt>
         </div>
         <div className="flex gap-1.5">
-          <dd className="text-white">{formatCount(downloads)}</dd>
+          <dd className="text-ink">{formatCount(downloads)}</dd>
           <dt>{t('creators.downloads')}</dt>
         </div>
         <div className="flex gap-1.5">
-          <dd className="text-white">{formatCount(likes)}</dd>
+          <dd className="text-ink">{formatCount(likes)}</dd>
           <dt>{t('creators.likes')}</dt>
         </div>
       </dl>

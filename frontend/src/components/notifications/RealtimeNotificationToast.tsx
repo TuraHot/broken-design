@@ -1,9 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Heart, Bell, X } from 'lucide-react';
+import type { Socket } from 'socket.io-client';
+import { useT } from '@/lib/i18n/client';
 import { getSocket } from '@/lib/socket';
-import { readSession } from '@/lib/session';
+import { SESSION_UPDATED_EVENT } from '@/lib/session';
 
 interface RealtimeNotice {
   id: string;
@@ -15,45 +17,66 @@ interface RealtimeNotice {
 }
 
 export default function RealtimeNotificationToast() {
+  const t = useT();
   const [notices, setNotices] = useState<RealtimeNotice[]>([]);
+  const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   useEffect(() => {
-    let socket: any = null;
+    let boundSocket: Socket | null = null;
+    const timers = timersRef.current;
 
-    try {
-      socket = getSocket();
-      if (!socket) return;
-
-      const handleNotification = (data: any) => {
-        if (!data || !data.title) return;
-        const newNotice: RealtimeNotice = {
-          id: `${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-          type: data.type || 'info',
-          title: data.title,
-          message: data.message || '',
-          modelId: data.modelId,
-          createdAt: data.createdAt || new Date().toISOString(),
-        };
-
-        setNotices((prev) => [newNotice, ...prev.slice(0, 4)]);
-
-        // Auto remove after 6 seconds
-        setTimeout(() => {
-          setNotices((prev) => prev.filter((n) => n.id !== newNotice.id));
-        }, 6000);
+    const handleNotification = (data: any) => {
+      if (!data || !data.title) return;
+      const newNotice: RealtimeNotice = {
+        id: `${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        type: data.type || 'info',
+        title: data.title,
+        message: data.message || '',
+        modelId: data.modelId,
+        createdAt: data.createdAt || new Date().toISOString(),
       };
 
-      socket.on('notification', handleNotification);
+      setNotices((prev) => [newNotice, ...prev.slice(0, 4)]);
 
-      return () => {
-        socket.off('notification', handleNotification);
-      };
-    } catch {
-      // Ignore if socket not available
-    }
+      // Auto remove after 6 seconds
+      const timer = setTimeout(() => {
+        timers.delete(newNotice.id);
+        setNotices((prev) => prev.filter((n) => n.id !== newNotice.id));
+      }, 6000);
+      timers.set(newNotice.id, timer);
+    };
+
+    const bind = () => {
+      try {
+        const socket = getSocket();
+        if (!socket || socket === boundSocket) return;
+        if (boundSocket) boundSocket.off('notification', handleNotification);
+        socket.on('notification', handleNotification);
+        boundSocket = socket;
+      } catch {
+        // Ignore if socket not available
+      }
+    };
+
+    bind();
+    window.addEventListener('storage', bind);
+    window.addEventListener(SESSION_UPDATED_EVENT, bind);
+
+    return () => {
+      window.removeEventListener('storage', bind);
+      window.removeEventListener(SESSION_UPDATED_EVENT, bind);
+      if (boundSocket) boundSocket.off('notification', handleNotification);
+      for (const timer of timers.values()) clearTimeout(timer);
+      timers.clear();
+    };
   }, []);
 
   const dismiss = (id: string) => {
+    const timer = timersRef.current.get(id);
+    if (timer) {
+      clearTimeout(timer);
+      timersRef.current.delete(id);
+    }
     setNotices((prev) => prev.filter((n) => n.id !== id));
   };
 
@@ -89,7 +112,7 @@ export default function RealtimeNotificationToast() {
             type="button"
             onClick={() => dismiss(n.id)}
             className="rounded p-1 text-ink/40 hover:text-ink transition-colors"
-            aria-label="Close notification"
+            aria-label={t('modal.close')}
           >
             <X className="h-3.5 w-3.5" />
           </button>

@@ -10,7 +10,7 @@ import ModelActions from '@/components/model/ModelActions';
 import ModelLikeButton from '@/components/model/ModelLikeButton';
 import ModelPreview from '@/components/model/ModelPreview';
 import UserAvatar from '@/components/ui/UserAvatar';
-import { fetchCoreApiModels, fetchModel, fetchMoreFromCreator } from '@/lib/api';
+import { fetchModel, fetchMoreFromCreator } from '@/lib/api';
 import { creatorHandle } from '@/lib/creators';
 import { formatCount, formatPrice } from '@/lib/format';
 import { getT } from '@/lib/i18n/server';
@@ -30,11 +30,13 @@ const LABEL = 'font-mono text-[11px] uppercase tracking-[0.16em] text-accent';
 export default async function ModelDetailPage({ params }: Props) {
   const { t } = await getT();
   const { id } = await params;
-  const [model] = await Promise.all([fetchModel(id), fetchCoreApiModels()]);
+  const model = await fetchModel(id, true);
   if (!model) notFound();
 
   const more = await fetchMoreFromCreator(model);
   const free = model.priceCents === 0;
+  const creatorSlug = creatorHandle(model.creator);
+  const creatorHref = creatorSlug ? `/creators/${encodeURIComponent(creatorSlug)}` : null;
 
   return (
     <main className="mx-auto max-w-[1400px] px-4 pb-16 pt-24 md:px-6">
@@ -83,12 +85,16 @@ export default async function ModelDetailPage({ params }: Props) {
             <div className="flex items-center gap-3 border-t border-line pt-5">
               <UserAvatar name={model.creator} avatarUrl={model.creatorAvatarUrl} size="md" />
               <div className="min-w-0">
-                <Link
-                  href={`/creators/${creatorHandle(model.creator)}`}
-                  className="block truncate text-sm font-medium text-ink transition-colors hover:text-accent"
-                >
-                  {model.creator}
-                </Link>
+                {creatorHref ? (
+                  <Link
+                    href={creatorHref}
+                    className="block truncate text-sm font-medium text-ink transition-colors hover:text-accent"
+                  >
+                    {model.creator}
+                  </Link>
+                ) : (
+                  <span className="block truncate text-sm font-medium text-ink">{model.creator}</span>
+                )}
                 <p className="text-sm text-ink-soft">{t('model.owner')}</p>
               </div>
             </div>
@@ -142,9 +148,13 @@ export default async function ModelDetailPage({ params }: Props) {
         <section aria-labelledby="more-from" className="mt-16">
           <h2 id="more-from" className="font-display text-[clamp(18px,2.2vw,24px)] uppercase leading-snug text-ink">
             {t('model.moreFrom')}{' '}
-            <Link href={`/creators/${creatorHandle(model.creator)}`} className="transition-colors hover:text-accent">
-              {model.creator}
-            </Link>
+            {creatorHref ? (
+              <Link href={creatorHref} className="transition-colors hover:text-accent">
+                {model.creator}
+              </Link>
+            ) : (
+              <span>{model.creator}</span>
+            )}
           </h2>
           <ul className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {more.map((m) => (

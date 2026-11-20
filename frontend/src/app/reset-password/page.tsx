@@ -9,7 +9,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: t('auth.meta.reset') };
 }
 
-export default function ForgotPasswordPage() {
+export default function ResetPasswordPage() {
   return (
     <main className="relative isolate grid min-h-dvh place-items-center px-4 py-16 md:px-6">
       <div

@@ -8,7 +8,7 @@ import { Loader2, Search, X } from 'lucide-react';
 import { startNavigationLoading } from '@/components/ui/NavigationProgress';
 import { hidesPublicChrome } from '@/lib/auth-paths';
 import { creatorHandle } from '@/lib/creators';
-import { readSession } from '@/lib/session';
+import { readSession, SESSION_UPDATED_EVENT } from '@/lib/session';
 import { useT } from '@/lib/i18n/client';
 import type { MessageKey } from '@/lib/i18n/messages';
 import AccountMenu from './AccountMenu';
@@ -45,14 +45,18 @@ export default function Navbar() {
       const canSell = Boolean(user && user.role !== 'admin' && (user.is_seller || user.role === 'creator'));
       if (canSell && user) {
         const handle = creatorHandle(user.display_name?.trim() || user.email);
-        setCreatorDashboardHref(handle ? `/creators/${handle}?tab=dashboard` : '/seller');
+        setCreatorDashboardHref(handle ? `/creators/${encodeURIComponent(handle)}?tab=dashboard` : '/seller');
       } else {
         setCreatorDashboardHref(null);
       }
     };
     update();
     window.addEventListener('storage', update);
-    return () => window.removeEventListener('storage', update);
+    window.addEventListener(SESSION_UPDATED_EVENT, update);
+    return () => {
+      window.removeEventListener('storage', update);
+      window.removeEventListener(SESSION_UPDATED_EVENT, update);
+    };
   }, [pathname]);
 
   const handleNavClick = (href: string) => (e: MouseEvent<HTMLAnchorElement>) => {

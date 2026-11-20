@@ -17,7 +17,7 @@ const HASH_RE = /^[0-9a-f]{64}$/;
 // purchases.embed_key is VARCHAR(64); payments currently issues 48 hex chars.
 const EMBED_KEY_RE = /^[A-Za-z0-9_-]{16,64}$/;
 
-export const isUuid = (v: string) => UUID_RE.test(v);
+const isUuid = (v: string) => UUID_RE.test(v);
 export const isContentHash = (v: string) => HASH_RE.test(v);
 
 export interface CdnModel {
@@ -32,6 +32,7 @@ export interface CdnModel {
   hidden_at: Date | string | null;
   deleted_at: Date | string | null;
   owner_suspended_at: Date | string | null;
+  owner_deleted_at: Date | string | null;
 }
 
 export const isPaid = (m: CdnModel) => Number(m.price_cents) > 0;
@@ -53,7 +54,7 @@ export async function loadModel(id: string): Promise<CdnModel> {
   try {
     const result = await db.query(
       `SELECT m.id, m.owner_id, m.title, m.license, m.file_hash, m.preview_hash, m.poster_hash,
-              m.price_cents, m.hidden_at, m.deleted_at, u.suspended_at AS owner_suspended_at
+              m.price_cents, m.hidden_at, m.deleted_at, u.suspended_at AS owner_suspended_at, u.deleted_at AS owner_deleted_at
          FROM models m
          JOIN users u ON u.id = m.owner_id
         WHERE m.id = $1`,
@@ -65,7 +66,7 @@ export async function loadModel(id: string): Promise<CdnModel> {
     const { data, error } = await supabase
       .from("models")
       .select(
-        "id, owner_id, title, license, file_hash, preview_hash, poster_hash, price_cents, hidden_at, deleted_at, users!models_owner_id_fkey(suspended_at)",
+        "id, owner_id, title, license, file_hash, preview_hash, poster_hash, price_cents, hidden_at, deleted_at, users!models_owner_id_fkey(suspended_at, deleted_at)",
       )
       .eq("id", id)
       .maybeSingle();
@@ -86,6 +87,7 @@ export async function loadModel(id: string): Promise<CdnModel> {
         hidden_at: data.hidden_at,
         deleted_at: data.deleted_at,
         owner_suspended_at: ownerRel?.suspended_at ?? null,
+        owner_deleted_at: ownerRel?.deleted_at ?? null,
       };
     }
   }
@@ -99,16 +101,18 @@ export interface CdnUserAvatar {
   avatar_hash: string;
 }
 
-/** Load an active user's avatar hash. 404 when missing, suspended, or no avatar uploaded. */
+/** Load an active user's avatar hash. 404 when missing, suspended, deleted by an admin, or no avatar uploaded. */
 export async function loadUserAvatar(userId: string): Promise<CdnUserAvatar> {
   if (!isUuid(userId)) {
     throw new AppError(404, "AVATAR_NOT_FOUND", "User avatar not found");
   }
 
-  let row: { id: string; avatar_hash: string | null; suspended_at: Date | string | null } | undefined;
+  let row:
+    | { id: string; avatar_hash: string | null; suspended_at: Date | string | null; deleted_at: Date | string | null }
+    | undefined;
   try {
     const result = await db.query(
-      `SELECT id, avatar_hash, suspended_at FROM users WHERE id = $1`,
+      `SELECT id, avatar_hash, suspended_at, deleted_at FROM users WHERE id = $1`,
       [userId],
     );
     row = result.rows[0] as typeof row;
@@ -116,7 +120,7 @@ export async function loadUserAvatar(userId: string): Promise<CdnUserAvatar> {
     if (!supabase) throw err;
     const { data, error } = await supabase
       .from("users")
-      .select("id, avatar_hash, suspended_at")
+      .select("id, avatar_hash, suspended_at, deleted_at")
       .eq("id", userId)
       .maybeSingle();
     if (error) throw err;
@@ -124,7 +128,7 @@ export async function loadUserAvatar(userId: string): Promise<CdnUserAvatar> {
   }
 
   const hash = row?.avatar_hash?.trim() || null;
-  if (!row || row.suspended_at || !hash) {
+  if (!row || row.suspended_at || row.deleted_at || !hash) {
     throw new AppError(404, "AVATAR_NOT_FOUND", "User avatar not found");
   }
   return { id: row.id, avatar_hash: hash };
@@ -132,7 +136,7 @@ export async function loadUserAvatar(userId: string): Promise<CdnUserAvatar> {
 
 /**
  * Hidden models and models whose owner is suspended stop being served immediately — for everyone, buyers included.
- * Soft-deleted models are only served to people who bought them (`allowDeleted`).
+ * Soft-deleted models, and models of an account an admin deleted, are only served to people who bought them (`allowDeleted`).
  */
 export function assertServable(
   model: CdnModel,
@@ -145,7 +149,7 @@ export function assertServable(
       "This model is currently unavailable",
     );
   }
-  if (model.deleted_at && !opts.allowDeleted) {
+  if ((model.deleted_at || model.owner_deleted_at) && !opts.allowDeleted) {
     throw new AppError(404, "MODEL_NOT_FOUND", "Model not found");
   }
 }
@@ -217,7 +221,7 @@ export interface PaidDownloadAccess {
   licenseType: string | null;
 }
 
-/** Paid-model download: owner or a buyer with a `paid` purchase; the downloader must not be suspended. */
+/** Paid-model download: requires a `paid` purchase and an unsuspended downloader (owners are blocked by OWN_MODEL). */
 export async function assertCanDownloadPaid(
   model: CdnModel,
   userId: string,
@@ -284,7 +288,7 @@ export async function assertCanDownloadPaid(
       "ACCOUNT_SUSPENDED",
       "Your account has been suspended",
     );
-  if (model.owner_id !== userId && !row.purchased) {
+  if (!row.purchased) {
     throw new AppError(
       403,
       "PURCHASE_REQUIRED",

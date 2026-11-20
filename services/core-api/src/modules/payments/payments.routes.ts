@@ -6,6 +6,7 @@ import { requireAuth, requireBuyer, requireNotSuspended } from '../../middleware
 import { db } from '../../config/db';
 import { env } from '../../config/env';
 import { AppError } from '../../middlewares/error.middleware';
+import { isModelUnavailable, MODEL_SELLABLE_SQL } from '../models/availability';
 
 export const paymentsRouter = Router();
 
@@ -25,6 +26,44 @@ function toThbSatang(amountCents: number, currency: string): number {
   // Stripe PromptPay requires THB in satang (minimum 1000 satang = 10 THB)
   const satang = cur === 'THB' ? amountCents : Math.round(amountCents * 35);
   return Math.max(1000, satang);
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function requireUuid(id: string) {
+  if (!UUID_RE.test(id)) {
+    throw new AppError(400, 'INVALID_ID', 'Invalid id');
+  }
+}
+
+async function createAndStorePromptPayIntent(params: {
+  stripe: Stripe;
+  purchaseId: string;
+  modelId: string;
+  userId: string;
+  buyerEmail: string;
+  title: string;
+  amountCents: number;
+  currency: string;
+}): Promise<Stripe.PaymentIntent> {
+  const amountSatang = toThbSatang(params.amountCents, params.currency);
+  const paymentIntent = await params.stripe.paymentIntents.create({
+    amount: amountSatang,
+    currency: 'thb',
+    payment_method_types: ['promptpay'],
+    confirm: true,
+    payment_method_data: {
+      type: 'promptpay',
+      billing_details: { email: params.buyerEmail },
+    },
+    description: `Lixyte: ${params.title}`,
+    metadata: { purchaseId: params.purchaseId, modelId: params.modelId, userId: params.userId },
+  });
+  await db.query(`UPDATE purchases SET provider_session_id = $1 WHERE id = $2`, [
+    paymentIntent.id,
+    params.purchaseId,
+  ]);
+  return paymentIntent;
 }
 
 // ─── Helper ────────────────────────────────────────────────────────────────────
@@ -49,12 +88,16 @@ function requireMockProvider(
 // สร้างคำสั่งซื้อรายชิ้น (pending) ล็อกราคา สกุลเงิน และประเภท License จากฐานข้อมูลจริง — กันซื้อซ้ำ
 paymentsRouter.post('/models/:id/checkout', requireAuth, requireBuyer, async (req, res) => {
   const userId = req.user!.id;
-  const modelId = req.params.id;
+  const modelId = String(req.params.id);
+  requireUuid(modelId);
 
-  // ดึงราคาและประเภท License จากฐานข้อมูลจริง
+  // ดึงราคา ประเภท License และสถานะเจ้าของจากฐานข้อมูลจริง
   const modelRow = await db.query(
-    `SELECT id, title, price_cents, currency, license, deleted_at, hidden_at, owner_id
-     FROM models WHERE id = $1`,
+    `SELECT m.id, m.title, m.price_cents, m.currency, m.license, m.deleted_at, m.hidden_at, m.owner_id,
+            u.suspended_at AS owner_suspended_at, u.deleted_at AS owner_deleted_at
+     FROM models m
+     LEFT JOIN users u ON u.id = m.owner_id
+     WHERE m.id = $1`,
     [modelId],
   );
   if (modelRow.rowCount === 0) {
@@ -62,7 +105,7 @@ paymentsRouter.post('/models/:id/checkout', requireAuth, requireBuyer, async (re
   }
   const model = modelRow.rows[0];
 
-  if (model.deleted_at || model.hidden_at) {
+  if (isModelUnavailable(model)) {
     throw new AppError(400, 'MODEL_UNAVAILABLE', 'This model is no longer available');
   }
 
@@ -101,13 +144,36 @@ paymentsRouter.post('/models/:id/checkout', requireAuth, requireBuyer, async (re
   const currency = String(model.currency || 'USD').trim();
   const licenseType = String(model.license || 'COMMERCIAL').trim();
 
-  const result = await db.query(
-    `INSERT INTO purchases (user_id, model_id, status, embed_key, amount_cents, currency, license_type)
-     VALUES ($1, $2, 'pending', $3, $4, $5, $6)
-     RETURNING id`,
-    [userId, modelId, embedKey, amountCents, currency, licenseType],
-  );
-  const purchaseId = result.rows[0].id;
+  let purchaseId: string;
+  try {
+    const result = await db.query(
+      `INSERT INTO purchases (user_id, model_id, status, embed_key, amount_cents, currency, license_type)
+       VALUES ($1, $2, 'pending', $3, $4, $5, $6)
+       RETURNING id`,
+      [userId, modelId, embedKey, amountCents, currency, licenseType],
+    );
+    purchaseId = result.rows[0].id;
+  } catch (err: any) {
+    if (err?.code === '23505') {
+      const raced = await db.query(
+        `SELECT id, status FROM purchases WHERE user_id = $1 AND model_id = $2`,
+        [userId, modelId],
+      );
+      const existingPurchase = raced.rows[0];
+      if (existingPurchase?.status === 'paid') {
+        throw new AppError(409, 'ALREADY_PURCHASED', 'You have already purchased this model');
+      }
+      if (existingPurchase) {
+        res.json({
+          purchaseId: existingPurchase.id,
+          checkoutUrl: `/checkout/${existingPurchase.id}`,
+          provider: env.paymentProvider,
+        });
+        return;
+      }
+    }
+    throw err;
+  }
 
   res.json({
     purchaseId,
@@ -116,29 +182,72 @@ paymentsRouter.post('/models/:id/checkout', requireAuth, requireBuyer, async (re
   });
 });
 
+// ─── 1b. GET /api/models/:id/purchase ────────────────────────────────────────
+// ตรวจสอบว่าผู้ใช้ปัจจุบันได้ซื้อโมเดลนี้ไปแล้วหรือยัง (เฉพาะ status = 'paid')
+paymentsRouter.get('/models/:id/purchase', requireAuth, async (req, res) => {
+  const userId = req.user!.id;
+  const modelId = String(req.params.id);
+  requireUuid(modelId);
+
+  const result = await db.query(
+    `SELECT id, status, embed_key, paid_at, created_at
+     FROM purchases
+     WHERE user_id = $1 AND model_id = $2 AND status = 'paid'`,
+    [userId, modelId],
+  );
+
+  const purchased = (result.rowCount ?? 0) > 0;
+  res.json({
+    purchased,
+    purchase: purchased
+      ? {
+          id: result.rows[0].id,
+          modelId,
+          embedKey: result.rows[0].embed_key,
+          paidAt: result.rows[0].paid_at ?? result.rows[0].created_at,
+        }
+      : null,
+  });
+});
+
 // ─── 2. POST /api/purchases/:id/confirm-mock ────────────────────────────────
 // กดจ่ายจำลอง → เปลี่ยน status เป็น paid, บันทึก paid_at = NOW(), embed_key พร้อมใช้ทันที
 // เปิดได้เฉพาะเมื่อ PAYMENT_PROVIDER=mock
 paymentsRouter.post('/purchases/:id/confirm-mock', requireAuth, requireMockProvider, requireBuyer, async (req, res) => {
   const userId = req.user!.id;
-  const purchaseId = req.params.id;
+  const purchaseId = String(req.params.id);
+  requireUuid(purchaseId);
 
   const result = await db.query(
-    `UPDATE purchases
+    `UPDATE purchases p
      SET status = 'paid', paid_at = NOW()
-     WHERE id = $1 AND user_id = $2 AND status = 'pending'
-     RETURNING id, model_id, embed_key, amount_cents, currency, license_type, paid_at`,
+     FROM models m
+     LEFT JOIN users o ON o.id = m.owner_id
+     WHERE p.id = $1 AND p.user_id = $2 AND p.status = 'pending'
+       AND m.id = p.model_id
+       AND ${MODEL_SELLABLE_SQL}
+     RETURNING p.id, p.model_id, p.embed_key, p.amount_cents, p.currency, p.license_type, p.paid_at`,
     [purchaseId, userId],
   );
 
   if (result.rowCount === 0) {
-    // อาจจ่ายไปแล้ว หรือไม่ใช่ของตัวเอง
+    // อาจจ่ายไปแล้ว, โมเดลถูกซ่อน/ลบ/เจ้าของถูกระงับ, หรือไม่ใช่ของตัวเอง
     const check = await db.query(
-      `SELECT status FROM purchases WHERE id = $1 AND user_id = $2`,
+      `SELECT p.status, m.deleted_at, m.hidden_at, o.suspended_at AS owner_suspended_at, o.deleted_at AS owner_deleted_at
+       FROM purchases p
+       LEFT JOIN models m ON m.id = p.model_id
+       LEFT JOIN users o ON o.id = m.owner_id
+       WHERE p.id = $1 AND p.user_id = $2`,
       [purchaseId, userId],
     );
-    if (check.rowCount! > 0 && check.rows[0].status === 'paid') {
-      throw new AppError(409, 'ALREADY_PAID', 'This purchase has already been paid');
+    if (check.rowCount! > 0) {
+      const row = check.rows[0];
+      if (row.status === 'paid') {
+        throw new AppError(409, 'ALREADY_PAID', 'This purchase has already been paid');
+      }
+      if (isModelUnavailable(row)) {
+        throw new AppError(400, 'MODEL_UNAVAILABLE', 'This model is no longer available');
+      }
     }
     throw new AppError(404, 'PURCHASE_NOT_FOUND', 'Purchase not found');
   }
@@ -159,31 +268,46 @@ paymentsRouter.post('/purchases/:id/confirm-mock', requireAuth, requireMockProvi
 // ─── 2b. POST /api/models/:id/pay-mock (Alias by modelId for single-click mock pay) ─
 paymentsRouter.post('/models/:id/pay-mock', requireAuth, requireMockProvider, requireBuyer, async (req, res) => {
   const userId = req.user!.id;
-  const modelId = req.params.id;
+  const modelId = String(req.params.id);
+  requireUuid(modelId);
 
   const result = await db.query(
-    `UPDATE purchases
+    `UPDATE purchases p
      SET status = 'paid', paid_at = NOW()
-     WHERE model_id = $1 AND user_id = $2 AND status = 'pending'
-     RETURNING id, model_id, embed_key, amount_cents, currency, license_type, paid_at`,
+     FROM models m
+     LEFT JOIN users o ON o.id = m.owner_id
+     WHERE p.model_id = $1 AND p.user_id = $2 AND p.status = 'pending'
+       AND m.id = p.model_id
+       AND ${MODEL_SELLABLE_SQL}
+     RETURNING p.id, p.model_id, p.embed_key, p.amount_cents, p.currency, p.license_type, p.paid_at`,
     [modelId, userId],
   );
 
   if (result.rowCount === 0) {
     const check = await db.query(
-      `SELECT id, model_id, embed_key, status, paid_at FROM purchases WHERE model_id = $1 AND user_id = $2`,
+      `SELECT p.id, p.model_id, p.embed_key, p.status, p.paid_at,
+              m.deleted_at, m.hidden_at, o.suspended_at AS owner_suspended_at, o.deleted_at AS owner_deleted_at
+       FROM purchases p
+       LEFT JOIN models m ON m.id = p.model_id
+       LEFT JOIN users o ON o.id = m.owner_id
+       WHERE p.model_id = $1 AND p.user_id = $2`,
       [modelId, userId],
     );
-    if (check.rowCount! > 0 && check.rows[0].status === 'paid') {
-      const paidRow = check.rows[0];
-      res.json({
-        message: 'Payment already confirmed',
-        purchaseId: paidRow.id,
-        modelId: paidRow.model_id,
-        embedKey: paidRow.embed_key,
-        paidAt: paidRow.paid_at,
-      });
-      return;
+    if (check.rowCount! > 0) {
+      const row = check.rows[0];
+      if (row.status === 'paid') {
+        res.json({
+          message: 'Payment already confirmed',
+          purchaseId: row.id,
+          modelId: row.model_id,
+          embedKey: row.embed_key,
+          paidAt: row.paid_at,
+        });
+        return;
+      }
+      if (isModelUnavailable(row)) {
+        throw new AppError(400, 'MODEL_UNAVAILABLE', 'This model is no longer available');
+      }
     }
     throw new AppError(404, 'PURCHASE_NOT_FOUND', 'Pending purchase not found for this model');
   }
@@ -205,13 +329,16 @@ paymentsRouter.post('/models/:id/pay-mock', requireAuth, requireMockProvider, re
 // สร้าง QR Code สำหรับชำระเงิน (PromptPay ผ่าน Stripe เมื่อ PAYMENT_PROVIDER=stripe หรือ Mock QR)
 paymentsRouter.post('/purchases/:id/qr', requireAuth, requireBuyer, async (req, res) => {
   const userId = req.user!.id;
-  const purchaseId = req.params.id;
+  const purchaseId = String(req.params.id);
+  requireUuid(purchaseId);
 
   const result = await db.query(
     `SELECT p.id, p.model_id, p.status, p.amount_cents, p.currency, p.provider_session_id,
-            m.title
+            m.title, m.deleted_at, m.hidden_at,
+            o.suspended_at AS owner_suspended_at, o.deleted_at AS owner_deleted_at
      FROM purchases p
      JOIN models m ON m.id = p.model_id
+     LEFT JOIN users o ON o.id = m.owner_id
      WHERE p.id = $1 AND p.user_id = $2`,
     [purchaseId, userId],
   );
@@ -223,6 +350,9 @@ paymentsRouter.post('/purchases/:id/qr', requireAuth, requireBuyer, async (req, 
   const purchase = result.rows[0];
   if (purchase.status === 'paid') {
     throw new AppError(409, 'ALREADY_PAID', 'This purchase has already been paid');
+  }
+  if (isModelUnavailable(purchase)) {
+    throw new AppError(400, 'MODEL_UNAVAILABLE', 'This model is no longer available');
   }
 
   if (env.paymentProvider !== 'stripe') {
@@ -238,7 +368,7 @@ paymentsRouter.post('/purchases/:id/qr', requireAuth, requireBuyer, async (req, 
   }
 
   const stripe = getStripe();
-  let paymentIntent: Stripe.PaymentIntent;
+  let paymentIntent: Stripe.PaymentIntent | null = null;
 
   if (purchase.provider_session_id && String(purchase.provider_session_id).startsWith('pi_')) {
     const existingPi = await stripe.paymentIntents.retrieve(purchase.provider_session_id);
@@ -251,43 +381,20 @@ paymentsRouter.post('/purchases/:id/qr', requireAuth, requireBuyer, async (req, 
     }
     if (existingPi.status === 'requires_action' && existingPi.next_action?.promptpay_display_qr_code) {
       paymentIntent = existingPi;
-    } else {
-      const amountSatang = toThbSatang(Number(purchase.amount_cents) || 0, purchase.currency);
-      paymentIntent = await stripe.paymentIntents.create({
-        amount: amountSatang,
-        currency: 'thb',
-        payment_method_types: ['promptpay'],
-        confirm: true,
-        payment_method_data: {
-          type: 'promptpay',
-          billing_details: { email: req.user!.email },
-        },
-        description: `Lixyte: ${purchase.title}`,
-        metadata: { purchaseId: purchase.id, modelId: purchase.model_id, userId },
-      });
-      await db.query(`UPDATE purchases SET provider_session_id = $1 WHERE id = $2`, [
-        paymentIntent.id,
-        purchase.id,
-      ]);
     }
-  } else {
-    const amountSatang = toThbSatang(Number(purchase.amount_cents) || 0, purchase.currency);
-    paymentIntent = await stripe.paymentIntents.create({
-      amount: amountSatang,
-      currency: 'thb',
-      payment_method_types: ['promptpay'],
-      confirm: true,
-      payment_method_data: {
-        type: 'promptpay',
-        billing_details: { email: req.user!.email },
-      },
-      description: `Lixyte: ${purchase.title}`,
-      metadata: { purchaseId: purchase.id, modelId: purchase.model_id, userId },
+  }
+
+  if (!paymentIntent) {
+    paymentIntent = await createAndStorePromptPayIntent({
+      stripe,
+      purchaseId: purchase.id,
+      modelId: purchase.model_id,
+      userId,
+      buyerEmail: req.user!.email,
+      title: purchase.title,
+      amountCents: Number(purchase.amount_cents) || 0,
+      currency: purchase.currency,
     });
-    await db.query(`UPDATE purchases SET provider_session_id = $1 WHERE id = $2`, [
-      paymentIntent.id,
-      purchase.id,
-    ]);
   }
 
   const qr = paymentIntent.next_action?.promptpay_display_qr_code;
@@ -378,7 +485,8 @@ paymentsRouter.get('/me/purchases', requireAuth, async (req, res) => {
 // ขอ embed_key ใหม่ → รหัสเก่าใช้ไม่ได้ทันที
 paymentsRouter.post('/purchases/:id/regenerate-key', requireAuth, requireNotSuspended, async (req, res) => {
   const userId = req.user!.id;
-  const purchaseId = req.params.id;
+  const purchaseId = String(req.params.id);
+  requireUuid(purchaseId);
   const newKey = generateEmbedKey();
 
   const result = await db.query(
@@ -404,7 +512,8 @@ paymentsRouter.post('/purchases/:id/regenerate-key', requireAuth, requireNotSusp
 // ดึงข้อมูลคำสั่งซื้อ (สำหรับหน้าชำระเงิน QR)
 paymentsRouter.get('/purchases/:id', requireAuth, async (req, res) => {
   const userId = req.user!.id;
-  const purchaseId = req.params.id;
+  const purchaseId = String(req.params.id);
+  requireUuid(purchaseId);
 
   const result = await db.query(
     `SELECT p.id, p.model_id, p.status, p.amount_cents, p.currency AS purchase_currency,

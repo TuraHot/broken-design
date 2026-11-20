@@ -7,13 +7,13 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Bell, Box, Flag, LayoutDashboard, LogOut, Receipt, UserCheck, Users, type LucideIcon } from 'lucide-react';
+import { Bell, Box, Flag, LayoutDashboard, LogOut, Receipt, UserCheck, Users, Wallet, type LucideIcon } from 'lucide-react';
 import LanguageSwitch from '@/components/LanguageSwitch';
 import ThemeToggle from '@/components/ThemeToggle';
 import { fetchWaitingSummary, WAITING_CHANGED_EVENT, type AdminWaitingCounts } from '@/lib/admin-api';
 import { useT } from '@/lib/i18n/client';
 import type { MessageKey } from '@/lib/i18n/messages';
-import { clearSession, readSession, type Session } from '@/lib/session';
+import { clearSession, readSession, SESSION_UPDATED_EVENT, type Session } from '@/lib/session';
 
 type Count = keyof AdminWaitingCounts;
 
@@ -25,6 +25,7 @@ const TABS: { href: string; label: MessageKey; icon: LucideIcon; count?: Count }
   { href: '/admin/users', label: 'admin.nav.users', icon: Users },
   { href: '/admin/creator-approvals', label: 'admin.nav.creatorApprovals', icon: UserCheck, count: 'creatorApplications' },
   { href: '/admin/purchases', label: 'admin.nav.purchases', icon: Receipt },
+  { href: '/admin/withdrawals', label: 'admin.nav.withdrawals', icon: Wallet },
   { href: '/admin/complaints', label: 'admin.nav.complaints', icon: Flag, count: 'complaints' },
 ];
 
@@ -59,7 +60,11 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
     };
     sync();
     window.addEventListener('storage', sync);
-    return () => window.removeEventListener('storage', sync);
+    window.addEventListener(SESSION_UPDATED_EVENT, sync);
+    return () => {
+      window.removeEventListener('storage', sync);
+      window.removeEventListener(SESSION_UPDATED_EVENT, sync);
+    };
   }, []);
 
   // How many things wait for an admin (shown next to the tabs). Read again on every page change and once a minute while

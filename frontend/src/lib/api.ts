@@ -1,5 +1,5 @@
 import { cache } from 'react';
-import { buildProfile, creatorHandle, type CreatorProfile } from './creators';
+import type { CreatorProfile } from './creators';
 import { isPublicModel, PAGE_SIZE, queryModels } from './pagination';
 import {
   GALLERY_TAGS,
@@ -40,32 +40,16 @@ function buildModelSearchParams(params: ModelsParams, pageSize?: number): URLSea
   return sp;
 }
 
-const fetchCoreApiModelsCached = cache(async (query: string): Promise<Model[]> => {
-  try {
-    const url = `${getServerCoreApiUrl()}/api/models${query ? `?${query}` : ''}`;
-    const res = await fetch(url, { cache: 'no-store' });
-    if (!res.ok) return [];
-    const data = (await res.json()) as Partial<ModelsPage>;
-    return Array.isArray(data.items) ? data.items.filter(isPublicModel) : [];
-  } catch {
-    return [];
-  }
-});
-
-export async function fetchCoreApiModels(params: ModelsParams = {}, pageSize = 100): Promise<Model[]> {
-  const query = buildModelSearchParams(params, pageSize).toString();
-  return fetchCoreApiModelsCached(query);
-}
-
-const fetchCoreApiModelById = cache(async (id: string): Promise<Model | null> => {
+const fetchCoreApiModelById = cache(async (id: string, trackView = false): Promise<Model | null> => {
   if (!UUID_RE.test(id)) return null;
   try {
-    const res = await fetch(`${getServerCoreApiUrl()}/api/models/${encodeURIComponent(id)}`, {
+    const suffix = trackView ? '?trackView=1' : '';
+    const res = await fetch(`${getServerCoreApiUrl()}/api/models/${encodeURIComponent(id)}${suffix}`, {
       cache: 'no-store',
     });
     if (!res.ok) return null;
     const data = (await res.json()) as Partial<Model>;
-    if (data && data.id && data.title !== 'Sample 3D Asset' && isPublicModel(data as Model)) {
+    if (data && data.id && isPublicModel(data as Model)) {
       return data as Model;
     }
     return null;
@@ -121,9 +105,9 @@ export async function fetchAvailableTags(includeDefaults = true): Promise<string
 }
 
 /** One model for its detail page, or `null` when it does not exist. */
-export async function fetchModel(id: string): Promise<Model | null> {
+export async function fetchModel(id: string, trackView = false): Promise<Model | null> {
   if (UUID_RE.test(id)) {
-    const fromApi = await fetchCoreApiModelById(id);
+    const fromApi = await fetchCoreApiModelById(id, trackView);
     if (fromApi) return fromApi;
   }
 
@@ -132,20 +116,31 @@ export async function fetchModel(id: string): Promise<Model | null> {
 
 /** Other models by the same creator (most popular first), for the "More from" row. */
 export async function fetchMoreFromCreator(model: Model, limit = 4): Promise<Model[]> {
-  const apiModels = await fetchCoreApiModels();
-  return queryModels(
-    apiModels.filter((m) => m.creator === model.creator && m.id !== model.id),
-    {},
-    limit,
-  ).items;
+  if (!model.ownerId || !UUID_RE.test(model.ownerId)) return [];
+  try {
+    const sp = new URLSearchParams({
+      ownerId: model.ownerId,
+      pageSize: String(limit + 1),
+    });
+    const res = await fetch(`${getServerCoreApiUrl()}/api/models?${sp}`, { cache: 'no-store' });
+    if (res.ok) {
+      const data = (await res.json()) as Partial<ModelsPage>;
+      if (Array.isArray(data.items)) {
+        return queryModels(
+          data.items.filter((m) => isPublicModel(m) && m.id !== model.id),
+          {},
+          limit,
+        ).items;
+      }
+    }
+  } catch {
+    // Core API offline
+  }
+  return [];
 }
 
-/** A creator profile by handle (see `creatorHandle`), or `null` when nobody has that handle. */
+/** A creator profile by handle (calls GET /api/creators/:handle directly, works even with 0 models or >100 total models). */
 export async function fetchCreator(handle: string): Promise<CreatorProfile | null> {
-  const apiModels = await fetchCoreApiModels();
-  const mine = apiModels.filter((m) => creatorHandle(m.creator) === handle);
-  if (mine.length > 0) return buildProfile(mine[0].creator, mine);
-
   try {
     const res = await fetch(`${getServerCoreApiUrl()}/api/creators/${encodeURIComponent(handle)}`, { cache: 'no-store' });
     if (res.ok) return (await res.json()) as CreatorProfile;
@@ -193,6 +188,32 @@ export async function fetchMyPurchases(token: string): Promise<PurchaseItem[]> {
   return data.purchases || [];
 }
 
+/** Check if the current user has already purchased a specific model (`GET /api/models/:id/purchase`). */
+export async function checkModelPurchased(
+  modelId: string,
+  token: string,
+): Promise<{ purchased: boolean; purchase?: { id: string; embedKey: string; paidAt: string } | null }> {
+  try {
+    return await coreApiFetch<{ purchased: boolean; purchase?: { id: string; embedKey: string; paidAt: string } | null }>(
+      `/api/models/${encodeURIComponent(modelId)}/purchase`,
+      token,
+      { cache: 'no-store' },
+    );
+  } catch {
+    // Fallback: check /api/me/purchases
+    try {
+      const purchases = await fetchMyPurchases(token);
+      const found = purchases.find((p) => p.modelId === modelId);
+      return {
+        purchased: Boolean(found),
+        purchase: found ? { id: found.id, embedKey: found.embedKey, paidAt: found.paidAt } : null,
+      };
+    } catch {
+      return { purchased: false, purchase: null };
+    }
+  }
+}
+
 /** Regenerate embed_key for a purchase (`POST /api/purchases/:id/regenerate-key`). */
 export async function regenerateEmbedKey(
   purchaseId: string,
@@ -233,11 +254,6 @@ export async function createQrPayment(purchaseId: string, token: string): Promis
   return coreApiFetch<QrPaymentResponse>(`/api/purchases/${encodeURIComponent(purchaseId)}/qr`, token, {
     method: 'POST',
   });
-}
-
-/** Enable seller mode for user (`POST /api/seller/enable`). */
-export async function enableSellerMode(token: string): Promise<void> {
-  await coreApiFetch('/api/seller/enable', token, { method: 'POST' });
 }
 
 export interface CreatorApplication {
@@ -357,7 +373,23 @@ export interface NoticeItem {
   id: string;
   kind: string;
   modelId: string | null;
-  data: { modelTitle?: string; oldLicense?: string; newLicense?: string; reason?: string | null; until?: string | null; auto?: boolean; note?: string | null };
+  data: {
+    modelTitle?: string;
+    oldLicense?: string;
+    newLicense?: string;
+    reason?: string | null;
+    until?: string | null;
+    auto?: boolean;
+    note?: string | null;
+    liker_id?: string;
+    liker_name?: string;
+    model_title?: string;
+    message?: string;
+    adminNote?: string | null;
+    netAmountCents?: number;
+    currency?: string;
+    payoutMethod?: string;
+  };
   readAt: string | null;
   createdAt: string;
 }

@@ -4,10 +4,14 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Check, Copy, Lock } from 'lucide-react';
-import { CDN_SERVICE_URL } from '@/lib/api';
 import { useT } from '@/lib/i18n/client';
 import type { MessageKey } from '@/lib/i18n/messages';
-import { readSession } from '@/lib/session';
+import {
+  buildIframeSnippet,
+  buildVmModelSnippet,
+  DEFAULT_EMBED_ORIGIN,
+} from '@/lib/model-assets';
+import { readSession, SESSION_UPDATED_EVENT } from '@/lib/session';
 
 type Kind = 'component' | 'iframe';
 
@@ -21,7 +25,7 @@ export default function EmbedSnippets({ id, paid }: { id: string; paid: boolean 
   const [kind, setKind] = useState<Kind>('component');
   const [copied, setCopied] = useState(false);
   // Default to localhost:3000 so snippets never copy with an empty/relative origin before hydration.
-  const [origin, setOrigin] = useState('http://localhost:3000');
+  const [origin, setOrigin] = useState(DEFAULT_EMBED_ORIGIN);
   const [ready, setReady] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
 
@@ -33,15 +37,19 @@ export default function EmbedSnippets({ id, paid }: { id: string; paid: boolean 
     };
     syncSession();
     window.addEventListener('storage', syncSession);
-    return () => window.removeEventListener('storage', syncSession);
+    window.addEventListener(SESSION_UPDATED_EVENT, syncSession);
+    return () => {
+      window.removeEventListener('storage', syncSession);
+      window.removeEventListener(SESSION_UPDATED_EVENT, syncSession);
+    };
   }, []);
 
   const canUseEmbed = ready && signedIn;
-  const key = paid ? ' key="YOUR_EMBED_KEY"' : '';
+  const embedKey = paid ? 'YOUR_EMBED_KEY' : undefined;
   const code =
     kind === 'component'
-      ? `<script type="module" src="${origin}/embed.js"></script>\n<vm-model model-id="${id}" cdn-base="${CDN_SERVICE_URL}"${key} auto-rotate camera-controls></vm-model>`
-      : `<iframe\n  src="${origin}/embed/${id}${paid ? '?key=YOUR_EMBED_KEY' : ''}"\n  width="600"\n  height="400"\n  loading="lazy"\n  allow="fullscreen"\n  style="border:0"\n></iframe>`;
+      ? buildVmModelSnippet({ origin, modelId: id, embedKey })
+      : buildIframeSnippet({ origin, modelId: id, embedKey });
 
   const selectKind = (next: Kind) => {
     if (!readSession()) {

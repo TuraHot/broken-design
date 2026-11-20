@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react';
 import { useT } from '@/lib/i18n/client';
 import type { MessageKey } from '@/lib/i18n/messages';
 
-export const LANDING_SECTIONS: { id: string; no: string; label: MessageKey }[] = [
+const LANDING_SECTIONS: { id: string; no: string; label: MessageKey }[] = [
   { id: 'hero', no: '01', label: 'home.nav.hero' },
   { id: 'how', no: '02', label: 'home.how.title' },
   { id: 'categories', no: '03', label: 'home.categories' },

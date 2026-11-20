@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import multer from 'multer';
+import rateLimit from 'express-rate-limit';
 import sharp from 'sharp';
 import path from 'path';
 import fs from 'fs';
@@ -20,6 +21,30 @@ import { AppError } from '../../middlewares/error.middleware';
 import { limitedDiskStorage } from './limitedDiskStorage';
 
 export const uploadRouter = Router();
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const uploadLimitNum = (() => {
+  const n = Number(process.env.CDN_UPLOADS_PER_15MIN);
+  return Number.isFinite(n) && n > 0 ? n : 20;
+})();
+
+const uploadLimiter = rateLimit({
+  windowMs: 15 * 60_000,
+  limit: uploadLimitNum,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === 'test' && process.env.ENFORCE_UPLOAD_RATE_LIMIT !== 'true',
+  handler: (_req: Request, res: Response) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.status(429).json({
+      error: {
+        code: 'RATE_LIMITED',
+        message: 'Too many model uploads, please slow down.',
+      },
+    });
+  },
+});
 
 // Ensure temporary upload directory exists
 fs.mkdirSync(path.resolve(env.tmpUploadDir), { recursive: true });
@@ -109,8 +134,10 @@ async function readAndCheckForeignGlb(
 }
 
 // POST /api/models (Upload 3D Asset: file, preview?, poster?, metadata)
+// requireSeller verifies live DB status (is_seller, role <> 'admin', suspended_at IS NULL) BEFORE Multer buffers files.
 uploadRouter.post(
   '/models',
+  uploadLimiter,
   requireAuth,
   requireSeller,
   uploadFields,
@@ -120,34 +147,6 @@ uploadRouter.post(
     let storage: StorageAdapter | null = null;
 
     try {
-      // 0. Verify seller account status in database (ensure account is active and not suspended)
-      try {
-        const userCheck = await db.query(
-          `SELECT id, role, is_seller, suspended_at FROM users WHERE id = $1`,
-          [req.user!.id]
-        );
-
-        if (userCheck.rows.length > 0) {
-          const dbUser = userCheck.rows[0];
-          if (dbUser.suspended_at !== null) {
-            throw new AppError(
-              403,
-              'ACCOUNT_SUSPENDED',
-              'Your account has been suspended by an administrator. Upload access is blocked.'
-            );
-          }
-          if (!dbUser.is_seller && dbUser.role !== 'creator' && dbUser.role !== 'admin') {
-            throw new AppError(
-              403,
-              'FORBIDDEN',
-              'Seller access is disabled for this account.'
-            );
-          }
-        }
-      } catch (err) {
-        if (err instanceof AppError) throw err;
-      }
-
       // 1. Extract and validate metadata upfront
       const {
         title,
@@ -161,6 +160,13 @@ uploadRouter.post(
       if (!title || typeof title !== 'string' || title.trim() === '') {
         throw new AppError(400, 'BAD_REQUEST', 'Model title is required');
       }
+      if (title.trim().length > 255) {
+        throw new AppError(400, 'BAD_REQUEST', 'Model title must not exceed 255 characters');
+      }
+      const cleanDescription = typeof description === 'string' ? description.trim() : '';
+      if (cleanDescription.length > 5000) {
+        throw new AppError(400, 'BAD_REQUEST', 'Description must not exceed 5000 characters');
+      }
 
       // Validate License Enum against Postgres license_type enum ('CC0', 'CC-BY', 'CC-BY-NC', 'COMMERCIAL')
       const VALID_LICENSES = ['CC0', 'CC-BY', 'CC-BY-NC', 'COMMERCIAL'] as const;
@@ -173,7 +179,11 @@ uploadRouter.post(
         );
       }
 
-      const parsedPrice = Math.max(0, parseInt(String(price_cents), 10) || 0);
+      const rawPrice = Number(price_cents ?? 0);
+      const parsedPrice = Number.isFinite(rawPrice) ? Math.round(rawPrice) : NaN;
+      if (!Number.isFinite(parsedPrice) || parsedPrice < 0 || parsedPrice > 100_000_000) {
+        throw new AppError(400, 'BAD_REQUEST', 'Invalid price_cents (must be between 0 and 100000000)');
+      }
 
       // Business Rule (project.md Section 5): Paid models MUST have a preview GLB file for public rotation
       const previewFile = files?.['preview']?.[0];
@@ -280,7 +290,9 @@ uploadRouter.post(
           parsedTags = tags.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean);
         }
       }
-      parsedTags = Array.from(new Set(parsedTags));
+      parsedTags = Array.from(
+        new Set(parsedTags.filter((t) => t.length > 0 && t.length <= 50)),
+      ).slice(0, 20);
 
       const parsedCurrency = String(currency || 'USD').trim().toUpperCase().slice(0, 3);
 
@@ -298,7 +310,7 @@ uploadRouter.post(
             modelId,
             ownerId,
             title.trim(),
-            description.trim(),
+            cleanDescription,
             parsedTags,
             normalizedLicense,
             fileHash,
@@ -318,7 +330,7 @@ uploadRouter.post(
             id: modelId,
             owner_id: ownerId,
             title: title.trim(),
-            description: description.trim(),
+            description: cleanDescription,
             tags: parsedTags,
             license: normalizedLicense,
             file_hash: fileHash,
@@ -334,6 +346,7 @@ uploadRouter.post(
         insertedModel = data;
       }
 
+      await cleanupFiles(files);
       res.status(201).json({
         message: 'Model uploaded successfully',
         model: insertedModel,
@@ -351,6 +364,7 @@ uploadRouter.post(
 // PATCH /api/models/:id/assets (Replace main GLB, preview GLB, and/or poster image)
 uploadRouter.patch(
   '/models/:id/assets',
+  uploadLimiter,
   requireAuth,
   requireSeller,
   uploadFields,
@@ -361,30 +375,10 @@ uploadRouter.patch(
 
     try {
       const modelId = String(req.params.id);
+      if (!UUID_RE.test(modelId)) {
+        throw new AppError(404, 'MODEL_NOT_FOUND', 'Model not found');
+      }
       const userId = req.user!.id;
-      const userRole = req.user!.role;
-
-      let dbUser: { id: string; role: string; is_seller: boolean; suspended_at: Date | string | null } | undefined;
-      try {
-        const userCheck = await db.query(
-          `SELECT id, role, is_seller, suspended_at FROM users WHERE id = $1`,
-          [userId]
-        );
-        dbUser = userCheck.rows[0];
-      } catch (err) {
-        if (err instanceof AppError) throw err;
-        if (supabase) {
-          const { data } = await supabase
-            .from('users')
-            .select('id, role, is_seller, suspended_at')
-            .eq('id', userId)
-            .maybeSingle();
-          dbUser = (data as typeof dbUser | null) ?? undefined;
-        }
-      }
-      if (dbUser && dbUser.suspended_at !== null) {
-        throw new AppError(403, 'ACCOUNT_SUSPENDED', 'Your account has been suspended by an administrator.');
-      }
 
       let existing: {
         id: string;
@@ -416,7 +410,7 @@ uploadRouter.patch(
       if (!existing || existing.deleted_at !== null) {
         throw new AppError(404, 'MODEL_NOT_FOUND', 'Model not found');
       }
-      if (existing.owner_id !== userId && userRole !== 'admin') {
+      if (existing.owner_id !== userId) {
         throw new AppError(403, 'FORBIDDEN', 'You do not have permission to edit this model');
       }
 

@@ -15,7 +15,7 @@ import {
 } from '@/lib/complaints';
 import { useT } from '@/lib/i18n/client';
 import type { MessageKey } from '@/lib/i18n/messages';
-import { readSession } from '@/lib/session';
+import { readSession, SESSION_UPDATED_EVENT } from '@/lib/session';
 
 const FIELD = 'w-full rounded-lg border border-line bg-ink/5 px-3 text-sm text-ink placeholder:text-ink/40 focus:border-ink/50 focus:outline-none';
 const PRIMARY = 'inline-flex h-10 items-center justify-center rounded-lg bg-ink px-4 text-[15px] font-medium text-canvas transition-colors hover:bg-ink/85 disabled:cursor-not-allowed disabled:opacity-50';
@@ -40,8 +40,17 @@ export default function ReportForm({ initialModelRef = '', onClose }: { initialM
   const [sent, setSent] = useState(false);
 
   useEffect(() => {
-    setSignedIn(readSession() !== null);
-    setReady(true);
+    const sync = () => {
+      setSignedIn(readSession() !== null);
+      setReady(true);
+    };
+    sync();
+    window.addEventListener('storage', sync);
+    window.addEventListener(SESSION_UPDATED_EVENT, sync);
+    return () => {
+      window.removeEventListener('storage', sync);
+      window.removeEventListener(SESSION_UPDATED_EVENT, sync);
+    };
   }, []);
 
   const submit = async (e: FormEvent) => {

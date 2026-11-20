@@ -9,13 +9,19 @@ import { generateEmbedKey } from './payments.routes';
 
 const JWT_SECRET = env.jwtSecret;
 
+const MODEL_1 = '11111111-1111-4111-8111-111111111111';
+const MODEL_MISSING = '22222222-2222-4222-8222-222222222222';
+const MODEL_FREE = '33333333-3333-4333-8333-333333333333';
+const MODEL_PAID = '44444444-4444-4444-8444-444444444444';
+const PURCHASE_1 = '55555555-5555-4555-8555-555555555555';
+
 function makeToken(user: { id?: string; email?: string; role?: 'user' | 'creator' } = {}) {
   const payload = {
     id: user.id || 'u-1',
     email: user.email || 'buyer@example.com',
     role: user.role || 'user',
   };
-  return jwt.sign(payload, JWT_SECRET);
+  return jwt.sign(payload, JWT_SECRET, { algorithm: 'HS256' });
 }
 
 test('generateEmbedKey generates a 48-character hex string and unique keys', () => {
@@ -30,7 +36,7 @@ test('POST /api/models/:id/checkout - rejects unauthenticated requests', async (
   const server = app.listen(0);
   const port = (server.address() as any).port;
   try {
-    const res = await fetch(`http://localhost:${port}/api/models/m-1/checkout`, {
+    const res = await fetch(`http://localhost:${port}/api/models/${MODEL_1}/checkout`, {
       method: 'POST',
     });
     assert.equal(res.status, 401);
@@ -39,11 +45,46 @@ test('POST /api/models/:id/checkout - rejects unauthenticated requests', async (
   }
 });
 
+test('payments - rejects malformed non-UUID ids with 400 INVALID_ID before hitting Postgres', async () => {
+  const originalQuery = db.query.bind(db);
+  (db as any).query = async (sql: string) => {
+    if (sql.includes('SELECT deleted_at FROM users WHERE id = $1')) {
+      return { rowCount: 1, rows: [{ deleted_at: null }] };
+    }
+    if (sql.includes('suspended_at') && sql.includes('FROM users WHERE id = $1')) {
+      return { rowCount: 1, rows: [{ suspended_at: null, role: 'user' }] };
+    }
+    throw new Error(`Unexpected DB query for invalid id: ${sql}`);
+  };
+
+  const server = app.listen(0);
+  const port = (server.address() as any).port;
+  try {
+    const headers = { Authorization: `Bearer ${makeToken()}` };
+    for (const [method, path] of [
+      ['POST', '/api/models/not-a-uuid/checkout'],
+      ['GET', '/api/models/not-a-uuid/purchase'],
+      ['POST', '/api/purchases/not-a-uuid/confirm-mock'],
+      ['POST', '/api/models/not-a-uuid/pay-mock'],
+      ['POST', '/api/purchases/not-a-uuid/qr'],
+      ['POST', '/api/purchases/not-a-uuid/regenerate-key'],
+      ['GET', '/api/purchases/not-a-uuid'],
+    ]) {
+      const res = await fetch(`http://localhost:${port}${path}`, { method, headers });
+      assert.equal(res.status, 400, path);
+      assert.equal((await res.json()).error?.code, 'INVALID_ID', path);
+    }
+  } finally {
+    server.close();
+    db.query = originalQuery;
+  }
+});
+
 test('POST /api/models/:id/checkout - returns 404 when model not found', async () => {
   const originalQuery = db.query.bind(db);
   (db as any).query = async (sql: string) => {
     if (sql.includes('suspended_at') && sql.includes('FROM users WHERE id = $1')) return { rowCount: 1, rows: [{ suspended_at: null, role: 'user' }] };
-    if (sql.includes('FROM models WHERE id = $1')) {
+    if (sql.includes('FROM models m')) {
       return { rowCount: 0, rows: [] };
     }
     return { rowCount: 0, rows: [] };
@@ -52,7 +93,7 @@ test('POST /api/models/:id/checkout - returns 404 when model not found', async (
   const server = app.listen(0);
   const port = (server.address() as any).port;
   try {
-    const res = await fetch(`http://localhost:${port}/api/models/m-999/checkout`, {
+    const res = await fetch(`http://localhost:${port}/api/models/${MODEL_MISSING}/checkout`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${makeToken()}` },
     });
@@ -65,14 +106,25 @@ test('POST /api/models/:id/checkout - returns 404 when model not found', async (
   }
 });
 
-test('POST /api/models/:id/checkout - rejects purchasing own model', async () => {
+test('POST /api/models/:id/checkout - rejects models whose owner is suspended', async () => {
   const originalQuery = db.query.bind(db);
   (db as any).query = async (sql: string) => {
     if (sql.includes('suspended_at') && sql.includes('FROM users WHERE id = $1')) return { rowCount: 1, rows: [{ suspended_at: null, role: 'user' }] };
-    if (sql.includes('FROM models WHERE id = $1')) {
+    if (sql.includes('FROM models m')) {
       return {
         rowCount: 1,
-        rows: [{ id: 'm-1', title: 'My Model', price_cents: 1500, currency: 'USD', owner_id: 'u-1' }],
+        rows: [
+          {
+            id: MODEL_PAID,
+            title: 'Suspended Owner Model',
+            price_cents: 1500,
+            currency: 'USD',
+            owner_id: 'creator-suspended',
+            deleted_at: null,
+            hidden_at: null,
+            owner_suspended_at: new Date().toISOString(),
+          },
+        ],
       };
     }
     return { rowCount: 0, rows: [] };
@@ -81,7 +133,75 @@ test('POST /api/models/:id/checkout - rejects purchasing own model', async () =>
   const server = app.listen(0);
   const port = (server.address() as any).port;
   try {
-    const res = await fetch(`http://localhost:${port}/api/models/m-1/checkout`, {
+    const res = await fetch(`http://localhost:${port}/api/models/${MODEL_PAID}/checkout`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${makeToken()}` },
+    });
+    assert.equal(res.status, 400);
+    assert.equal((await res.json()).error?.code, 'MODEL_UNAVAILABLE');
+  } finally {
+    server.close();
+    db.query = originalQuery;
+  }
+});
+
+test('POST /api/models/:id/checkout - rejects models whose owner account was deleted', async () => {
+  const originalQuery = db.query.bind(db);
+  (db as any).query = async (sql: string) => {
+    if (sql.includes('suspended_at') && sql.includes('FROM users WHERE id = $1')) return { rowCount: 1, rows: [{ suspended_at: null, role: 'user' }] };
+    if (sql.includes('FROM models m')) {
+      return {
+        rowCount: 1,
+        rows: [
+          {
+            id: MODEL_PAID,
+            title: 'Deleted Owner Model',
+            price_cents: 1500,
+            currency: 'USD',
+            owner_id: 'creator-deleted',
+            deleted_at: null,
+            hidden_at: null,
+            owner_suspended_at: null,
+            owner_deleted_at: new Date().toISOString(),
+          },
+        ],
+      };
+    }
+    return { rowCount: 0, rows: [] };
+  };
+
+  const server = app.listen(0);
+  const port = (server.address() as any).port;
+  try {
+    const res = await fetch(`http://localhost:${port}/api/models/${MODEL_PAID}/checkout`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${makeToken()}` },
+    });
+    assert.equal(res.status, 400);
+    assert.equal((await res.json()).error?.code, 'MODEL_UNAVAILABLE');
+  } finally {
+    server.close();
+    db.query = originalQuery;
+  }
+});
+
+test('POST /api/models/:id/checkout - rejects purchasing own model', async () => {
+  const originalQuery = db.query.bind(db);
+  (db as any).query = async (sql: string) => {
+    if (sql.includes('suspended_at') && sql.includes('FROM users WHERE id = $1')) return { rowCount: 1, rows: [{ suspended_at: null, role: 'user' }] };
+    if (sql.includes('FROM models m')) {
+      return {
+        rowCount: 1,
+        rows: [{ id: MODEL_1, title: 'My Model', price_cents: 1500, currency: 'USD', owner_id: 'u-1', owner_suspended_at: null }],
+      };
+    }
+    return { rowCount: 0, rows: [] };
+  };
+
+  const server = app.listen(0);
+  const port = (server.address() as any).port;
+  try {
+    const res = await fetch(`http://localhost:${port}/api/models/${MODEL_1}/checkout`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${makeToken({ id: 'u-1', email: 'owner@example.com', role: 'creator' })}` },
     });
@@ -98,10 +218,10 @@ test('POST /api/models/:id/checkout - rejects purchasing free model', async () =
   const originalQuery = db.query.bind(db);
   (db as any).query = async (sql: string) => {
     if (sql.includes('suspended_at') && sql.includes('FROM users WHERE id = $1')) return { rowCount: 1, rows: [{ suspended_at: null, role: 'user' }] };
-    if (sql.includes('FROM models WHERE id = $1')) {
+    if (sql.includes('FROM models m')) {
       return {
         rowCount: 1,
-        rows: [{ id: 'm-free', title: 'Free Model', price_cents: 0, currency: 'USD', owner_id: 'other-user' }],
+        rows: [{ id: MODEL_FREE, title: 'Free Model', price_cents: 0, currency: 'USD', owner_id: 'other-user', owner_suspended_at: null }],
       };
     }
     return { rowCount: 0, rows: [] };
@@ -110,7 +230,7 @@ test('POST /api/models/:id/checkout - rejects purchasing free model', async () =
   const server = app.listen(0);
   const port = (server.address() as any).port;
   try {
-    const res = await fetch(`http://localhost:${port}/api/models/m-free/checkout`, {
+    const res = await fetch(`http://localhost:${port}/api/models/${MODEL_FREE}/checkout`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${makeToken()}` },
     });
@@ -129,10 +249,10 @@ test('POST /api/models/:id/checkout - creates pending purchase with price from d
 
   (db as any).query = async (sql: string, params: any[]) => {
     if (sql.includes('suspended_at') && sql.includes('FROM users WHERE id = $1')) return { rowCount: 1, rows: [{ suspended_at: null, role: 'user' }] };
-    if (sql.includes('FROM models WHERE id = $1')) {
+    if (sql.includes('FROM models m')) {
       return {
         rowCount: 1,
-        rows: [{ id: 'm-paid', title: 'Paid Model', price_cents: 2900, currency: 'USD', owner_id: 'creator-9' }],
+        rows: [{ id: MODEL_PAID, title: 'Paid Model', price_cents: 2900, currency: 'USD', owner_id: 'creator-9', owner_suspended_at: null }],
       };
     }
     if (sql.includes('FROM purchases WHERE user_id = $1 AND model_id = $2')) {
@@ -140,7 +260,7 @@ test('POST /api/models/:id/checkout - creates pending purchase with price from d
     }
     if (sql.includes('INSERT INTO purchases')) {
       insertedData = { userId: params[0], modelId: params[1], embedKey: params[2] };
-      return { rowCount: 1, rows: [{ id: 'purchase-123' }] };
+      return { rowCount: 1, rows: [{ id: PURCHASE_1 }] };
     }
     return { rowCount: 0, rows: [] };
   };
@@ -148,17 +268,59 @@ test('POST /api/models/:id/checkout - creates pending purchase with price from d
   const server = app.listen(0);
   const port = (server.address() as any).port;
   try {
-    const res = await fetch(`http://localhost:${port}/api/models/m-paid/checkout`, {
+    const res = await fetch(`http://localhost:${port}/api/models/${MODEL_PAID}/checkout`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${makeToken({ id: 'buyer-1', email: 'b@example.com', role: 'user' })}` },
     });
     assert.equal(res.status, 200);
     const body = await res.json();
-    assert.equal(body.purchaseId, 'purchase-123');
-    assert.equal(body.checkoutUrl, '/checkout/purchase-123');
+    assert.equal(body.purchaseId, PURCHASE_1);
+    assert.equal(body.checkoutUrl, `/checkout/${PURCHASE_1}`);
     assert.equal(body.provider, 'mock');
     assert.equal(insertedData.userId, 'buyer-1');
-    assert.equal(insertedData.modelId, 'm-paid');
+    assert.equal(insertedData.modelId, MODEL_PAID);
+  } finally {
+    server.close();
+    db.query = originalQuery;
+  }
+});
+
+test('POST /api/models/:id/checkout - recovers gracefully from concurrent 23505 insert race', async () => {
+  const originalQuery = db.query.bind(db);
+  let selectCalls = 0;
+
+  (db as any).query = async (sql: string) => {
+    if (sql.includes('suspended_at') && sql.includes('FROM users WHERE id = $1')) return { rowCount: 1, rows: [{ suspended_at: null, role: 'user' }] };
+    if (sql.includes('FROM models m')) {
+      return {
+        rowCount: 1,
+        rows: [{ id: MODEL_PAID, title: 'Paid Model', price_cents: 2900, currency: 'USD', owner_id: 'creator-9', owner_suspended_at: null }],
+      };
+    }
+    if (sql.includes('FROM purchases WHERE user_id = $1 AND model_id = $2')) {
+      selectCalls++;
+      if (selectCalls === 1) return { rowCount: 0, rows: [] };
+      return { rowCount: 1, rows: [{ id: PURCHASE_1, status: 'pending' }] };
+    }
+    if (sql.includes('INSERT INTO purchases')) {
+      const err: any = new Error('duplicate key');
+      err.code = '23505';
+      throw err;
+    }
+    return { rowCount: 0, rows: [] };
+  };
+
+  const server = app.listen(0);
+  const port = (server.address() as any).port;
+  try {
+    const res = await fetch(`http://localhost:${port}/api/models/${MODEL_PAID}/checkout`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${makeToken()}` },
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.purchaseId, PURCHASE_1);
+    assert.equal(body.checkoutUrl, `/checkout/${PURCHASE_1}`);
   } finally {
     server.close();
     db.query = originalQuery;
@@ -169,14 +331,14 @@ test('POST /api/models/:id/checkout - prevents duplicate purchase if already pai
   const originalQuery = db.query.bind(db);
   (db as any).query = async (sql: string) => {
     if (sql.includes('suspended_at') && sql.includes('FROM users WHERE id = $1')) return { rowCount: 1, rows: [{ suspended_at: null, role: 'user' }] };
-    if (sql.includes('FROM models WHERE id = $1')) {
+    if (sql.includes('FROM models m')) {
       return {
         rowCount: 1,
-        rows: [{ id: 'm-paid', title: 'Paid Model', price_cents: 2900, currency: 'USD', owner_id: 'creator-9' }],
+        rows: [{ id: MODEL_PAID, title: 'Paid Model', price_cents: 2900, currency: 'USD', owner_id: 'creator-9', owner_suspended_at: null }],
       };
     }
     if (sql.includes('FROM purchases WHERE user_id = $1 AND model_id = $2')) {
-      return { rowCount: 1, rows: [{ id: 'p-already-paid', status: 'paid' }] };
+      return { rowCount: 1, rows: [{ id: PURCHASE_1, status: 'paid' }] };
     }
     return { rowCount: 0, rows: [] };
   };
@@ -184,13 +346,63 @@ test('POST /api/models/:id/checkout - prevents duplicate purchase if already pai
   const server = app.listen(0);
   const port = (server.address() as any).port;
   try {
-    const res = await fetch(`http://localhost:${port}/api/models/m-paid/checkout`, {
+    const res = await fetch(`http://localhost:${port}/api/models/${MODEL_PAID}/checkout`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${makeToken()}` },
     });
     assert.equal(res.status, 409);
     const body = await res.json();
     assert.equal(body.error?.code, 'ALREADY_PURCHASED');
+  } finally {
+    server.close();
+    db.query = originalQuery;
+  }
+});
+
+test('GET /api/models/:id/purchase - returns purchased=true when user has paid purchase', async () => {
+  const originalQuery = db.query.bind(db);
+  (db as any).query = async (sql: string) => {
+    if (sql.includes("FROM purchases WHERE user_id = $1 AND model_id = $2 AND status = 'paid'")) {
+      return {
+        rowCount: 1,
+        rows: [{ id: PURCHASE_1, status: 'paid', embed_key: 'embed-key-123', paid_at: '2026-11-20T00:00:00.000Z' }],
+      };
+    }
+    return { rowCount: 0, rows: [] };
+  };
+
+  const server = app.listen(0);
+  const port = (server.address() as any).port;
+  try {
+    const res = await fetch(`http://localhost:${port}/api/models/${MODEL_PAID}/purchase`, {
+      headers: { Authorization: `Bearer ${makeToken()}` },
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.purchased, true);
+    assert.equal(body.purchase?.id, PURCHASE_1);
+  } finally {
+    server.close();
+    db.query = originalQuery;
+  }
+});
+
+test('GET /api/models/:id/purchase - returns purchased=false when user has not bought model', async () => {
+  const originalQuery = db.query.bind(db);
+  (db as any).query = async () => {
+    return { rowCount: 0, rows: [] };
+  };
+
+  const server = app.listen(0);
+  const port = (server.address() as any).port;
+  try {
+    const res = await fetch(`http://localhost:${port}/api/models/${MODEL_1}/purchase`, {
+      headers: { Authorization: `Bearer ${makeToken()}` },
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.purchased, false);
+    assert.equal(body.purchase, null);
   } finally {
     server.close();
     db.query = originalQuery;
@@ -204,7 +416,7 @@ test('POST /api/purchases/:id/confirm-mock - confirms payment and changes status
     if (sql.includes('UPDATE purchases') && sql.includes("status = 'paid'")) {
       return {
         rowCount: 1,
-        rows: [{ id: params[0], model_id: 'm-1', embed_key: 'mock-embed-key-123' }],
+        rows: [{ id: params[0], model_id: MODEL_1, embed_key: 'mock-embed-key-123' }],
       };
     }
     return { rowCount: 0, rows: [] };
@@ -213,13 +425,13 @@ test('POST /api/purchases/:id/confirm-mock - confirms payment and changes status
   const server = app.listen(0);
   const port = (server.address() as any).port;
   try {
-    const res = await fetch(`http://localhost:${port}/api/purchases/purchase-123/confirm-mock`, {
+    const res = await fetch(`http://localhost:${port}/api/purchases/${PURCHASE_1}/confirm-mock`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${makeToken()}` },
     });
     assert.equal(res.status, 200);
     const body = await res.json();
-    assert.equal(body.purchaseId, 'purchase-123');
+    assert.equal(body.purchaseId, PURCHASE_1);
     assert.equal(body.embedKey, 'mock-embed-key-123');
   } finally {
     server.close();
@@ -227,16 +439,16 @@ test('POST /api/purchases/:id/confirm-mock - confirms payment and changes status
   }
 });
 
-test('POST /api/purchases/:id/confirm-mock - prevents duplicate confirmation (cannot get new key)', async () => {
+test('POST /api/purchases/:id/confirm-mock - prevents duplicate confirmation and blocks unavailable models', async () => {
   const originalQuery = db.query.bind(db);
+  let checkRow: any = { status: 'paid', deleted_at: null, hidden_at: null, owner_suspended_at: null };
   (db as any).query = async (sql: string) => {
     if (sql.includes('suspended_at') && sql.includes('FROM users WHERE id = $1')) return { rowCount: 1, rows: [{ suspended_at: null, role: 'user' }] };
     if (sql.includes('UPDATE purchases')) {
-      // 0 rows updated because status wasn't pending
       return { rowCount: 0, rows: [] };
     }
-    if (sql.includes('SELECT status FROM purchases WHERE id = $1 AND user_id = $2')) {
-      return { rowCount: 1, rows: [{ status: 'paid' }] };
+    if (sql.includes('SELECT p.status') && sql.includes('FROM purchases p')) {
+      return { rowCount: 1, rows: [checkRow] };
     }
     return { rowCount: 0, rows: [] };
   };
@@ -244,13 +456,22 @@ test('POST /api/purchases/:id/confirm-mock - prevents duplicate confirmation (ca
   const server = app.listen(0);
   const port = (server.address() as any).port;
   try {
-    const res = await fetch(`http://localhost:${port}/api/purchases/purchase-123/confirm-mock`, {
+    const res = await fetch(`http://localhost:${port}/api/purchases/${PURCHASE_1}/confirm-mock`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${makeToken()}` },
     });
     assert.equal(res.status, 409);
     const body = await res.json();
     assert.equal(body.error?.code, 'ALREADY_PAID');
+
+    // Pending purchase whose model was hidden or owner suspended before confirmation -> 400 MODEL_UNAVAILABLE
+    checkRow = { status: 'pending', deleted_at: null, hidden_at: '2026-11-20T00:00:00.000Z', owner_suspended_at: null };
+    const unavailableRes = await fetch(`http://localhost:${port}/api/purchases/${PURCHASE_1}/confirm-mock`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${makeToken()}` },
+    });
+    assert.equal(unavailableRes.status, 400);
+    assert.equal((await unavailableRes.json()).error?.code, 'MODEL_UNAVAILABLE');
   } finally {
     server.close();
     db.query = originalQuery;
@@ -266,7 +487,7 @@ test('POST /api/purchases/:id/confirm-mock - rejects when PAYMENT_PROVIDER is no
   const server = app.listen(0);
   const port = (server.address() as any).port;
   try {
-    const res = await fetch(`http://localhost:${port}/api/purchases/purchase-123/confirm-mock`, {
+    const res = await fetch(`http://localhost:${port}/api/purchases/${PURCHASE_1}/confirm-mock`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${makeToken()}` },
     });
@@ -289,8 +510,8 @@ test('GET /api/me/purchases - lists only paid purchases with embed_key', async (
         rowCount: 1,
         rows: [
           {
-            id: 'p-1',
-            model_id: 'm-1',
+            id: PURCHASE_1,
+            model_id: MODEL_1,
             embed_key: 'embed-key-1',
             created_at: '2026-11-11T00:00:00.000Z',
             title: 'Sample Model',
@@ -330,7 +551,7 @@ test('POST /api/purchases/:id/regenerate-key - generates a new key and invalidat
       updatedKey = params[0];
       return {
         rowCount: 1,
-        rows: [{ id: params[1], model_id: 'm-1' }],
+        rows: [{ id: params[1], model_id: MODEL_1 }],
       };
     }
     return { rowCount: 0, rows: [] };
@@ -339,7 +560,7 @@ test('POST /api/purchases/:id/regenerate-key - generates a new key and invalidat
   const server = app.listen(0);
   const port = (server.address() as any).port;
   try {
-    const res = await fetch(`http://localhost:${port}/api/purchases/purchase-123/regenerate-key`, {
+    const res = await fetch(`http://localhost:${port}/api/purchases/${PURCHASE_1}/regenerate-key`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${makeToken()}` },
     });
@@ -384,7 +605,13 @@ const SUSPENDED = { suspended_at: '2026-11-18T00:00:00.000Z' };
 test('payments - a suspended user is refused on checkout, confirm, pay and key change, and nothing is written', async () => {
   await withUser(SUSPENDED, async (base, writes) => {
     const headers = { Authorization: `Bearer ${makeToken()}` };
-    for (const path of ['/models/m-1/checkout', '/purchases/p-1/confirm-mock', '/models/m-1/pay-mock', '/purchases/p-1/qr', '/purchases/p-1/regenerate-key']) {
+    for (const path of [
+      `/models/${MODEL_1}/checkout`,
+      `/purchases/${PURCHASE_1}/confirm-mock`,
+      `/models/${MODEL_1}/pay-mock`,
+      `/purchases/${PURCHASE_1}/qr`,
+      `/purchases/${PURCHASE_1}/regenerate-key`,
+    ]) {
       const res = await fetch(`${base}${path}`, { method: 'POST', headers });
       assert.equal(res.status, 403, path);
       assert.equal((await res.json()).error.code, 'ACCOUNT_SUSPENDED', path);
@@ -395,7 +622,7 @@ test('payments - a suspended user is refused on checkout, confirm, pay and key c
 
 test('payments - a token whose user no longer exists is refused with 401', async () => {
   await withUser(null, async (base, writes) => {
-    const res = await fetch(`${base}/models/m-1/checkout`, { method: 'POST', headers: { Authorization: `Bearer ${makeToken()}` } });
+    const res = await fetch(`${base}/models/${MODEL_1}/checkout`, { method: 'POST', headers: { Authorization: `Bearer ${makeToken()}` } });
     assert.equal(res.status, 401);
     assert.equal(writes.length, 0);
   });
@@ -410,10 +637,14 @@ test('payments - a suspended user can still read their purchases (read only)', a
 
 // ─── an admin cannot buy: the role is read from the database, not from the token ───
 test('payments - an admin cannot checkout, confirm, pay or start a QR payment, and nothing is written', async () => {
-  // the token below says "user"; only the database says admin
   await withUser({ suspended_at: null, role: 'admin' }, async (base, writes) => {
     const headers = { Authorization: `Bearer ${makeToken()}` };
-    for (const path of ['/models/m-1/checkout', '/purchases/p-1/confirm-mock', '/models/m-1/pay-mock', '/purchases/p-1/qr']) {
+    for (const path of [
+      `/models/${MODEL_1}/checkout`,
+      `/purchases/${PURCHASE_1}/confirm-mock`,
+      `/models/${MODEL_1}/pay-mock`,
+      `/purchases/${PURCHASE_1}/qr`,
+    ]) {
       const res = await fetch(`${base}${path}`, { method: 'POST', headers });
       assert.equal(res.status, 403, path);
       assert.equal((await res.json()).error.code, 'ADMIN_CANNOT_BUY', path);
@@ -424,9 +655,52 @@ test('payments - an admin cannot checkout, confirm, pay or start a QR payment, a
 
 test('payments - a normal user still passes the buyer check', async () => {
   await withUser({ suspended_at: null, role: 'user' }, async (base) => {
-    // the model does not exist in this mock, so the request gets past the check and ends at 404
-    const res = await fetch(`${base}/models/m-1/checkout`, { method: 'POST', headers: { Authorization: `Bearer ${makeToken()}` } });
+    const res = await fetch(`${base}/models/${MODEL_1}/checkout`, { method: 'POST', headers: { Authorization: `Bearer ${makeToken()}` } });
     assert.equal(res.status, 404);
     assert.equal((await res.json()).error.code, 'MODEL_NOT_FOUND');
   });
+});
+
+test('confirm-mock, pay-mock and qr - a pending purchase of a model whose owner account was deleted is refused with MODEL_UNAVAILABLE', async () => {
+  const originalQuery = db.query.bind(db);
+  (db as any).query = async (sql: string) => {
+    if (sql.includes('suspended_at') && sql.includes('FROM users WHERE id = $1')) return { rowCount: 1, rows: [{ suspended_at: null, role: 'user' }] };
+    if (sql.includes('UPDATE purchases')) return { rowCount: 0, rows: [] }; // the sellable-owner predicate did not match
+    if (sql.includes('FROM purchases p')) {
+      return {
+        rowCount: 1,
+        rows: [
+          {
+            id: PURCHASE_1,
+            model_id: MODEL_PAID,
+            status: 'pending',
+            amount_cents: 2900,
+            currency: 'USD',
+            title: 'Paid Model',
+            deleted_at: null,
+            hidden_at: null,
+            owner_suspended_at: null,
+            owner_deleted_at: '2026-11-20T00:00:00.000Z',
+          },
+        ],
+      };
+    }
+    return { rowCount: 0, rows: [] };
+  };
+
+  const server = app.listen(0);
+  const port = (server.address() as any).port;
+  try {
+    for (const path of [`/purchases/${PURCHASE_1}/confirm-mock`, `/models/${MODEL_PAID}/pay-mock`, `/purchases/${PURCHASE_1}/qr`]) {
+      const res = await fetch(`http://localhost:${port}/api${path}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${makeToken()}` },
+      });
+      assert.equal(res.status, 400, path);
+      assert.equal((await res.json()).error?.code, 'MODEL_UNAVAILABLE', path);
+    }
+  } finally {
+    server.close();
+    db.query = originalQuery;
+  }
 });

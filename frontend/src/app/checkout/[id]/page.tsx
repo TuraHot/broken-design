@@ -6,9 +6,10 @@ import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { CheckCircle2, ExternalLink, Loader2, QrCode } from 'lucide-react';
 import { confirmMockPayment, createQrPayment, fetchPurchaseById } from '@/lib/api';
+import { updateProfile } from '@/lib/auth';
 import { initials } from '@/lib/creators';
 import { formatMoney } from '@/lib/format';
-import { readSession } from '@/lib/session';
+import { readSession, updateSessionUser } from '@/lib/session';
 import { useT } from '@/lib/i18n/client';
 import { fromErr, msgText, type Msg } from '@/lib/i18n/msg';
 import type { PurchaseDetail, QrPaymentResponse } from '@/lib/types';
@@ -82,6 +83,12 @@ export default function CheckoutPage() {
     try {
       setSubmitting(true);
       setErrorMsg(null);
+      const trimmedName = displayName.trim();
+      const savedName = readSession()?.user.display_name?.trim() ?? '';
+      if (trimmedName && trimmedName !== savedName) {
+        const updated = await updateProfile(trimmedName, token);
+        updateSessionUser({ display_name: updated.display_name });
+      }
       const res = await createQrPayment(purchase.id, token);
       setQrInfo(res);
     } catch (err: any) {
@@ -159,6 +166,7 @@ export default function CheckoutPage() {
           <CheckCircle2 className="mx-auto h-10 w-10 text-accent" />
           <h1 className="mt-3 font-display text-xl uppercase text-ink">{t('pay.paidTitle')}</h1>
           <p className="mt-1.5 text-sm text-ink-soft">{purchase.title}</p>
+          <p className="mt-2 text-sm font-medium text-accent">{t('pay.alreadyOwned')}</p>
           <Link
             href={`/checkout/success?purchaseId=${encodeURIComponent(purchase.id)}`}
             className="mt-6 inline-flex h-11 w-full items-center justify-center rounded-full bg-ink text-sm font-medium text-canvas transition-colors hover:bg-ink/85"
@@ -179,11 +187,11 @@ export default function CheckoutPage() {
             {initials(sellerName)}
           </span>
           <p className="text-sm font-medium text-ink">
-            {sellerName} <span className="font-normal text-ink/50">({t('pay.seller')})</span>
+            {sellerName} <span className="font-normal text-ink-soft">({t('pay.seller')})</span>
           </p>
         </div>
 
-        <p className="mt-3 text-center text-xs text-ink/55">
+        <p className="mt-3 text-center text-xs text-ink-soft">
           {t('pay.signedInAs', { email })}
         </p>
 
@@ -191,7 +199,7 @@ export default function CheckoutPage() {
         <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-line bg-ink/[0.03] px-4 py-3.5">
           <div className="min-w-0">
             <p className="truncate text-sm font-medium text-ink">{purchase.title}</p>
-            <p className="mt-0.5 font-mono text-[11px] uppercase tracking-wider text-ink/50">
+            <p className="mt-0.5 font-mono text-[11px] uppercase tracking-wider text-ink-soft">
               {purchase.licenseType}
             </p>
           </div>
@@ -309,10 +317,12 @@ export default function CheckoutPage() {
                 <div className="mx-auto mt-3 grid h-40 w-40 place-items-center rounded-xl border border-dashed border-ink/25 bg-ink/5">
                   <QrCode className="h-24 w-24 text-ink/80" />
                 </div>
-                <p className="mt-2 text-xs text-ink/55">
-                  {t('pay.mockHelp1')} <code className="text-ink/80">PAYMENT_PROVIDER=stripe</code> {t('pay.mockHelp2')}{' '}
-                  <code className="text-ink/80">core-api/.env</code> {t('pay.mockHelp3')}
-                </p>
+                {process.env.NODE_ENV !== 'production' && (
+                  <p className="mt-2 text-xs text-ink-soft">
+                    {t('pay.mockHelp1')} <code className="text-ink/80">PAYMENT_PROVIDER=stripe</code> {t('pay.mockHelp2')}{' '}
+                    <code className="text-ink/80">core-api/.env</code> {t('pay.mockHelp3')}
+                  </p>
+                )}
                 <button
                   type="button"
                   disabled={submitting}

@@ -1,12 +1,32 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
+import { ownerActiveSql } from '../models/availability';
 import { db } from '../../config/db';
-import { requireAuth } from '../../middlewares/auth.middleware';
+import { requireAuth, isSuspended } from '../../middlewares/auth.middleware';
 import { AppError } from '../../middlewares/error.middleware';
 import { notifyModelLike, notifyUser } from '../../config/socket';
 
 export const interactionsRouter = Router();
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// GET /api/me/likes (Batch fetch all model IDs liked by the current user — avoids N+1 requests on /gallery)
+interactionsRouter.get(
+  '/me/likes',
+  requireAuth,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const result = await db.query<{ model_id: string }>(
+        `SELECT model_id FROM likes WHERE user_id = $1`,
+        [req.user!.id],
+      );
+      res.json({
+        modelIds: result.rows.map((r) => r.model_id),
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 // GET /api/models/:id/like (Current user's like state + total count)
 interactionsRouter.get(
@@ -50,16 +70,19 @@ interactionsRouter.post(
         throw new AppError(404, 'MODEL_NOT_FOUND', 'Model not found');
       }
 
-      const userCheck = await db.query<{ suspended_at: Date | null }>(
-        `SELECT suspended_at FROM users WHERE id = $1`,
+      const userCheck = await db.query<{ suspended_at: Date | null; suspended_until: Date | null }>(
+        `SELECT suspended_at, suspended_until FROM users WHERE id = $1`,
         [userId],
       );
-      if (userCheck.rows[0]?.suspended_at !== null && userCheck.rows[0]?.suspended_at !== undefined) {
+      if (userCheck.rows[0] && isSuspended(userCheck.rows[0])) {
         throw new AppError(403, 'ACCOUNT_SUSPENDED', 'Your account has been suspended by an administrator');
       }
 
       const modelCheck = await db.query<{ id: string; owner_id: string; title: string }>(
-        `SELECT id, owner_id, title FROM models WHERE id = $1 AND hidden_at IS NULL AND deleted_at IS NULL`,
+        `SELECT m.id, m.owner_id, m.title
+         FROM models m
+         JOIN users u ON u.id = m.owner_id
+         WHERE m.id = $1 AND m.hidden_at IS NULL AND m.deleted_at IS NULL AND ${ownerActiveSql('u')}`,
         [id],
       );
       if (modelCheck.rows.length === 0) {
@@ -137,14 +160,4 @@ interactionsRouter.post(
     }
   },
 );
-
-// [Member 6] GET /api/models/:id/comments
-interactionsRouter.get('/models/:id/comments', async (req, res) => {
-  res.json({ comments: [] });
-});
-
-// [Member 6] POST /api/models/:id/comments
-interactionsRouter.post('/models/:id/comments', requireAuth, async (req, res) => {
-  res.status(201).json({ message: `TODO [Member 6]: Add comment for model ${req.params.id}` });
-});
 

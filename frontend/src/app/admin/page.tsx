@@ -82,10 +82,12 @@ export default function AdminOverviewPage() {
 
   const attention = data
     ? [
-        { n: data.openComplaints, text: t(data.openComplaints === 1 ? 'admin.ov.complaint.one' : 'admin.ov.complaint.many'), href: '/admin/complaints' },
-        { n: data.suspendedUsers, text: t(data.suspendedUsers === 1 ? 'admin.ov.suspended.one' : 'admin.ov.suspended.many'), href: '/admin/users' },
-        { n: data.hiddenModels, text: t(data.hiddenModels === 1 ? 'admin.ov.hidden.one' : 'admin.ov.hidden.many'), href: '/admin/models' },
-        { n: data.pendingPurchases, text: t(data.pendingPurchases === 1 ? 'admin.ov.unpaid.one' : 'admin.ov.unpaid.many'), href: '/admin/purchases' },
+        { id: 'apps', n: data.pendingApplications ?? 0, text: t((data.pendingApplications ?? 0) === 1 ? 'admin.ov.application.one' : 'admin.ov.application.many'), href: '/admin/creator-approvals' },
+        { id: 'wd', n: data.pendingWithdrawals ?? 0, text: t((data.pendingWithdrawals ?? 0) === 1 ? 'admin.ov.withdrawal.one' : 'admin.ov.withdrawal.many'), href: '/admin/withdrawals' },
+        { id: 'complaints', n: data.openComplaints, text: t(data.openComplaints === 1 ? 'admin.ov.complaint.one' : 'admin.ov.complaint.many'), href: '/admin/complaints' },
+        { id: 'suspended', n: data.suspendedUsers, text: t(data.suspendedUsers === 1 ? 'admin.ov.suspended.one' : 'admin.ov.suspended.many'), href: '/admin/users' },
+        { id: 'hidden', n: data.hiddenModels, text: t(data.hiddenModels === 1 ? 'admin.ov.hidden.one' : 'admin.ov.hidden.many'), href: '/admin/models' },
+        { id: 'unpaid', n: data.pendingPurchases, text: t(data.pendingPurchases === 1 ? 'admin.ov.unpaid.one' : 'admin.ov.unpaid.many'), href: '/admin/purchases' },
       ].filter((a) => a.n > 0)
     : [];
 
@@ -113,7 +115,7 @@ export default function AdminOverviewPage() {
             ) : (
               <ul className="flex flex-wrap gap-3">
                 {attention.map((a) => (
-                  <li key={a.href}>
+                  <li key={a.id}>
                     <Link href={a.href} className="inline-flex items-center gap-2 rounded-lg border border-warn/50 px-3 py-2 text-sm text-warn transition-colors hover:bg-ink/5">
                       <AlertCircle aria-hidden className="h-4 w-4 shrink-0" />
                       <span><strong className="font-medium">{formatCount(a.n)}</strong> {a.text}</span>

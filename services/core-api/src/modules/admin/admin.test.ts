@@ -25,7 +25,7 @@ async function withServer(
 ) {
   const originalQuery = db.query.bind(db);
   (db as any).query = async (sql: string, params: any[]) => {
-    if (sql.includes('SELECT role, suspended_at FROM users WHERE id = $1')) {
+    if (sql.includes('SELECT role, suspended_at, suspended_until FROM users WHERE id = $1')) {
       return adminRow ? { rowCount: 1, rows: [adminRow] } : { rowCount: 0, rows: [] };
     }
     return handler(sql, params) ?? { rowCount: 0, rows: [] };
@@ -88,6 +88,8 @@ test('GET /api/admin/overview - returns totals, breakdowns and recent lists', as
               paid_purchases: 5,
               pending_purchases: 1,
               open_complaints: 2,
+              pending_applications: 3,
+              pending_withdrawals: 4,
               total_revenue_cents: '12900',
               revenue_7d_cents: '2900',
             },
@@ -133,6 +135,8 @@ test('GET /api/admin/overview - returns totals, breakdowns and recent lists', as
       assert.equal(body.totalUsers, 10);
       assert.equal(body.hiddenModels, 2);
       assert.equal(body.paidPurchases, 5);
+      assert.equal(body.pendingApplications, 3);
+      assert.equal(body.pendingWithdrawals, 4);
       assert.equal(body.pendingPurchases, 1);
       assert.equal(body.openComplaints, 2);
       assert.equal(body.totalRevenueCents, 12900);
@@ -1101,6 +1105,234 @@ test('GET /api/admin/models/:id/history - 400 for a bad id, otherwise license an
   assert.deepEqual(params, [MODEL_ID]);
 });
 
+// ─── creator applications (atomic CTE + notification + guards) & invite codes ───
+test('PATCH /api/admin/creator-applications/:id - validates UUID, approves atomically, and blocks non-pending/admin/suspended', async () => {
+  const APP_ID = '88888888-8888-4888-8888-888888888888';
+  let cteRow: Record<string, any> = {
+    found: 1,
+    prev_status: 'pending',
+    user_role: 'user',
+    user_suspended_at: null,
+    user_deleted_at: null,
+    id: APP_ID,
+    user_id: TARGET_ID,
+    status: 'approved',
+    admin_note: 'Looks great',
+    reviewed_at: '2026-11-20T00:00:00.000Z',
+  };
+  let sawAtomicSql = false;
+
+  await withServer(
+    ACTIVE_ADMIN,
+    (sql) => {
+      if (sql.includes('WITH target AS') && sql.includes('creator_applications')) {
+        sawAtomicSql = sql.includes('FOR UPDATE OF ca, u') && sql.includes('INSERT INTO notifications');
+        return { rowCount: 1, rows: [cteRow] };
+      }
+      return undefined;
+    },
+    async (base) => {
+      // 1. Bad UUID -> 400
+      const badId = await fetch(`${base}/creator-applications/not-a-uuid`, {
+        method: 'PATCH',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'approved' }),
+      });
+      assert.equal(badId.status, 400);
+
+      // 2. Approve pending user -> 200 via atomic CTE
+      const ok = await fetch(`${base}/creator-applications/${APP_ID}`, {
+        method: 'PATCH',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'approved', adminNote: 'Looks great' }),
+      });
+      assert.equal(ok.status, 200);
+      assert.equal(sawAtomicSql, true);
+      const body = await ok.json();
+      assert.equal(body.application.status, 'approved');
+
+      // 3. Already reviewed -> 409
+      cteRow = { ...cteRow, prev_status: 'approved', id: null };
+      const dup = await fetch(`${base}/creator-applications/${APP_ID}`, {
+        method: 'PATCH',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'approved' }),
+      });
+      assert.equal(dup.status, 409);
+      assert.equal((await dup.json()).error.code, 'ALREADY_REVIEWED');
+
+      // 4. Cannot approve suspended applicant -> 403
+      cteRow = { ...cteRow, prev_status: 'pending', user_suspended_at: '2026-11-19T00:00:00.000Z', id: null };
+      const susp = await fetch(`${base}/creator-applications/${APP_ID}`, {
+        method: 'PATCH',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'approved' }),
+      });
+      assert.equal(susp.status, 403);
+      assert.equal((await susp.json()).error.code, 'ACCOUNT_SUSPENDED');
+    },
+  );
+});
+
+test('POST /api/admin/invite-codes - generates cryptographic code and returns 409 on duplicate', async () => {
+  let insertedCode = '';
+  let forceDuplicate = false;
+
+  await withServer(
+    ACTIVE_ADMIN,
+    (sql, params) => {
+      if (sql.includes('INSERT INTO creator_invite_codes')) {
+        if (forceDuplicate) {
+          const err: any = new Error('duplicate key');
+          err.code = '23505';
+          throw err;
+        }
+        insertedCode = params[0];
+        return {
+          rowCount: 1,
+          rows: [
+            {
+              id: 'code-1',
+              code: params[0],
+              max_uses: params[1],
+              used_count: 0,
+              expires_at: params[3],
+              created_at: '2026-11-20T00:00:00.000Z',
+            },
+          ],
+        };
+      }
+      return undefined;
+    },
+    async (base) => {
+      // 1. Default generated code has 12 uppercase hex chars (crypto.randomBytes(6))
+      const res = await fetch(`${base}/invite-codes`, {
+        method: 'POST',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ maxUses: 3 }),
+      });
+      assert.equal(res.status, 201);
+      assert.match(insertedCode, /^LIXYTE-[0-9A-F]{12}$/);
+
+      // 2. Invalid custom code rejected with 400
+      const bad = await fetch(`${base}/invite-codes`, {
+        method: 'POST',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: 'x' }),
+      });
+      assert.equal(bad.status, 400);
+
+      // 3. Duplicate code -> 409 CODE_EXISTS
+      forceDuplicate = true;
+      const dup = await fetch(`${base}/invite-codes`, {
+        method: 'POST',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: 'LIXYTE-VIP2026' }),
+      });
+      assert.equal(dup.status, 409);
+      assert.equal((await dup.json()).error.code, 'CODE_EXISTS');
+    },
+  );
+});
+
+const WITHDRAWAL_ID = '77777777-7777-4777-8777-777777777777';
+
+test('GET /api/admin/withdrawals - lists paginated withdrawals with seller info and status filter', async () => {
+  await withServer(
+    ACTIVE_ADMIN,
+    (sql) => {
+      if (sql.includes('COUNT(*)::int AS total FROM creator_withdrawals')) {
+        return { rowCount: 1, rows: [{ total: 1 }] };
+      }
+      if (sql.includes('FROM creator_withdrawals w') && sql.includes('LIMIT')) {
+        return {
+          rowCount: 1,
+          rows: [
+            {
+              id: WITHDRAWAL_ID,
+              seller_id: TARGET_ID,
+              gross_amount_cents: 5000,
+              platform_fee_cents: 350,
+              net_amount_cents: 4650,
+              fee_rate_bps: 700,
+              currency: 'USD',
+              payout_method: 'promptpay',
+              payout_account: '081-234-5678',
+              status: 'pending',
+              created_at: '2026-11-20T00:00:00.000Z',
+              processed_at: null,
+              seller_name: 'Demo Creator',
+              seller_email: 'creator@example.com',
+            },
+          ],
+        };
+      }
+      return undefined;
+    },
+    async (base) => {
+      const bad = await fetch(`${base}/withdrawals?status=bogus`, { headers: authHeaders() });
+      assert.equal(bad.status, 400);
+
+      const res = await fetch(`${base}/withdrawals?status=pending`, { headers: authHeaders() });
+      assert.equal(res.status, 200);
+      const body = await res.json();
+      assert.equal(body.total, 1);
+      assert.equal(body.items[0].id, WITHDRAWAL_ID);
+      assert.equal(body.items[0].netAmountCents, 4650);
+      assert.equal(body.items[0].seller.displayName, 'Demo Creator');
+    },
+  );
+});
+
+test('PATCH /api/admin/withdrawals/:id - transitions atomically with notification and rejects finalized transitions', async () => {
+  let mockRow: any = {
+    found: 1,
+    prev_status: 'pending',
+    id: WITHDRAWAL_ID,
+    status: 'paid',
+    processed_at: '2026-11-20T01:00:00.000Z',
+  };
+  let sawAtomicCte = false;
+
+  await withServer(
+    ACTIVE_ADMIN,
+    (sql) => {
+      if (sql.includes('FROM creator_withdrawals') && sql.includes('FOR UPDATE')) {
+        sawAtomicCte = sql.includes('INSERT INTO notifications');
+        return { rowCount: 1, rows: [mockRow] };
+      }
+      return undefined;
+    },
+    async (base) => {
+      const badId = await fetch(`${base}/withdrawals/not-a-uuid`, {
+        method: 'PATCH',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'paid' }),
+      });
+      assert.equal(badId.status, 400);
+
+      const ok = await fetch(`${base}/withdrawals/${WITHDRAWAL_ID}`, {
+        method: 'PATCH',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'paid' }),
+      });
+      assert.equal(ok.status, 200);
+      assert.equal(sawAtomicCte, true);
+      assert.equal((await ok.json()).status, 'paid');
+
+      // Already paid -> 409 INVALID_TRANSITION
+      mockRow = { found: 1, prev_status: 'paid', id: null, status: null, processed_at: null };
+      const conflict = await fetch(`${base}/withdrawals/${WITHDRAWAL_ID}`, {
+        method: 'PATCH',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'rejected' }),
+      });
+      assert.equal(conflict.status, 409);
+      assert.equal((await conflict.json()).error.code, 'INVALID_TRANSITION');
+    },
+  );
+});
+
 // ─── DELETE /api/admin/users/:id (soft delete, history stays, email is freed) ──────────
 const DELETE_REASON = 'Account used to resell stolen models, confirmed by two complaints.';
 
@@ -1303,7 +1535,7 @@ test('GET /api/admin/notifications - lists the waiting items newest first with t
 
 test('creator applications - an application of a deleted account is not listed and cannot be approved', async () => {
   let listSql = '';
-  let updated = false;
+  let patchSql = '';
   const APP_ID = '66666666-6666-4666-8666-666666666666';
   await withServer(
     ACTIVE_ADMIN,
@@ -1312,10 +1544,26 @@ test('creator applications - an application of a deleted account is not listed a
         listSql = sql;
         return { rowCount: 0, rows: [] };
       }
-      if (sql.includes('FROM creator_applications ca') && sql.includes('WHERE ca.id = $1')) {
-        return { rowCount: 1, rows: [{ id: APP_ID, user_id: TARGET_ID, status: 'pending', deleted_at: '2026-11-20T00:00:00.000Z' }] };
+      if (sql.includes('WITH target AS') && sql.includes('creator_applications')) {
+        patchSql = sql;
+        return {
+          rowCount: 1,
+          rows: [
+            {
+              found: 1,
+              prev_status: 'pending',
+              user_role: 'user',
+              user_suspended_at: null,
+              user_deleted_at: '2026-11-20T00:00:00.000Z',
+              id: null,
+              user_id: null,
+              status: null,
+              admin_note: null,
+              reviewed_at: null,
+            },
+          ],
+        };
       }
-      if (sql.includes('UPDATE')) updated = true;
       return undefined;
     },
     async (base) => {
@@ -1331,7 +1579,7 @@ test('creator applications - an application of a deleted account is not listed a
     },
   );
   assert.match(listSql, /u\.deleted_at IS NULL/);
-  assert.equal(updated, false); // neither the application nor the user was changed
+  assert.match(patchSql, /t\.user_deleted_at IS NULL/); // neither the application nor the user is updated when deleted
 });
 
 test('GET /api/admin/users - a deleted account shows the address it had, not the placeholder, and can be searched by it', async () => {

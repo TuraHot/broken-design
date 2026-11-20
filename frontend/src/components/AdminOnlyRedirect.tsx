@@ -8,7 +8,7 @@
 import { useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { isAdminPath } from '@/lib/auth-paths';
-import { readSession } from '@/lib/session';
+import { readSession, SESSION_UPDATED_EVENT } from '@/lib/session';
 
 // `/embed` is shown inside other people's sites, so it must never redirect.
 const EXEMPT = ['/embed'];
@@ -18,9 +18,18 @@ export default function AdminOnlyRedirect() {
   const router = useRouter();
 
   useEffect(() => {
-    if (isAdminPath(pathname)) return;
-    if (EXEMPT.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return;
-    if (readSession()?.user.role === 'admin') router.replace('/admin');
+    const check = () => {
+      if (isAdminPath(pathname)) return;
+      if (EXEMPT.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return;
+      if (readSession()?.user.role === 'admin') router.replace('/admin');
+    };
+    check();
+    window.addEventListener('storage', check);
+    window.addEventListener(SESSION_UPDATED_EVENT, check);
+    return () => {
+      window.removeEventListener('storage', check);
+      window.removeEventListener(SESSION_UPDATED_EVENT, check);
+    };
   }, [pathname, router]);
 
   return null;

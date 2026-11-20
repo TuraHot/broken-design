@@ -3,7 +3,7 @@
 // Checkout Success page — displays confirmed purchase, embed_key, embed snippets, and .glb download.
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import {
   Check,
   CheckCircle2,
@@ -14,11 +14,18 @@ import {
   Library,
   Loader2,
 } from 'lucide-react';
-import { CDN_SERVICE_URL, fetchMyPurchases } from '@/lib/api';
+import { fetchMyPurchases } from '@/lib/api';
 import { formatDate, formatMoney } from '@/lib/format';
-import { readSession } from '@/lib/session';
+import { readSession, SESSION_UPDATED_EVENT } from '@/lib/session';
 import { useT } from '@/lib/i18n/client';
 import { fromErr, msgText, serverError, type Msg } from '@/lib/i18n/msg';
+import {
+  buildIframeSnippet,
+  buildVmModelSnippet,
+  DEFAULT_EMBED_ORIGIN,
+  DownloadError,
+  downloadModelGlb,
+} from '@/lib/model-assets';
 import type { PurchaseItem } from '@/lib/types';
 
 const CARD = 'rounded-lg border border-line bg-ink/5 p-5 sm:p-6';
@@ -36,27 +43,44 @@ function CheckoutSuccessContent() {
   const [copiedTarget, setCopiedTarget] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<Msg | null>(null);
+  const [origin, setOrigin] = useState(DEFAULT_EMBED_ORIGIN);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    const session = readSession();
-    setToken(session?.token ?? null);
-    setReady(true);
+    setOrigin(window.location.origin);
+    const syncSession = () => {
+      const nextToken = readSession()?.token ?? null;
+      setToken(nextToken);
+      setReady(true);
+      if (!nextToken) {
+        setPurchase(null);
+        setLoading(false);
+      }
+    };
+    syncSession();
+    window.addEventListener('storage', syncSession);
+    window.addEventListener(SESSION_UPDATED_EVENT, syncSession);
+    return () => {
+      window.removeEventListener('storage', syncSession);
+      window.removeEventListener(SESSION_UPDATED_EVENT, syncSession);
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    };
+  }, []);
 
-    if (!session) {
-      setLoading(false);
-      return;
-    }
+  useEffect(() => {
+    if (!token) return;
 
     let active = true;
+    setLoading(true);
     (async () => {
       try {
-        const list = await fetchMyPurchases(session.token);
+        const list = await fetchMyPurchases(token);
         if (!active) return;
         const found = purchaseId
           ? list.find((item) => item.id === purchaseId) ?? null
           : list[0] ?? null;
         setPurchase(found);
-        if (!found) setErrorMsg({ key: 'pay.errNoPaid' });
+        setErrorMsg(found ? null : { key: 'pay.errNoPaid' });
       } catch (err: any) {
         if (active) setErrorMsg(fromErr(err, 'pay.errLoadPurchase'));
       } finally {
@@ -67,13 +91,14 @@ function CheckoutSuccessContent() {
     return () => {
       active = false;
     };
-  }, [purchaseId]);
+  }, [token, purchaseId]);
 
   const handleCopy = async (label: string, text: string) => {
     try {
       await navigator.clipboard.writeText(text);
       setCopiedTarget(label);
-      setTimeout(() => setCopiedTarget(null), 2000);
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = setTimeout(() => setCopiedTarget(null), 2000);
     } catch {
       // Clipboard blocked
     }
@@ -84,27 +109,13 @@ function CheckoutSuccessContent() {
     try {
       setDownloading(true);
       setErrorMsg(null);
-      const res = await fetch(
-        `${CDN_SERVICE_URL}/cdn/models/${encodeURIComponent(purchase.modelId)}/download`,
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-      if (!res.ok) {
-        const body = await res.json().catch(() => null);
-        throw body?.error?.message ? serverError(body.error.message) : new Error('download failed');
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      const safeName =
-        purchase.title.replace(/[^\w\u0E00-\u0E7F-]+/g, '_').replace(/^_+|_+$/g, '') || 'model';
-      a.download = `${safeName}.glb`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      await downloadModelGlb(purchase.modelId, purchase.title, token);
     } catch (err: any) {
-      setErrorMsg(fromErr(err, 'pay.errDownload'));
+      if (err instanceof DownloadError && err.serverMessage) {
+        setErrorMsg(fromErr(serverError(err.serverMessage), 'pay.errDownload'));
+      } else {
+        setErrorMsg(fromErr(err, 'pay.errDownload'));
+      }
     } finally {
       setDownloading(false);
     }
@@ -159,9 +170,17 @@ function CheckoutSuccessContent() {
     );
   }
 
-  const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
-  const webComponentSnippet = `<script type="module" src="${origin}/embed.js"></script>\n<vm-model\n  model-id="${purchase.modelId}"\n  cdn-base="${CDN_SERVICE_URL}"\n  key="${purchase.embedKey}"\n  auto-rotate\n  camera-controls\n></vm-model>`;
-  const iframeSnippet = `<iframe\n  src="${origin}/embed/${purchase.modelId}?key=${purchase.embedKey}"\n  width="600"\n  height="400"\n  loading="lazy"\n  allow="fullscreen"\n  style="border:0"\n></iframe>`;
+  const webComponentSnippet = buildVmModelSnippet({
+    origin,
+    modelId: purchase.modelId,
+    embedKey: purchase.embedKey,
+    multiline: true,
+  });
+  const iframeSnippet = buildIframeSnippet({
+    origin,
+    modelId: purchase.modelId,
+    embedKey: purchase.embedKey,
+  });
 
   return (
     <div className="space-y-6">

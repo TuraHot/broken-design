@@ -30,13 +30,15 @@ export function getSocket(): Socket {
       reconnectionDelay: 1000,
     });
 
-    socket.on('connect', () => {
-      console.log('[Socket.IO Client] Connected to server, id:', socket?.id);
-    });
+    if (process.env.NODE_ENV !== 'production') {
+      socket.on('connect', () => {
+        console.log('[Socket.IO Client] Connected to server, id:', socket?.id);
+      });
 
-    socket.on('disconnect', (reason) => {
-      console.log('[Socket.IO Client] Disconnected:', reason);
-    });
+      socket.on('disconnect', (reason) => {
+        console.log('[Socket.IO Client] Disconnected:', reason);
+      });
+    }
   }
 
   return socket;

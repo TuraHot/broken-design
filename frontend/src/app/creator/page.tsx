@@ -1,5 +1,4 @@
-// Creator landing — what you can do as a creator, with an interactive 3D model preview and a Get started button.
-// Content only: nothing here calls an API (auth and upload are not connected yet).
+// Creator landing — what you can do as a creator, interactive 3D preview, and 2-step creator application CTA.
 import type { Metadata } from 'next';
 import { CodeXml, Coins, LayoutDashboard, Scale, Upload, Zap, type LucideIcon } from 'lucide-react';
 import SectionHeading from '@/components/landing/SectionHeading';
@@ -12,8 +11,6 @@ export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getT();
   return { title: t('creator.meta') };
 }
-
-const HUD_CLIP = 'polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px))';
 
 const FEATURES: { icon: LucideIcon; title: MessageKey; body: MessageKey }[] = [
   { icon: Upload, title: 'creator.f1.title', body: 'creator.f1.body' },
@@ -130,28 +127,6 @@ export default async function CreatorPage() {
             ))}
           </ol>
         </section>
-
-        {/* <section
-          aria-label="Become a creator"
-          className="border border-accent/40 bg-canvas/70 p-6 backdrop-blur-sm md:p-10"
-          style={{ clipPath: HUD_CLIP }}
-        >
-          <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-accent">[ Join ]</p>
-              <h2 className="mt-3 font-display text-[clamp(20px,2.6vw,30px)] uppercase leading-snug text-ink">
-                Ready to publish?
-              </h2>
-              <p className="mt-3 max-w-[52ch] text-[15px] leading-relaxed text-ink-soft">
-                Create a free account and upload your first model in minutes.
-              </p>
-            </div>
-            <Link href="/login" className={`${GET_STARTED} shrink-0 self-start md:self-auto`}>
-              Get started
-              <ArrowRight aria-hidden className="h-4 w-4" />
-            </Link>
-          </div>
-        </section> */}
       </div>
     </main>
   );

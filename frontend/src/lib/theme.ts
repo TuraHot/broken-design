@@ -6,7 +6,7 @@ export type Theme = 'light' | 'dark';
 export const THEME_COOKIE = 'theme';
 
 /** Routes whose pages are converted to the colour tokens. Add a route here only after checking both themes. */
-export const THEME_READY_ROUTES: readonly string[] = ['/', '/gallery', '/models/[id]', '/creator', '/creators/[handle]', '/login', '/register', '/forgot-password', '/reset-password', '/docs', '/terms', '/privacy', '/seller-terms', '/refunds', '/dmca', '/licenses', '/contact', '/me', '/seller', '/settings', '/upload', '/checkout/[id]', '/checkout/success', '/pay/mock/[id]', '/admin', '/admin/models', '/admin/users', '/admin/purchases', '/admin/complaints', '/admin/notifications', '/admin/creator-approvals', '/403'];
+export const THEME_READY_ROUTES: readonly string[] = ['/', '/gallery', '/models/[id]', '/creator', '/creators/[handle]', '/login', '/register', '/forgot-password', '/reset-password', '/docs', '/terms', '/privacy', '/seller-terms', '/refunds', '/dmca', '/licenses', '/contact', '/me', '/seller', '/settings', '/upload', '/checkout/[id]', '/checkout/success', '/admin', '/admin/models', '/admin/users', '/admin/purchases', '/admin/complaints', '/admin/notifications', '/admin/creator-approvals', '/admin/withdrawals', '/403'];
 
 const normalize = (pathname: string) => {
   const path = pathname.split(/[?#]/)[0];

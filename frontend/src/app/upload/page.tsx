@@ -14,7 +14,6 @@ import {
   Layers,
   DollarSign,
   Tag,
-  FileCode,
   ArrowRight,
   RefreshCw,
   Check,
@@ -66,7 +65,8 @@ export default function UploadPage() {
 
   const canUpload = Boolean(
     session?.user &&
-      (session.user.is_seller || session.user.role === 'creator' || session.user.role === 'admin'),
+      session.user.role !== 'admin' &&
+      (session.user.is_seller || session.user.role === 'creator'),
   );
   // Model-viewer dynamic import for client-side WebGL
   const [modelViewerLoaded, setModelViewerLoaded] = useState(false);
@@ -416,7 +416,7 @@ export default function UploadPage() {
               {t('upload.offBody')}
             </p>
             <Link
-              href="/seller"
+              href="/creator"
               className="mt-6 inline-block rounded-lg bg-ink px-5 py-2 text-sm font-medium text-canvas transition-colors hover:bg-ink/85"
             >
               {t('upload.toSellerDash')}
@@ -483,7 +483,7 @@ export default function UploadPage() {
                         style={{ width: '100%', height: '100%', backgroundColor: 'rgb(var(--c-canvas))' }}
                       />
                     ) : (
-                      <div className="grid h-full place-items-center text-sm text-ink/50">
+                      <div className="grid h-full place-items-center text-sm text-ink-soft">
                         {t('upload.loadingCanvas')}
                       </div>
                     )}
@@ -536,7 +536,7 @@ export default function UploadPage() {
                       <Box className="h-8 w-8 text-accent" />
                     </div>
                     <span className="mt-4 text-base font-medium text-ink">{t('upload.dropTitle')}</span>
-                    <span className="mt-1 text-xs text-ink/50">{t('upload.dropHint')}</span>
+                    <span className="mt-1 text-xs text-ink-soft">{t('upload.dropHint')}</span>
                     <div className="mt-4 rounded-md border border-line bg-ink/5 px-3 py-1.5 text-xs text-ink/70">
                       {t('upload.browse')}
                     </div>
@@ -644,7 +644,7 @@ export default function UploadPage() {
             <div className="space-y-5 lg:col-span-6">
               {/* Validation / Submit Alerts */}
               {validationError && (
-                <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-warn">
+                <div className="flex items-center gap-2 rounded-lg border border-warn/30 bg-warn/10 p-3 text-xs text-warn">
                   <AlertCircle className="h-4 w-4 shrink-0" />
                   <span>{msgText(validationError)}</span>
                 </div>
@@ -707,7 +707,7 @@ export default function UploadPage() {
                         <button
                           type="button"
                           onClick={() => removeTag(tag)}
-                          className="ml-0.5 text-ink/50 hover:text-ink transition-colors"
+                          className="ml-0.5 text-ink-soft hover:text-ink transition-colors"
                           title={t('upload.tagRemove')}
                         >
                           <X className="h-3 w-3" />
@@ -828,7 +828,7 @@ export default function UploadPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <span className="text-sm font-semibold text-ink">{t('upload.pricing')}</span>
-                    <p className="text-xs text-ink/50">{t('upload.pricingHint')}</p>
+                    <p className="text-xs text-ink-soft">{t('upload.pricingHint')}</p>
                   </div>
                   <div className="inline-flex rounded-lg border border-line bg-ink/5 p-1">
                     <button

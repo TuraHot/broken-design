@@ -29,8 +29,8 @@ export default function AccountMenu() {
   const buttonRef = useRef<HTMLButtonElement>(null);
   const syncedTokenRef = useRef<string | null>(null);
 
-  // Read the saved sign-in after mount (localStorage does not exist on the server), again on every
-  // page change (the login form saves it just before it navigates), and when another tab changes it.
+  // Read the saved sign-in after mount (sessionStorage does not exist on the server), again on every
+  // page change (the login form saves it just before it navigates), and when updated in this tab.
   useEffect(() => {
     setSession(readSession());
     setReady(true);
@@ -77,7 +77,13 @@ export default function AccountMenu() {
       headers: { Authorization: `Bearer ${token}` },
       cache: 'no-store',
     })
-      .then((res) => (res.ok ? res.json() : null))
+      .then((res) => {
+        if (!cancelled && (res.status === 401 || res.status === 403)) {
+          clearSession();
+          return null;
+        }
+        return res.ok ? res.json() : null;
+      })
       .then((data) => {
         if (!cancelled && data?.user) {
           updateSessionUser(data.user);
@@ -187,13 +193,17 @@ export default function AccountMenu() {
                     )}
                   </Link>
                 </li>
-                {user.is_seller && (
-                  <li>
-                    <Link href={`/creators/${creatorHandle(name)}`} className={itemClass}>
-                      {t('menu.creatorProfile')}
-                    </Link>
-                  </li>
-                )}
+                {user.is_seller && (() => {
+                  const handle = creatorHandle(name);
+                  const profileHref = handle ? `/creators/${encodeURIComponent(handle)}` : '/seller';
+                  return (
+                    <li>
+                      <Link href={profileHref} className={itemClass}>
+                        {t('menu.creatorProfile')}
+                      </Link>
+                    </li>
+                  );
+                })()}
                 <li>
                   <Link href="/settings" className={itemClass}>
                     {t('menu.settings')}

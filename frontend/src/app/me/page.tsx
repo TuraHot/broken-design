@@ -1,7 +1,7 @@
 'use client';
 
-// User Dashboard — profile overview, seller toggle, purchased models, embed keys & GLB downloads
-import { useEffect, useState } from 'react';
+// User Dashboard — profile overview, purchased models, embed keys & GLB downloads
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import NoticeBox from '@/components/notifications/NoticeBox';
 import {
@@ -12,14 +12,11 @@ import {
   KeyRound,
   Layers,
   RefreshCw,
-  ShieldCheck,
   Sparkles,
   User as UserIcon,
 } from 'lucide-react';
-import AvatarUploader from '@/components/profile/AvatarUploader';
+import UserAvatar from '@/components/ui/UserAvatar';
 import {
-  CDN_SERVICE_URL,
-  enableSellerMode,
   fetchMyPurchases,
   fetchSellerStatus,
   regenerateEmbedKey,
@@ -28,7 +25,13 @@ import { creatorHandle } from '@/lib/creators';
 import { formatPrice } from '@/lib/format';
 import { useT } from '@/lib/i18n/client';
 import { fromErr, serverError, type Msg } from '@/lib/i18n/msg';
-import { readSession, updateSessionUser } from '@/lib/session';
+import {
+  buildVmModelSnippet,
+  DEFAULT_EMBED_ORIGIN,
+  DownloadError,
+  downloadModelGlb,
+} from '@/lib/model-assets';
+import { readSession, SESSION_UPDATED_EVENT, updateSessionUser } from '@/lib/session';
 import type { AuthUser, PurchaseItem } from '@/lib/types';
 
 
@@ -44,16 +47,27 @@ export default function MePage() {
   const [statusMsg, setStatusMsg] = useState<Msg | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [origin, setOrigin] = useState(DEFAULT_EMBED_ORIGIN);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // 1. Load user & token from storage
+  // 1. Load & stay in sync with session storage (display name, avatar, sign-out)
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const session = readSession();
-    if (session) {
-      setToken(session.token);
-      setUser(session.user as AuthUser);
-    }
-    setLoading(false);
+    setOrigin(window.location.origin);
+    const syncSession = () => {
+      const session = readSession();
+      setToken(session?.token ?? null);
+      setUser((session?.user as AuthUser) ?? null);
+      if (!session) setPurchases([]);
+      setLoading(false);
+    };
+    syncSession();
+    window.addEventListener('storage', syncSession);
+    window.addEventListener(SESSION_UPDATED_EVENT, syncSession);
+    return () => {
+      window.removeEventListener('storage', syncSession);
+      window.removeEventListener(SESSION_UPDATED_EVENT, syncSession);
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    };
   }, []);
 
   // 2. Fetch purchases and seller status
@@ -86,28 +100,6 @@ export default function MePage() {
     };
   }, [token]);
 
-  // Handle Enable Seller Mode
-  const handleEnableSeller = async () => {
-    if (!token) return;
-    try {
-      setBusyAction('enable-seller');
-      setStatusMsg(null);
-      await enableSellerMode(token);
-      setUser((prev) => {
-        if (!prev) return prev;
-        const nextRole: AuthUser['role'] = prev.role === 'user' ? 'creator' : prev.role;
-        const updated = { ...prev, is_seller: true, role: nextRole };
-        updateSessionUser({ is_seller: true, role: nextRole });
-        return updated;
-      });
-      setStatusMsg({ key: 'me.sellerOn' });
-    } catch (err: any) {
-      setStatusMsg(fromErr(err, 'me.sellerFail'));
-    } finally {
-      setBusyAction(null);
-    }
-  };
-
   // Handle Regenerate Embed Key
   const handleRegenerateKey = async (purchaseId: string) => {
     if (!token) return;
@@ -135,47 +127,35 @@ export default function MePage() {
     try {
       setBusyAction(`dl-${modelId}`);
       setStatusMsg(null);
-      const headers: Record<string, string> = {};
-      if (token) headers.Authorization = `Bearer ${token}`;
-
-      const res = await fetch(`${CDN_SERVICE_URL}/cdn/models/${encodeURIComponent(modelId)}/download`, {
-        headers,
-      });
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => null);
-        throw body?.error?.message ? serverError(body.error.message) : new Error('download failed');
-      }
-
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      const safeName = title.replace(/[^\w\u0E00-\u0E7F-]+/g, '_').replace(/^_+|_+$/g, '') || 'model';
-      a.download = `${safeName}.glb`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      await downloadModelGlb(modelId, title, token);
       setStatusMsg({ key: 'me.dlStarted', vars: { title } });
     } catch (err: any) {
-      setStatusMsg(fromErr(err, 'me.dlFailed'));
+      if (err instanceof DownloadError && err.serverMessage) {
+        setStatusMsg(fromErr(serverError(err.serverMessage), 'me.dlFailed'));
+      } else {
+        setStatusMsg(fromErr(err, 'me.dlFailed'));
+      }
     } finally {
       setBusyAction(null);
     }
   };
 
   // Copy helper
-  const copyText = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedKey(id);
-    setTimeout(() => setCopiedKey(null), 2000);
+  const copyText = async (text: string, id: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedKey(id);
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = setTimeout(() => setCopiedKey(null), 2000);
+    } catch {
+      setCopiedKey(null);
+    }
   };
 
   if (loading) {
     return (
       <main className="mx-auto max-w-[1200px] px-4 pb-16 pt-24 md:px-6">
-        <p className="font-mono text-sm text-ink/50">{t('me.loading')}</p>
+        <p className="font-mono text-sm text-ink-soft">{t('me.loading')}</p>
       </main>
     );
   }
@@ -234,14 +214,7 @@ export default function MePage() {
       {/* Profile Header */}
       <div className={`${CARD} flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between`}>
         <div className="flex flex-wrap items-center gap-4">
-          <AvatarUploader
-            name={displayName}
-            avatarUrl={user?.avatar_url}
-            size="lg"
-            onUpdated={(nextUrl) =>
-              setUser((prev) => (prev ? { ...prev, avatar_url: nextUrl } : prev))
-            }
-          />
+          <UserAvatar name={displayName} avatarUrl={user?.avatar_url} size="lg" />
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="break-words font-display text-2xl uppercase text-ink">{displayName}</h1>
@@ -255,7 +228,7 @@ export default function MePage() {
                 {user?.is_seller ? t('me.creator') : t('me.buyer')}
               </span>
             </div>
-            <p className="mt-1 break-all font-mono text-xs text-ink/50">{user?.email}</p>
+            <p className="mt-1 break-all font-mono text-xs text-ink-soft">{user?.email}</p>
           </div>
         </div>
 
@@ -264,7 +237,7 @@ export default function MePage() {
           {user?.is_seller ? (
             <>
               <Link
-                href={`/creators/${handle}`}
+                href={handle ? `/creators/${encodeURIComponent(handle)}` : '/seller'}
                 className="flex h-9 items-center gap-2 rounded-lg border border-accent/30 bg-accent/10 px-3.5 text-xs font-mono uppercase tracking-wider text-accent transition-colors hover:bg-accent/20"
               >
                 <UserIcon className="h-4 w-4" />
@@ -279,15 +252,13 @@ export default function MePage() {
               </Link>
             </>
           ) : (
-            <button
-              type="button"
-              disabled={busyAction === 'enable-seller'}
-              onClick={handleEnableSeller}
-              className="flex h-9 items-center gap-2 rounded-lg bg-ink px-4 text-xs font-mono uppercase tracking-wider text-canvas transition-colors hover:bg-ink/85 disabled:opacity-60"
+            <Link
+              href="/creator"
+              className="flex h-9 items-center gap-2 rounded-lg bg-ink px-4 text-xs font-mono uppercase tracking-wider text-canvas transition-colors hover:bg-ink/85"
             >
               <Sparkles className="h-4 w-4" />
-              {busyAction === 'enable-seller' ? t('me.activating') : t('me.becomeCreator')}
-            </button>
+              {t('me.becomeCreator')}
+            </Link>
           )}
         </div>
       </div>
@@ -303,14 +274,12 @@ export default function MePage() {
                 {t('me.oppBody')}
               </p>
             </div>
-            <button
-              type="button"
-              disabled={busyAction === 'enable-seller'}
-              onClick={handleEnableSeller}
-              className="whitespace-nowrap rounded-lg bg-accent px-4 py-2 font-mono text-xs uppercase tracking-wider text-canvas font-semibold transition-colors hover:bg-accent/85 disabled:opacity-60"
+            <Link
+              href="/creator"
+              className="inline-flex items-center justify-center whitespace-nowrap rounded-lg bg-accent px-4 py-2 font-mono text-xs uppercase tracking-wider text-canvas font-semibold transition-colors hover:bg-accent/85"
             >
               {t('me.enableSeller')}
-            </button>
+            </Link>
           </div>
         </div>
       )}
@@ -320,7 +289,7 @@ export default function MePage() {
         <div className="flex items-center justify-between border-b border-line pb-3">
           <h2 className="font-display text-lg uppercase text-ink">
             {t('me.purchasesTitle')}
-            <span className="ml-2 font-mono text-xs text-ink/50">({purchases.length})</span>
+            <span className="ml-2 font-mono text-xs text-ink-soft">({purchases.length})</span>
           </h2>
           <Link
             href="/gallery"
@@ -334,7 +303,7 @@ export default function MePage() {
           <div className={`${CARD} mt-6 text-center py-12`}>
             <KeyRound className="mx-auto h-8 w-8 text-ink/30" />
             <h3 className="mt-3 font-display text-base uppercase text-ink">{t('me.noneTitle')}</h3>
-            <p className="mt-1 text-sm text-ink/50">
+            <p className="mt-1 text-sm text-ink-soft">
               {t('me.noneBody')}
             </p>
             <Link
@@ -347,8 +316,11 @@ export default function MePage() {
         ) : (
           <div className="mt-6 grid grid-cols-1 gap-6">
             {purchases.map((item) => {
-              const vmSnippet = `<vm-model model-id="${item.modelId}" cdn-base="${CDN_SERVICE_URL}" key="${item.embedKey}" auto-rotate camera-controls></vm-model>`;
-              const iframeSnippet = `<iframe src="http://localhost:3000/embed/${item.modelId}?key=${item.embedKey}" width="600" height="400" allow="fullscreen" style="border:0"></iframe>`;
+              const vmSnippet = buildVmModelSnippet({
+                origin,
+                modelId: item.modelId,
+                embedKey: item.embedKey,
+              });
 
               return (
                 <div key={item.id} className={`${CARD} min-w-0 space-y-4`}>
@@ -418,7 +390,7 @@ export default function MePage() {
                           type="button"
                           disabled={busyAction === `regen-${item.id}`}
                           onClick={() => handleRegenerateKey(item.id)}
-                          className="flex h-7 items-center gap-1 rounded border border-danger/30 px-2 font-mono text-[11px] text-danger/80 transition-colors hover:bg-danger/10 hover:text-danger disabled:opacity-50"
+                          className="flex h-7 items-center gap-1 rounded border border-danger/30 px-2 font-mono text-[11px] text-danger transition-colors hover:bg-danger/10 hover:text-danger disabled:opacity-50"
                           title={t('me.regenerateTip')}
                         >
                           <RefreshCw className={`h-3 w-3 ${busyAction === `regen-${item.id}` ? 'animate-spin' : ''}`} />
@@ -430,7 +402,7 @@ export default function MePage() {
                     {/* Code Snippets for web developers */}
                     <div className="mt-3 pt-3 border-t border-ink/5 flex flex-col gap-2 text-xs">
                       <div className="flex items-center justify-between">
-                        <span className="font-mono text-[11px] text-ink/50 flex items-center gap-1">
+                        <span className="font-mono text-[11px] text-ink-soft flex items-center gap-1">
                           <Code2 className="h-3.5 w-3.5" /> {t('me.snippet')}
                         </span>
                         <button

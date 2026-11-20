@@ -1,4 +1,4 @@
-// Creator profile helpers. Until core-api has creator accounts, a creator is just the name on a model.
+// Creator profile types and URL handle helpers (shared between frontend and core-api).
 import type { Model } from './types';
 
 export interface CreatorProfile {
@@ -11,13 +11,14 @@ export interface CreatorProfile {
   totalLikes: number;
 }
 
-/** "Tomás Vega" -> "tomas-vega" (URL-safe, accents dropped). */
+/** "Tomás Vega" -> "tomas-vega", "สมชาย ใจดี" -> "สมชาย-ใจดี" (preserves Unicode letters/marks, drops Latin diacritics). */
 export function creatorHandle(name: string): string {
   return name
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/[\u0300-\u036f]/g, '')
+    .normalize('NFC')
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/[^\p{L}\p{M}\p{N}]+/gu, '-')
     .replace(/^-+|-+$/g, '');
 }
 
@@ -27,18 +28,4 @@ export function initials(name: string): string {
     .slice(0, 2)
     .map((w) => w[0]?.toUpperCase() ?? '')
     .join('');
-}
-
-/** Build a profile from a creator's models (most popular first). */
-export function buildProfile(name: string, models: Model[]): CreatorProfile {
-  const sorted = [...models].sort((a, b) => b.likeCount - a.likeCount || b.downloadCount - a.downloadCount);
-  return {
-    handle: creatorHandle(name),
-    name,
-    avatarUrl: sorted.find((m) => m.creatorAvatarUrl)?.creatorAvatarUrl,
-    bio: 'Sample bio until creators can write their own.',
-    models: sorted,
-    totalDownloads: sorted.reduce((n, m) => n + m.downloadCount, 0),
-    totalLikes: sorted.reduce((n, m) => n + m.likeCount, 0),
-  };
 }

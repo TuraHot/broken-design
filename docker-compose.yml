@@ -5,10 +5,14 @@ services:
     ports:
       - "4000:4000"
     env_file:
-      - path: ./services/core-api/.env.example
-        required: false
       - path: ./services/core-api/.env
         required: false
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/health').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     restart: unless-stopped
 
   cdn-service:
@@ -17,10 +21,14 @@ services:
     ports:
       - "4001:4001"
     env_file:
-      - path: ./services/cdn-service/.env.example
-        required: false
       - path: ./services/cdn-service/.env
         required: false
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4001/health').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     volumes:
       - broken_design_storage:/app/storage_data
       - broken_design_tmp:/app/tmp_uploads
@@ -32,15 +40,15 @@ services:
     ports:
       - "3000:3000"
     env_file:
-      - path: ./frontend/.env.example
-        required: false
       - path: ./frontend/.env.local
         required: false
     environment:
       - INTERNAL_CORE_API_URL=http://core-api:4000
     depends_on:
-      - core-api
-      - cdn-service
+      core-api:
+        condition: service_healthy
+      cdn-service:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:

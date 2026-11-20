@@ -59,7 +59,7 @@ sellerRouter.get('/models', requireAuth, requireActiveSeller, async (req, res) =
     `SELECT id, title, description, license, price_cents, currency, view_count, download_count,
             poster_hash, hidden_at, deleted_at, created_at
      FROM models
-     WHERE owner_id = $1
+     WHERE owner_id = $1 AND deleted_at IS NULL
      ORDER BY created_at DESC`,
     [userId],
   );

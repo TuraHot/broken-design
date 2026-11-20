@@ -75,6 +75,7 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [deletedIds, setDeletedIds] = useState<Set<string>>(() => new Set());
 
   const [editingModel, setEditingModel] = useState<SellerModelItem | null>(null);
   const [deletingModel, setDeletingModel] = useState<SellerModelItem | null>(null);
@@ -200,7 +201,8 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
       setBusyAction(`delete-${modelId}`);
       setStatusMsg(null);
       await deleteModel(modelId, token);
-      setModels((prev) => prev.map((m) => (m.id === modelId ? { ...m, isDeleted: true } : m)));
+      setModels((prev) => prev.filter((m) => m.id !== modelId));
+      setDeletedIds((prev) => new Set(prev).add(modelId));
       setStatusMsg(t('profile.deletedMsg', { title }));
       setDeletingModel(null);
     } catch (err: any) {
@@ -240,8 +242,8 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
 
   const displayName = creatorName || handle;
   const avatarUrl = (isOwnerCreator ? user?.avatar_url : null) ?? initialCreator?.avatarUrl ?? null;
-  const publicModels = initialCreator?.models ?? [];
-  const activeSellerModels = models.filter((m) => !m.isDeleted);
+  const publicModels = (initialCreator?.models ?? []).filter((m) => !deletedIds.has(m.id));
+  const activeSellerModels = models.filter((m) => !m.isDeleted && !deletedIds.has(m.id));
   const modelCount = initialCreator ? publicModels.length : activeSellerModels.length;
   const totalDownloads = initialCreator
     ? initialCreator.totalDownloads
@@ -454,9 +456,9 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
 
                 {/* My 3D Models Table */}
                 <div>
-                  <div className="flex items-center justify-between border-b border-line pb-3">
-                    <h2 className="font-display text-base uppercase text-ink">
-                      {t('seller.myModels')} <span className="ml-1 font-mono text-xs text-ink-soft">({models.length})</span>
+                  <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                    <h2 className="font-display text-base uppercase text-white">
+                      {t('seller.myModels')} <span className="ml-1 font-mono text-xs text-white/50">({activeSellerModels.length})</span>
                     </h2>
                     <button
                       type="button"
@@ -467,7 +469,7 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                     </button>
                   </div>
 
-                  {models.length === 0 ? (
+                  {activeSellerModels.length === 0 ? (
                     <div className={`${CARD} mt-4 text-center py-8`}>
                       <p className="text-sm text-ink-soft">{t('profile.noUploadedModels')}</p>
                     </div>
@@ -483,38 +485,29 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                             <th className="px-4 py-3 text-right">{t('seller.thActions')}</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-line">
-                          {models.map((m) => (
-                            <tr key={m.id} className="hover:bg-ink/[0.02]">
-                              <td className="px-4 py-3 font-medium text-ink">
-                                {m.isDeleted ? (
-                                  <div className="flex items-center gap-3 opacity-60">
-                                    <div className="relative flex h-11 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md border border-line bg-ink/5">
-                                      <ImageIcon className="h-4 w-4 text-ink/30" />
-                                    </div>
-                                    <span className="truncate">{m.title}</span>
+                        <tbody className="divide-y divide-white/5">
+                          {activeSellerModels.map((m) => (
+                            <tr key={m.id} className="hover:bg-white/[0.02]">
+                              <td className="px-4 py-3 font-medium text-white">
+                                <Link
+                                  href={`/models/${m.id}`}
+                                  className="group flex items-center gap-3 transition-colors hover:text-hud"
+                                >
+                                  <div className="relative flex h-11 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10 bg-white/5 group-hover:border-hud/40">
+                                    <ImageIcon className="h-4 w-4 text-white/30" />
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img
+                                      src={m.posterUrl || `${CDN_SERVICE_URL}/cdn/models/${m.id}/poster.webp`}
+                                      alt=""
+                                      loading="lazy"
+                                      onError={(e) => {
+                                        e.currentTarget.style.display = 'none';
+                                      }}
+                                      className="absolute inset-0 h-full w-full object-cover"
+                                    />
                                   </div>
-                                ) : (
-                                  <Link
-                                    href={`/models/${m.id}`}
-                                    className="group flex items-center gap-3 transition-colors hover:text-accent"
-                                  >
-                                    <div className="relative flex h-11 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md border border-line bg-ink/5 group-hover:border-accent/40">
-                                      <ImageIcon className="h-4 w-4 text-ink/30" />
-                                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                                      <img
-                                        src={m.posterUrl || `${CDN_SERVICE_URL}/cdn/models/${m.id}/poster.webp`}
-                                        alt=""
-                                        loading="lazy"
-                                        onError={(e) => {
-                                          e.currentTarget.style.display = 'none';
-                                        }}
-                                        className="absolute inset-0 h-full w-full object-cover"
-                                      />
-                                    </div>
-                                    <span className="truncate group-hover:underline">{m.title}</span>
-                                  </Link>
-                                )}
+                                  <span className="truncate group-hover:underline">{m.title}</span>
+                                </Link>
                               </td>
                               <td className="px-4 py-3 font-mono text-xs text-ink/75">
                                 {m.priceCents === 0 ? t('acct.free') : formatPrice(m.priceCents)}

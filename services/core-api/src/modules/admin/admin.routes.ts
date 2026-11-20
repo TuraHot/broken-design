@@ -816,3 +816,137 @@ adminRouter.patch('/complaints/:id', async (req, res) => {
   const r = result.rows[0];
   res.json({ id: r.id, status: r.status, adminNote: r.admin_note, handledAt: r.handled_at });
 });
+
+// ─── Creator Applications (Admin Approval) ──────────────────────────────────
+
+adminRouter.get('/creator-applications', async (req, res) => {
+  const status = typeof req.query.status === 'string' ? req.query.status.trim() : 'pending';
+  const validStatuses = ['pending', 'approved', 'rejected', 'all'];
+  if (!validStatuses.includes(status)) {
+    throw new AppError(400, 'BAD_REQUEST', 'Invalid status filter');
+  }
+
+  const result = await db.query(
+    `SELECT ca.id, ca.user_id, ca.note, ca.status, ca.admin_note, ca.created_at, ca.reviewed_at,
+            u.email, u.display_name, u.role, u.is_seller, u.suspended_at
+     FROM creator_applications ca
+     JOIN users u ON u.id = ca.user_id
+     WHERE ($1 = 'all' OR ca.status = $1)
+     ORDER BY ca.created_at DESC
+     LIMIT 100`,
+    [status],
+  );
+
+  res.json({
+    applications: result.rows.map((r) => ({
+      id: r.id,
+      userId: r.user_id,
+      email: r.email,
+      displayName: r.display_name,
+      role: r.role,
+      isSeller: r.is_seller,
+      suspendedAt: r.suspended_at,
+      note: r.note ?? '',
+      status: r.status,
+      adminNote: r.admin_note ?? null,
+      createdAt: r.created_at,
+      reviewedAt: r.reviewed_at ?? null,
+    })),
+  });
+});
+
+adminRouter.patch('/creator-applications/:id', async (req, res) => {
+  const id = req.params.id;
+  const status = req.body?.status;
+  const adminNote = typeof req.body?.adminNote === 'string' ? req.body.adminNote.trim().slice(0, 500) : null;
+
+  if (status !== 'approved' && status !== 'rejected') {
+    throw new AppError(400, 'BAD_REQUEST', 'Status must be approved or rejected');
+  }
+
+  const existing = await db.query(
+    `SELECT id, user_id, status FROM creator_applications WHERE id = $1`,
+    [id],
+  );
+  if (existing.rowCount === 0) {
+    throw new AppError(404, 'APPLICATION_NOT_FOUND', 'Creator application not found');
+  }
+
+  const appRow = existing.rows[0];
+  const updated = await db.query(
+    `UPDATE creator_applications
+     SET status = $2,
+         admin_note = COALESCE($3, admin_note),
+         reviewed_by = $4,
+         reviewed_at = NOW()
+     WHERE id = $1
+     RETURNING id, user_id, status, admin_note, reviewed_at`,
+    [id, status, adminNote, req.user!.id],
+  );
+
+  if (status === 'approved') {
+    await db.query(
+      `UPDATE users
+       SET is_seller = TRUE,
+           role = CASE WHEN role = 'user' THEN 'creator' ELSE role END
+       WHERE id = $1`,
+      [appRow.user_id],
+    );
+  }
+
+  const r = updated.rows[0];
+  res.json({
+    application: {
+      id: r.id,
+      userId: r.user_id,
+      status: r.status,
+      adminNote: r.admin_note ?? null,
+      reviewedAt: r.reviewed_at,
+    },
+  });
+});
+
+// ─── Creator Invite Codes (Admin) ───────────────────────────────────────────
+
+adminRouter.get('/invite-codes', async (_req, res) => {
+  const result = await db.query(
+    `SELECT id, code, max_uses, used_count, expires_at, created_at
+     FROM creator_invite_codes
+     ORDER BY created_at DESC
+     LIMIT 50`,
+  );
+  res.json({
+    codes: result.rows.map((r) => ({
+      id: r.id,
+      code: r.code,
+      maxUses: r.max_uses,
+      usedCount: r.used_count,
+      expiresAt: r.expires_at,
+      createdAt: r.created_at,
+    })),
+  });
+});
+
+adminRouter.post('/invite-codes', async (req, res) => {
+  const rawCode = typeof req.body?.code === 'string' ? req.body.code.trim().toUpperCase() : '';
+  const code = rawCode || `LIXYTE-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+  const maxUses = Math.max(1, Math.min(1000, Math.round(Number(req.body?.maxUses) || 1)));
+
+  const result = await db.query(
+    `INSERT INTO creator_invite_codes (code, max_uses, created_by)
+     VALUES ($1, $2, $3)
+     RETURNING id, code, max_uses, used_count, expires_at, created_at`,
+    [code, maxUses, req.user!.id],
+  );
+  const r = result.rows[0];
+  res.status(201).json({
+    code: {
+      id: r.id,
+      code: r.code,
+      maxUses: r.max_uses,
+      usedCount: r.used_count,
+      expiresAt: r.expires_at,
+      createdAt: r.created_at,
+    },
+  });
+});

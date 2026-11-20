@@ -1,4 +1,4 @@
-// "/02 How it works": four steps in a row (lucide line icons, accent title, short mono text).
+// "/02.1 How it works": four steps in a row (lucide line icons, accent title, short mono text).
 import { ClipboardPaste, Copy, Search, Zap, type LucideIcon } from 'lucide-react';
 import NumberedHeading from '@/components/landing/NumberedHeading';
 import type { MessageKey } from '@/lib/i18n/messages';
@@ -14,8 +14,8 @@ const STEPS: { icon: LucideIcon; title: MessageKey; body: MessageKey }[] = [
 export default async function HowItWorks() {
   const { t } = await getT();
   return (
-    <section id="how" className="scroll-mt-20" aria-label={t('home.how.title')}>
-      <NumberedHeading index="02" title={t('home.how.title')} />
+    <section aria-label={t('home.how.title')}>
+      <NumberedHeading index="02.1" title={t('home.how.title')} />
       <ol className="grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-2 lg:grid-cols-4">
         {STEPS.map(({ icon: Icon, title, body }, i) => (
           <li key={title} className="flex gap-4">

@@ -7,6 +7,7 @@ import Categories from "@/components/landing/Categories";
 import HeroFrame from "@/components/landing/HeroFrame";
 import HowItWorks from "@/components/landing/HowItWorks";
 import NumberedHeading from "@/components/landing/NumberedHeading";
+import PageSnap from "@/components/landing/PageSnap";
 import PopularGrid from "@/components/landing/PopularGrid";
 import SectionDots, { ScrollCue } from "@/components/landing/SectionDots";
 import PixieCursor from "@/components/PixieCursor";
@@ -18,12 +19,13 @@ export default async function HomePage() {
   // Popular = top of the popularity-sorted list (top 15, one row that drifts sideways)
   const { items } = await fetchModels({ page: 1 });
   const popular = items.slice(0, 15);
-  const sectionIds = ["hero", "how", "categories", ...(popular.length > 0 ? ["popular"] : []), "join"];
+  const sectionIds = ["hero", "how", "join"];
 
   return (
     <main>
       <PixieCursor />
       <SectionDots ids={sectionIds} />
+      <PageSnap ids={sectionIds} />
 
       <section id="hero" className="relative z-10 min-h-dvh">
         <div className="mx-auto grid min-h-dvh w-full max-w-[2400px] grid-cols-1 pt-16 md:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
@@ -69,35 +71,35 @@ export default async function HomePage() {
         <ScrollCue target={sectionIds[1]} />
       </section>
 
-      {/* The sections below the hero are stacked bands, numbered /02 to /05, with no gaps between them */}
-      <Band tint>
-        <HowItWorks />
-      </Band>
+      {/* Below the hero there are two pages with no gaps: 02 (how it works, categories, popular) and 03 (join) */}
+      <Band id="how" full page>
+        <div className="flex flex-col gap-10 md:gap-8">
+          <div className="mx-auto w-full max-w-[1400px] px-4 md:px-6">
+            <HowItWorks />
+          </div>
 
-      <Band>
-        <section id="categories" className="scroll-mt-20" aria-label={t('home.categories')}>
-          <NumberedHeading index="03" title={t('home.categories')} />
-          <Categories />
-        </section>
-      </Band>
-
-      {popular.length > 0 && (
-        <Band tint full>
-          <section id="popular" className="scroll-mt-20" aria-label={t('home.popularAria')}>
-            <div className="mx-auto max-w-[1400px] px-4 md:px-6">
-              <NumberedHeading index="04" title={t('home.popular')} href="/gallery" />
-            </div>
-            <PopularGrid models={popular} />
+          <section aria-label={t('home.categories')} className="mx-auto w-full max-w-[1400px] px-4 md:px-6">
+            <NumberedHeading index="02.2" title={t('home.categories')} />
+            <Categories />
           </section>
-        </Band>
-      )}
 
-      <Band>
-        <section id="join" aria-label={t('home.joinAria')} className="scroll-mt-20">
+          {popular.length > 0 && (
+            <section aria-label={t('home.popularAria')}>
+              <div className="mx-auto max-w-[1400px] px-4 md:px-6">
+                <NumberedHeading index="02.3" title={t('home.popular')} href="/gallery" />
+              </div>
+              <PopularGrid models={popular} />
+            </section>
+          )}
+        </div>
+      </Band>
+
+      <Band id="join" tint page>
+        <section aria-label={t('home.joinAria')}>
           <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
             <div>
-              <p className="font-mono text-[13px] text-accent">/05</p>
-              <h2 className="mt-3 font-[family-name:var(--font-barlow)] text-[clamp(32px,4vw,56px)] uppercase leading-[0.95] text-ink">
+              <p className="font-mono text-[13px] text-accent">/03</p>
+              <h2 className="mt-3 font-[family-name:var(--font-barlow)] text-[clamp(40px,6vw,96px)] uppercase leading-[0.95] text-ink">
                 {t('home.joinTitle')}
               </h2>
               <p className="mt-4 max-w-[52ch] font-mono text-[12px] leading-relaxed text-ink">{t('home.joinBody')}</p>

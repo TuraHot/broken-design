@@ -282,3 +282,13 @@ CREATE TABLE IF NOT EXISTS password_resets (
 ALTER TABLE password_resets ADD COLUMN IF NOT EXISTS attempts INTEGER NOT NULL DEFAULT 0;
 CREATE INDEX IF NOT EXISTS idx_password_resets_user ON password_resets (user_id);
 ALTER TABLE password_resets ENABLE ROW LEVEL SECURITY;
+
+-- 13. Account deletion by an admin (soft delete, history stays). The row is kept so every model, purchase, complaint and
+-- suspension that points at it stays intact. email is replaced by a unique placeholder and the real address is kept in
+-- original_email, which frees the address: someone who signs up with it again gets a brand-new account (a new id) that has
+-- nothing to do with the deleted one. The deleted account can no longer log in or use an old token.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_by UUID REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_reason TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS original_email VARCHAR(255);
+CREATE INDEX IF NOT EXISTS idx_users_original_email ON users (LOWER(original_email)) WHERE original_email IS NOT NULL;

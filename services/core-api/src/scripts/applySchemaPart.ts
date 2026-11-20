@@ -5,7 +5,7 @@ import { env } from "../config/env";
 
 /**
  * Runs the NEW part of supabase/schema.sql (section 9 to the end: license-change history, notifications,
- * timed suspensions, hide / restore history) on the database in DATABASE_URL, in ONE transaction. Safe to run again: every
+ * timed suspensions, hide / restore history, password resets, account deletion columns) on the database in DATABASE_URL, in ONE transaction. Safe to run again: every
  * statement is IF NOT EXISTS. It does not run the seed accounts in section 7, so no account is reset.
  *
  * Run it from services/core-api:   npx.cmd tsx src/scripts/applySchemaPart.ts
@@ -43,7 +43,7 @@ async function main() {
     const check = await client.query(
       `SELECT
          (SELECT COUNT(*)::int FROM information_schema.columns
-           WHERE table_name = 'users' AND column_name IN ('suspended_until', 'suspension_reason')) AS user_columns,
+           WHERE table_name = 'users' AND column_name IN ('suspended_until', 'suspension_reason', 'deleted_at', 'deleted_by', 'deleted_reason', 'original_email')) AS user_columns,
          (SELECT COUNT(*)::int FROM information_schema.tables
            WHERE table_name IN ('model_license_changes', 'notifications', 'user_suspensions', 'model_visibility_changes')) AS new_tables,
          (SELECT COUNT(*)::int FROM pg_tables
@@ -51,8 +51,8 @@ async function main() {
              AND tablename IN ('model_license_changes', 'notifications', 'user_suspensions', 'model_visibility_changes')) AS rls_tables`,
     );
     const { user_columns, new_tables, rls_tables } = check.rows[0];
-    console.log(`Done. users columns: ${user_columns}/2, new tables: ${new_tables}/4, row level security on: ${rls_tables}/4`);
-    if (user_columns !== 2 || new_tables !== 4 || rls_tables !== 4) process.exitCode = 1;
+    console.log(`Done. users columns: ${user_columns}/6, new tables: ${new_tables}/4, row level security on: ${rls_tables}/4`);
+    if (user_columns !== 6 || new_tables !== 4 || rls_tables !== 4) process.exitCode = 1;
   } catch (err) {
     await client.query("ROLLBACK").catch(() => undefined);
     console.error("Failed, nothing was changed:", err instanceof Error ? err.message : err);

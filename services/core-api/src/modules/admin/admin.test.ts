@@ -1000,3 +1000,179 @@ test('GET /api/admin/models/:id/history - 400 for a bad id, otherwise license an
   );
   assert.deepEqual(params, [MODEL_ID]);
 });
+
+// ─── DELETE /api/admin/users/:id (soft delete, history stays, email is freed) ──────────
+const DELETE_REASON = 'Account used to resell stolen models, confirmed by two complaints.';
+
+function deleteUser(base: string, body: unknown, id = TARGET_ID) {
+  return fetch(`${base}/users/${id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+// the row the delete statement reports back
+const deleteRow = (o: Partial<{ found: number; changed: number; already_deleted: boolean | null }> = {}) => ({
+  rowCount: 1,
+  rows: [{ found: 1, changed: 1, already_deleted: false, ...o }],
+});
+
+test('DELETE /api/admin/users/:id - soft deletes in ONE statement, keeps the real email and frees the address', async () => {
+  const statements: { sql: string; params: any[] }[] = [];
+  await withServer(
+    ACTIVE_ADMIN,
+    (sql, params) => {
+      if (!sql.includes('SET deleted_at = NOW()')) return undefined;
+      statements.push({ sql, params });
+      return deleteRow();
+    },
+    async (base) => {
+      const res = await deleteUser(base, { reason: `  ${DELETE_REASON}  ` });
+      assert.equal(res.status, 200);
+      assert.deepEqual(await res.json(), { id: TARGET_ID, isDeleted: true });
+    },
+  );
+  assert.equal(statements.length, 1);
+  const { sql, params } = statements[0];
+  assert.match(sql, /UPDATE users/);
+  assert.match(sql, /original_email = old\.email/); // the real address is kept for the history
+  assert.match(sql, /email = 'deleted-' \|\| old\.id::text \|\| '@deleted\.invalid'/); // a unique placeholder frees the address
+  assert.match(sql, /password_hash = '!deleted'/);
+  assert.match(sql, /old\.role <> 'admin'/);
+  assert.match(sql, /old\.deleted_at IS NULL/);
+  assert.match(sql, /FOR UPDATE/);
+  assert.doesNotMatch(sql, /DELETE FROM/); // nothing is removed, so every purchase, model and complaint stays
+  assert.deepEqual(params, [TARGET_ID, ADMIN_ID, DELETE_REASON]); // reason trimmed, admin from the token
+});
+
+test('DELETE /api/admin/users/:id - needs a written reason of 10 to 1000 characters', async () => {
+  let touched = false;
+  await withServer(
+    ACTIVE_ADMIN,
+    (sql) => {
+      if (sql.includes('SET deleted_at')) touched = true;
+      return undefined;
+    },
+    async (base) => {
+      for (const body of [{}, { reason: '' }, { reason: 'too short' }, { reason: 'x'.repeat(1001) }, { reason: 42 }]) {
+        const res = await deleteUser(base, body);
+        assert.equal(res.status, 400);
+        assert.equal((await res.json()).error.code, 'INVALID_BODY');
+      }
+    },
+  );
+  assert.equal(touched, false);
+});
+
+test('DELETE /api/admin/users/:id - an admin cannot delete their own account, and a bad id is refused', async () => {
+  let touched = false;
+  await withServer(
+    ACTIVE_ADMIN,
+    (sql) => {
+      if (sql.includes('SET deleted_at')) touched = true;
+      return undefined;
+    },
+    async (base) => {
+      const self = await deleteUser(base, { reason: DELETE_REASON }, ADMIN_ID);
+      assert.equal(self.status, 400);
+      assert.equal((await self.json()).error.code, 'CANNOT_DELETE_SELF');
+      const bad = await deleteUser(base, { reason: DELETE_REASON }, 'not-a-uuid');
+      assert.equal(bad.status, 400);
+      assert.equal((await bad.json()).error.code, 'INVALID_ID');
+    },
+  );
+  assert.equal(touched, false);
+});
+
+test('DELETE /api/admin/users/:id - 404 for an unknown user, 403 for an admin, 409 when already deleted', async () => {
+  const cases: { row: ReturnType<typeof deleteRow>; status: number; code: string }[] = [
+    { row: deleteRow({ found: 0, changed: 0, already_deleted: null }), status: 404, code: 'USER_NOT_FOUND' },
+    { row: deleteRow({ changed: 0, already_deleted: false }), status: 403, code: 'CANNOT_DELETE_ADMIN' },
+    { row: deleteRow({ changed: 0, already_deleted: true }), status: 409, code: 'ALREADY_DELETED' },
+  ];
+  for (const c of cases) {
+    await withServer(
+      ACTIVE_ADMIN,
+      (sql) => (sql.includes('SET deleted_at = NOW()') ? c.row : undefined),
+      async (base) => {
+        const res = await deleteUser(base, { reason: DELETE_REASON });
+        assert.equal(res.status, c.status);
+        assert.equal((await res.json()).error.code, c.code);
+      },
+    );
+  }
+});
+
+test('DELETE /api/admin/users/:id - only an active admin (checked in the database) can delete', async () => {
+  let touched = false;
+  const handler = (sql: string) => {
+    if (sql.includes('SET deleted_at')) touched = true;
+    return undefined;
+  };
+  await withServer({ role: 'user', suspended_at: null }, handler, async (base) => {
+    const res = await deleteUser(base, { reason: DELETE_REASON });
+    assert.equal(res.status, 403);
+    assert.equal((await res.json()).error.code, 'FORBIDDEN');
+  });
+  await withServer({ role: 'admin', suspended_at: '2026-11-01T00:00:00.000Z' }, handler, async (base) => {
+    const res = await deleteUser(base, { reason: DELETE_REASON });
+    assert.equal(res.status, 403);
+    assert.equal((await res.json()).error.code, 'ACCOUNT_SUSPENDED');
+  });
+  assert.equal(touched, false);
+});
+
+test('admin routes - an admin whose own account was deleted is refused with 401 ACCOUNT_DELETED', async () => {
+  await withServer(
+    ACTIVE_ADMIN,
+    (sql) => (sql.includes('SELECT deleted_at FROM users') ? { rowCount: 1, rows: [{ deleted_at: '2026-11-20T00:00:00.000Z' }] } : undefined),
+    async (base) => {
+      const res = await fetch(`${base}/overview`, { headers: { Authorization: `Bearer ${token()}` } });
+      assert.equal(res.status, 401);
+      assert.equal((await res.json()).error.code, 'ACCOUNT_DELETED');
+    },
+  );
+});
+
+test('GET /api/admin/users - a deleted account shows the address it had, not the placeholder, and can be searched by it', async () => {
+  let where = '';
+  await withServer(
+    ACTIVE_ADMIN,
+    (sql) => {
+      if (sql.includes('COUNT(*)::int AS total FROM users')) return { rowCount: 1, rows: [{ total: 1 }] };
+      if (sql.includes('FROM users') && sql.includes('LIMIT')) {
+        where = sql;
+        return {
+          rowCount: 1,
+          rows: [
+            {
+              id: TARGET_ID,
+              email: `deleted-${TARGET_ID}@deleted.invalid`,
+              original_email: 'alice@example.com',
+              display_name: 'Alice',
+              role: 'creator',
+              is_seller: false,
+              suspended_at: null,
+              suspended_until: null,
+              suspension_reason: null,
+              created_at: '2026-11-01T00:00:00.000Z',
+              deleted_at: '2026-11-20T00:00:00.000Z',
+              deleted_reason: DELETE_REASON,
+            },
+          ],
+        };
+      }
+    },
+    async (base) => {
+      const res = await fetch(`${base}/users?q=alice`, { headers: { Authorization: `Bearer ${token()}` } });
+      assert.equal(res.status, 200);
+      const u = (await res.json()).items[0];
+      assert.equal(u.email, 'alice@example.com');
+      assert.equal(u.deletedAt, '2026-11-20T00:00:00.000Z');
+      assert.equal(u.deletedReason, DELETE_REASON);
+      assert.equal(JSON.stringify(u).includes('deleted.invalid'), false);
+    },
+  );
+  assert.match(where, /original_email ILIKE/);
+});

@@ -78,11 +78,13 @@ modelsRouter.get('/', async (req, res, next) => {
         ? Math.min(rawPageSize, MAX_PAGE_SIZE)
         : DEFAULT_PAGE_SIZE;
 
-    // เฉพาะโมเดลที่ไม่ถูกซ่อน ไม่ถูกลบ และเจ้าของไม่ถูกระงับ
+    // เฉพาะโมเดลที่ไม่ถูกซ่อน ไม่ถูกลบ และเจ้าของไม่ถูกระงับหรือลบบัญชี
+    // (a deleted owner's models leave the gallery; buyers keep using what they bought through the CDN)
     const conditions: string[] = [
       'm.hidden_at IS NULL',
       'm.deleted_at IS NULL',
       'u.suspended_at IS NULL',
+      'u.deleted_at IS NULL',
     ];
     const params: unknown[] = [];
 
@@ -171,6 +173,7 @@ modelsRouter.get('/tags', async (_req, res, next) => {
        WHERE m.hidden_at IS NULL
          AND m.deleted_at IS NULL
          AND u.suspended_at IS NULL
+         AND u.deleted_at IS NULL
        ORDER BY tag ASC`
     );
     const tags = result.rows.map((r) => r.tag).filter(Boolean);
@@ -213,7 +216,8 @@ modelsRouter.get('/:id', async (req, res, next) => {
        WHERE m.id = $1
          AND m.hidden_at IS NULL
          AND m.deleted_at IS NULL
-         AND u.suspended_at IS NULL`,
+         AND u.suspended_at IS NULL
+         AND u.deleted_at IS NULL`,
       [id],
     );
 

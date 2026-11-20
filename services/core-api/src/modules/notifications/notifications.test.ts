@@ -114,12 +114,13 @@ test('PATCH /api/me/notifications/read-all - only touches the callers unread not
 });
 
 // The reason for a suspension is delivered as a notice, so the inbox must stay open to a suspended account.
-// requireAuth reads no user row: if a "suspended" check were added to it, these requests would start failing.
-test('GET and PATCH /api/me/notifications - stay open to a suspended account and never look at the user row', async () => {
+// requireAuth only asks whether the account was deleted (SELECT deleted_at) and never reads the suspended status: if a
+// "suspended" check were added to it, these requests would start failing.
+test('GET and PATCH /api/me/notifications - stay open to a suspended account and never look at the suspended status', async () => {
   let userLookups = 0;
   await withServer(
     (sql) => {
-      if (sql.includes('FROM users')) {
+      if (sql.includes('FROM users') && !sql.includes('SELECT deleted_at')) {
         userLookups++;
         return { rowCount: 1, rows: [{ suspended_at: '2026-11-18T00:00:00.000Z' }] };
       }
@@ -134,4 +135,16 @@ test('GET and PATCH /api/me/notifications - stay open to a suspended account and
     },
   );
   assert.equal(userLookups, 0);
+});
+
+// An admin deleted this account: the old token must stop working at once (it lives a day), notices included.
+test('GET /api/me/notifications - refuses an account an admin deleted, with 401 ACCOUNT_DELETED', async () => {
+  await withServer(
+    (sql) => (sql.includes('SELECT deleted_at FROM users') ? { rowCount: 1, rows: [{ deleted_at: '2026-11-20T00:00:00.000Z' }] } : undefined),
+    async (base, headers) => {
+      const res = await fetch(base, { headers });
+      assert.equal(res.status, 401);
+      assert.equal((await res.json()).error.code, 'ACCOUNT_DELETED');
+    },
+  );
 });

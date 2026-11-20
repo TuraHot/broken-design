@@ -87,6 +87,10 @@ authRouter.post('/register', async (req, res) => {
 
   const { email, password, displayName } = parsed.data;
   const normalizedEmail = email.toLowerCase();
+  // The placeholder domain of deleted accounts (see the admin delete route) is never a real address to sign up with.
+  if (normalizedEmail.endsWith('@deleted.invalid')) {
+    throw new AppError(400, 'INVALID_INPUT', 'Invalid registration information');
+  }
 
   // Hash password before saving it.
   const passwordHash = await bcrypt.hash(password, 12);

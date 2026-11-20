@@ -34,9 +34,14 @@ import {
   updateSellerModel,
 } from '@/lib/api';
 import { creatorHandle, type CreatorProfile } from '@/lib/creators';
-import type { AuthUser } from '@/lib/auth';
+import { updateProfile, type AuthUser } from '@/lib/auth';
 import { formatCount, formatMoney, formatPrice } from '@/lib/format';
+<<<<<<< Updated upstream
 import { readSession } from '@/lib/session';
+=======
+import { useLocale, useT } from '@/lib/i18n/client';
+import { readSession, updateSessionUser } from '@/lib/session';
+>>>>>>> Stashed changes
 import type {
   SellerModelItem,
   SellerSalesSummary,
@@ -72,6 +77,10 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
 
   const [editingModel, setEditingModel] = useState<SellerModelItem | null>(null);
   const [deletingModel, setDeletingModel] = useState<SellerModelItem | null>(null);
+  const [bio, setBio] = useState<string>(initialCreator?.bio || '');
+  const [isEditingBio, setIsEditingBio] = useState(false);
+  const [bioInput, setBioInput] = useState('');
+  const [savingBio, setSavingBio] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editPriceUsd, setEditPriceUsd] = useState('0');
   const [editLicense, setEditLicense] = useState('CC0');
@@ -174,6 +183,9 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
 
     const myHandle = creatorHandle(u.display_name?.trim() || u.email);
     const isMine = myHandle === handle;
+    if (isMine && u.bio && !initialCreator?.bio) {
+      setBio(u.bio);
+    }
     if (!isMine) return;
 
     (async () => {
@@ -239,7 +251,40 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
     ? initialCreator.totalDownloads
     : models.reduce((sum, m) => sum + Number(m.downloadCount || 0), 0);
   const totalLikes = initialCreator?.totalLikes ?? 0;
+<<<<<<< Updated upstream
   const bio = initialCreator?.bio || 'Creator on Lixyte 3D Asset Platform.';
+=======
+  const currentBio = bio || (isOwnerCreator && user?.bio) || initialCreator?.bio || '';
+  const displayBio = currentBio.trim() ? currentBio : t('profile.bioFallback');
+
+  const handleStartEditBio = () => {
+    setBioInput(currentBio);
+    setIsEditingBio(true);
+  };
+
+  const handleSaveBio = async () => {
+    if (!token) return;
+    try {
+      setSavingBio(true);
+      setStatusMsg(null);
+      const updatedUser = await updateProfile({ bio: bioInput.trim() }, token);
+      const nextBio = updatedUser.bio ?? bioInput.trim();
+      setBio(nextBio);
+      updateSessionUser({ bio: nextBio });
+      setIsEditingBio(false);
+      setStatusMsg(t('profile.bioSaved'));
+    } catch (err: any) {
+      setStatusMsg(err?.message || t('profile.bioSaveFail'));
+    } finally {
+      setSavingBio(false);
+    }
+  };
+
+  const handleCancelEditBio = () => {
+    setIsEditingBio(false);
+    setBioInput('');
+  };
+>>>>>>> Stashed changes
 
   const showOwnerTabs = isOwnerCreator && !previewPublic;
   const currentTab: TabKey = showOwnerTabs ? activeTab : 'models';
@@ -326,10 +371,70 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
 
             <div className="mt-4 border-t border-white/10 pt-4">
               <div className="flex items-center justify-between text-xs font-medium text-white/80">
+<<<<<<< Updated upstream
                 <span>About me</span>
                 <span className="font-mono text-[11px] text-white/45">{formatCount(totalLikes)} likes</span>
+=======
+                <span>{t('profile.aboutMe')}</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-[11px] text-white/45">
+                    {formatCount(totalLikes)} {t('creators.likes')}
+                  </span>
+                  {showOwnerTabs && !isEditingBio && (
+                    <button
+                      type="button"
+                      onClick={handleStartEditBio}
+                      className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[11px] text-hud/80 hover:bg-white/10 hover:text-hud transition-colors"
+                      title={t('profile.editBio')}
+                    >
+                      <Pencil className="h-3 w-3" />
+                      <span>{t('profile.editBioBtn')}</span>
+                    </button>
+                  )}
+                </div>
+>>>>>>> Stashed changes
               </div>
-              <p className="mt-1.5 text-sm leading-relaxed text-white/60">{bio}</p>
+
+              {isEditingBio ? (
+                <div className="mt-2.5">
+                  <textarea
+                    rows={4}
+                    maxLength={500}
+                    value={bioInput}
+                    onChange={(e) => setBioInput(e.target.value)}
+                    placeholder={t('profile.bioPlaceholder')}
+                    className="w-full rounded-lg border border-white/20 bg-black/60 p-2.5 text-xs text-white placeholder-white/30 focus:border-hud focus:outline-none focus:ring-1 focus:ring-hud resize-none"
+                    disabled={savingBio}
+                    autoFocus
+                  />
+                  <div className="mt-1.5 flex items-center justify-between">
+                    <span className="font-mono text-[10px] text-white/40">
+                      {bioInput.length}/500
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleCancelEditBio}
+                        disabled={savingBio}
+                        className="rounded-md border border-white/15 px-2.5 py-1 text-xs text-white/70 hover:bg-white/10 transition-colors disabled:opacity-50"
+                      >
+                        {t('profile.cancelBio')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSaveBio}
+                        disabled={savingBio}
+                        className="inline-flex items-center gap-1 rounded-md bg-white px-3 py-1 text-xs font-medium text-black hover:bg-white/85 transition-colors disabled:opacity-50"
+                      >
+                        {savingBio ? t('profile.saving') : t('profile.saveBio')}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="mt-1.5 text-sm leading-relaxed text-white/60 whitespace-pre-wrap break-words">{displayBio}</p>
+              )}
+
               <Link
                 href="/creator"
                 className="mt-3 inline-block font-mono text-[11px] uppercase tracking-wider text-hud/75 hover:text-hud"

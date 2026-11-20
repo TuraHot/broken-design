@@ -72,6 +72,7 @@ export default function SettingsPage() {
   const [ready, setReady] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
   const [draftName, setDraftName] = useState('');
+  const [draftBio, setDraftBio] = useState('');
   const [avatarMode, setAvatarMode] = useState<AvatarMode>('saved');
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
@@ -92,6 +93,7 @@ export default function SettingsPage() {
       if (nextId !== initializedUserIdRef.current) {
         initializedUserIdRef.current = nextId;
         setDraftName(next?.user.display_name ?? '');
+        setDraftBio(next?.user.bio ?? '');
         setAvatarMode('saved');
         setPendingFile(null);
         setSelectedPresetIndex(null);
@@ -132,11 +134,12 @@ export default function SettingsPage() {
           : savedAvatarUrl;
 
   const nameDirty = Boolean(session && draftName.trim() !== (session.user.display_name || ''));
+  const bioDirty = Boolean(session && draftBio.trim() !== (session.user.bio || ''));
   const avatarDirty =
     avatarMode === 'file' ||
     avatarMode === 'preset' ||
     (avatarMode === 'remove' && Boolean(savedAvatarUrl));
-  const hasChanges = nameDirty || avatarDirty;
+  const hasChanges = nameDirty || bioDirty || avatarDirty;
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -201,10 +204,20 @@ export default function SettingsPage() {
     setSaveSuccess(false);
 
     try {
-      if (nameDirty) {
-        const updatedUser = await updateProfile(trimmedName, session.token);
-        updateSessionUser({ display_name: updatedUser.display_name });
+      if (nameDirty || bioDirty) {
+        const updatedUser = await updateProfile(
+          {
+            displayName: trimmedName,
+            bio: draftBio.trim(),
+          },
+          session.token,
+        );
+        updateSessionUser({
+          display_name: updatedUser.display_name,
+          bio: updatedUser.bio ?? draftBio.trim(),
+        });
         setDraftName(updatedUser.display_name);
+        setDraftBio(updatedUser.bio ?? draftBio.trim());
       }
 
       if (avatarDirty) {
@@ -350,6 +363,30 @@ export default function SettingsPage() {
                       }}
                       className="h-10 w-full max-w-sm rounded-lg border border-white/15 bg-black/40 px-3 text-sm text-white placeholder:text-white/40 focus:border-white/50 focus:outline-none disabled:opacity-60"
                     />
+                  </dd>
+                </div>
+                <div className="grid gap-1 py-3 sm:grid-cols-[160px_minmax(0,1fr)] sm:items-start sm:gap-4">
+                  <dt className="pt-2 text-sm text-white/65">
+                    <label htmlFor="settings-bio">{t('profile.aboutMe')}</label>
+                  </dt>
+                  <dd className="min-w-0">
+                    <textarea
+                      id="settings-bio"
+                      rows={3}
+                      maxLength={500}
+                      disabled={saving}
+                      value={draftBio}
+                      onChange={(e) => {
+                        setDraftBio(e.target.value);
+                        setSaveError(null);
+                        setSaveSuccess(false);
+                      }}
+                      placeholder={t('profile.bioPlaceholder')}
+                      className="w-full max-w-sm rounded-lg border border-white/15 bg-black/40 p-2.5 text-sm text-white placeholder:text-white/40 focus:border-white/50 focus:outline-none disabled:opacity-60 resize-none"
+                    />
+                    <span className="mt-1 block font-mono text-[10px] text-white/40">
+                      {draftBio.length}/500
+                    </span>
                   </dd>
                 </div>
                 <Row label={t('settings.email')}>{session.user.email}</Row>

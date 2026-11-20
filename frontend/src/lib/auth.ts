@@ -9,6 +9,7 @@ export interface AuthUser {
   role: string;
   is_seller: boolean;
   avatar_url?: string | null;
+  bio?: string | null;
 }
 
 // ผลลัพธ์เมื่อ Login หรือ Register สำเร็จ
@@ -105,18 +106,56 @@ export async function resetPassword(token: string, password: string): Promise<vo
   await authRequest<{ message: string }>('reset-password', { token, password });
 }
 
+<<<<<<< Updated upstream
 // อัปเดตชื่อที่แสดงของบัญชีปัจจุบัน (PATCH /api/auth/profile)
+=======
+// Sends a request for the signed-in account and returns the JSON body. Failures become AuthError so the page can
+// show them in the visitor's language (see authErrorText).
+async function accountRequest(url: string, init: RequestInit): Promise<any> {
+  let response: Response;
+  try {
+    response = await fetch(url, init);
+  } catch {
+    throw new AuthError('NETWORK');
+  }
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    const message = data?.error?.message;
+    throw message ? new AuthError('API', message) : new AuthError('GENERIC');
+  }
+  return data;
+}
+
+export interface UpdateProfileParams {
+  displayName?: string;
+  bio?: string;
+}
+
+// อัปเดตข้อมูลโปรไฟล์ (ชื่อที่แสดง / bio) ของบัญชีปัจจุบัน (PATCH /api/auth/profile)
+>>>>>>> Stashed changes
 export async function updateProfile(
-  displayName: string,
+  params: string | UpdateProfileParams,
   token: string,
 ): Promise<AuthUser> {
+<<<<<<< Updated upstream
   const response = await fetch(`${CORE_API_URL}/api/auth/profile`, {
+=======
+  const body =
+    typeof params === 'string'
+      ? { displayName: params.trim() }
+      : {
+          ...(params.displayName !== undefined ? { displayName: params.displayName.trim() } : {}),
+          ...(params.bio !== undefined ? { bio: params.bio.trim() } : {}),
+        };
+
+  const data = await accountRequest(`${CORE_API_URL}/api/auth/profile`, {
+>>>>>>> Stashed changes
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ displayName: displayName.trim() }),
+    body: JSON.stringify(body),
   });
 
   const data = await response.json().catch(() => null);

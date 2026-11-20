@@ -1,7 +1,7 @@
 'use client';
 
-// User Dashboard — profile overview, seller toggle, purchased models, embed keys & GLB downloads
-import { useEffect, useState } from 'react';
+// User Dashboard — profile overview, purchased models, embed keys & GLB downloads
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import NoticeBox from '@/components/notifications/NoticeBox';
 import {
@@ -15,9 +15,8 @@ import {
   Sparkles,
   User as UserIcon,
 } from 'lucide-react';
-import AvatarUploader from '@/components/profile/AvatarUploader';
+import UserAvatar from '@/components/ui/UserAvatar';
 import {
-  CDN_SERVICE_URL,
   fetchMyPurchases,
   fetchSellerStatus,
   regenerateEmbedKey,
@@ -26,7 +25,13 @@ import { creatorHandle } from '@/lib/creators';
 import { formatPrice } from '@/lib/format';
 import { useT } from '@/lib/i18n/client';
 import { fromErr, serverError, type Msg } from '@/lib/i18n/msg';
-import { readSession, updateSessionUser } from '@/lib/session';
+import {
+  buildVmModelSnippet,
+  DEFAULT_EMBED_ORIGIN,
+  DownloadError,
+  downloadModelGlb,
+} from '@/lib/model-assets';
+import { readSession, SESSION_UPDATED_EVENT, updateSessionUser } from '@/lib/session';
 import type { AuthUser, PurchaseItem } from '@/lib/types';
 
 
@@ -42,16 +47,27 @@ export default function MePage() {
   const [statusMsg, setStatusMsg] = useState<Msg | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [origin, setOrigin] = useState(DEFAULT_EMBED_ORIGIN);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // 1. Load user & token from storage
+  // 1. Load & stay in sync with session storage (display name, avatar, sign-out)
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const session = readSession();
-    if (session) {
-      setToken(session.token);
-      setUser(session.user as AuthUser);
-    }
-    setLoading(false);
+    setOrigin(window.location.origin);
+    const syncSession = () => {
+      const session = readSession();
+      setToken(session?.token ?? null);
+      setUser((session?.user as AuthUser) ?? null);
+      if (!session) setPurchases([]);
+      setLoading(false);
+    };
+    syncSession();
+    window.addEventListener('storage', syncSession);
+    window.addEventListener(SESSION_UPDATED_EVENT, syncSession);
+    return () => {
+      window.removeEventListener('storage', syncSession);
+      window.removeEventListener(SESSION_UPDATED_EVENT, syncSession);
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    };
   }, []);
 
   // 2. Fetch purchases and seller status
@@ -111,41 +127,29 @@ export default function MePage() {
     try {
       setBusyAction(`dl-${modelId}`);
       setStatusMsg(null);
-      const headers: Record<string, string> = {};
-      if (token) headers.Authorization = `Bearer ${token}`;
-
-      const res = await fetch(`${CDN_SERVICE_URL}/cdn/models/${encodeURIComponent(modelId)}/download`, {
-        headers,
-      });
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => null);
-        throw body?.error?.message ? serverError(body.error.message) : new Error('download failed');
-      }
-
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      const safeName = title.replace(/[^\w\u0E00-\u0E7F-]+/g, '_').replace(/^_+|_+$/g, '') || 'model';
-      a.download = `${safeName}.glb`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      await downloadModelGlb(modelId, title, token);
       setStatusMsg({ key: 'me.dlStarted', vars: { title } });
     } catch (err: any) {
-      setStatusMsg(fromErr(err, 'me.dlFailed'));
+      if (err instanceof DownloadError && err.serverMessage) {
+        setStatusMsg(fromErr(serverError(err.serverMessage), 'me.dlFailed'));
+      } else {
+        setStatusMsg(fromErr(err, 'me.dlFailed'));
+      }
     } finally {
       setBusyAction(null);
     }
   };
 
   // Copy helper
-  const copyText = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedKey(id);
-    setTimeout(() => setCopiedKey(null), 2000);
+  const copyText = async (text: string, id: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedKey(id);
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = setTimeout(() => setCopiedKey(null), 2000);
+    } catch {
+      setCopiedKey(null);
+    }
   };
 
   if (loading) {
@@ -210,14 +214,7 @@ export default function MePage() {
       {/* Profile Header */}
       <div className={`${CARD} flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between`}>
         <div className="flex flex-wrap items-center gap-4">
-          <AvatarUploader
-            name={displayName}
-            avatarUrl={user?.avatar_url}
-            size="lg"
-            onUpdated={(nextUrl) =>
-              setUser((prev) => (prev ? { ...prev, avatar_url: nextUrl } : prev))
-            }
-          />
+          <UserAvatar name={displayName} avatarUrl={user?.avatar_url} size="lg" />
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="break-words font-display text-2xl uppercase text-white">{displayName}</h1>
@@ -240,7 +237,7 @@ export default function MePage() {
           {user?.is_seller ? (
             <>
               <Link
-                href={`/creators/${handle}`}
+                href={handle ? `/creators/${encodeURIComponent(handle)}` : '/seller'}
                 className="flex h-9 items-center gap-2 rounded-lg border border-hud/30 bg-hud/10 px-3.5 text-xs font-mono uppercase tracking-wider text-hud transition-colors hover:bg-hud/20"
               >
                 <UserIcon className="h-4 w-4" />
@@ -319,7 +316,11 @@ export default function MePage() {
         ) : (
           <div className="mt-6 grid grid-cols-1 gap-6">
             {purchases.map((item) => {
-              const vmSnippet = `<vm-model model-id="${item.modelId}" cdn-base="${CDN_SERVICE_URL}" key="${item.embedKey}" auto-rotate camera-controls></vm-model>`;
+              const vmSnippet = buildVmModelSnippet({
+                origin,
+                modelId: item.modelId,
+                embedKey: item.embedKey,
+              });
 
               return (
                 <div key={item.id} className={`${CARD} min-w-0 space-y-4`}>

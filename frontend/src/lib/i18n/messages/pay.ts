@@ -7,7 +7,6 @@ export const payEn = {
   'pay.signInTitle': 'Sign in required',
   'pay.signInQr': 'Please sign in to continue to QR checkout.',
   'pay.signInView': 'Please log in to view your embed key and download your model.',
-  'pay.signInOrder': 'Please log in with the account that created this order to complete your payment.',
   'pay.login': 'Log in',
   'pay.backGallery': 'Back to Gallery',
   'pay.browseGallery': 'Browse Gallery',
@@ -15,8 +14,6 @@ export const payEn = {
   'pay.orderNotFound': 'Order not found',
   'pay.errLoadOrder': 'Unable to load order.',
   'pay.errOrderMissing': 'This order could not be found.',
-  'pay.errLoadCheckout': 'Unable to load checkout details.',
-  'pay.errOrderOther': 'This purchase does not exist or belongs to another account.',
   'pay.errQr': 'Unable to generate QR payment.',
   'pay.errConfirm': 'Payment confirmation failed.',
   'pay.errNoPaid': 'No confirmed purchase found for this order.',
@@ -61,15 +58,6 @@ export const payEn = {
   'pay.success.embedTitle': 'Ready-to-use Embed Code',
   'pay.success.webComponent': 'Web Component (<vm-model>)',
   'pay.success.iframe': 'Iframe',
-
-  // mock pay (used on /checkout/[id] when PAYMENT_PROVIDER=mock)
-  'pay.mock.alreadyPaid': 'Already Paid',
-  'pay.mock.alreadyBody': 'This order ({amount}) was already confirmed on {date}.',
-  'pay.mock.viewKey': 'View Embed Key',
-  'pay.mock.testPay': 'Mock Test Payment',
-  'pay.mock.testMode': 'Test Mode',
-  'pay.mock.orderId': 'Order ID',
-  'pay.mock.confirmPay': 'Confirm & Pay {price}',
 } as const;
 
 export const payTh: Record<keyof typeof payEn, string> = {
@@ -80,7 +68,6 @@ export const payTh: Record<keyof typeof payEn, string> = {
   'pay.signInTitle': 'ต้องเข้าสู่ระบบ',
   'pay.signInQr': 'กรุณาเข้าสู่ระบบเพื่อดำเนินการชำระเงินด้วย QR',
   'pay.signInView': 'กรุณาล็อกอินเพื่อดู embed key และดาวน์โหลดโมเดลของคุณ',
-  'pay.signInOrder': 'กรุณาล็อกอินด้วยบัญชีที่สร้างคำสั่งซื้อนี้เพื่อชำระเงินให้เสร็จสิ้น',
   'pay.login': 'เข้าสู่ระบบ',
   'pay.backGallery': 'กลับไปแกลเลอรี',
   'pay.browseGallery': 'ดูแกลเลอรี',
@@ -88,8 +75,6 @@ export const payTh: Record<keyof typeof payEn, string> = {
   'pay.orderNotFound': 'ไม่พบคำสั่งซื้อ',
   'pay.errLoadOrder': 'โหลดคำสั่งซื้อไม่สำเร็จ',
   'pay.errOrderMissing': 'ไม่พบคำสั่งซื้อนี้',
-  'pay.errLoadCheckout': 'โหลดรายละเอียดการชำระเงินไม่สำเร็จ',
-  'pay.errOrderOther': 'ไม่มีรายการซื้อนี้ หรือเป็นของบัญชีอื่น',
   'pay.errQr': 'สร้าง QR สำหรับชำระเงินไม่สำเร็จ',
   'pay.errConfirm': 'ยืนยันการชำระเงินไม่สำเร็จ',
   'pay.errNoPaid': 'ไม่พบรายการซื้อที่ยืนยันแล้วสำหรับคำสั่งซื้อนี้',
@@ -133,12 +118,4 @@ export const payTh: Record<keyof typeof payEn, string> = {
   'pay.success.embedTitle': 'โค้ดฝังที่พร้อมใช้',
   'pay.success.webComponent': 'Web Component (<vm-model>)',
   'pay.success.iframe': 'Iframe',
-
-  'pay.mock.alreadyPaid': 'ชำระแล้ว',
-  'pay.mock.alreadyBody': 'คำสั่งซื้อนี้ ({amount}) ยืนยันแล้วเมื่อ {date}',
-  'pay.mock.viewKey': 'ดู embed key',
-  'pay.mock.testPay': 'การชำระเงินทดสอบจำลอง',
-  'pay.mock.testMode': 'โหมดทดสอบ',
-  'pay.mock.orderId': 'รหัสคำสั่งซื้อ',
-  'pay.mock.confirmPay': 'ยืนยันและชำระ {price}',
 };

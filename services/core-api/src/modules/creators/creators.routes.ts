@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../../config/db';
-import { env } from '../../config/env';
 import { AppError } from '../../middlewares/error.middleware';
+import { buildAvatarUrl, formatModelResponse, type ModelPresenterRow } from '../models/model.presenter';
 
 export const creatorsRouter = Router();
 
@@ -14,11 +14,6 @@ export function toCreatorHandle(name: string): string {
     .toLowerCase()
     .replace(/[^\p{L}\p{M}\p{N}]+/gu, '-')
     .replace(/^-+|-+$/g, '');
-}
-
-function buildAvatarUrl(userId: string, avatarHash?: string | null): string | undefined {
-  const clean = avatarHash?.trim();
-  return clean ? `${env.cdnServiceUrl}/cdn/users/${userId}/avatar.webp?v=${clean.slice(0, 12)}` : undefined;
 }
 
 // GET /api/creators/:handle — public creator profile + all visible models (works even for creators with 0 models or >100 total catalog models)
@@ -45,7 +40,8 @@ creatorsRouter.get('/:handle', async (req, res) => {
            SELECT 1 FROM models m
            WHERE m.owner_id = u.id AND m.hidden_at IS NULL AND m.deleted_at IS NULL
          )
-       )`,
+       )
+     ORDER BY u.created_at ASC, u.id ASC`,
   );
 
   const creator = candidatesRes.rows.find((u) => {
@@ -60,24 +56,7 @@ creatorsRouter.get('/:handle', async (req, res) => {
   const displayName = creator.display_name?.trim() || creator.email;
   const avatarUrl = buildAvatarUrl(creator.id, creator.avatar_hash);
 
-  const modelsRes = await db.query<{
-    id: string;
-    owner_id: string;
-    title: string;
-    description: string | null;
-    tags: string[];
-    license: string;
-    file_hash: string;
-    file_size: string | number;
-    preview_hash: string | null;
-    poster_hash: string | null;
-    price_cents: number;
-    currency: string;
-    view_count: string | number;
-    download_count: string | number;
-    like_count: string | number;
-    created_at: Date | string;
-  }>(
+  const modelsRes = await db.query<Omit<ModelPresenterRow, 'creator' | 'creator_avatar_hash'>>(
     `SELECT
        m.id,
        m.owner_id,
@@ -103,30 +82,15 @@ creatorsRouter.get('/:handle', async (req, res) => {
     [creator.id],
   );
 
-  const models = modelsRes.rows.map((row) => {
-    const isPaid = row.price_cents > 0;
-    const baseCdn = `${env.cdnServiceUrl}/cdn/models/${row.id}`;
-    return {
-      id: row.id,
-      ownerId: row.owner_id,
-      creator: displayName,
-      creatorAvatarUrl: avatarUrl,
-      title: row.title,
-      description: row.description ?? '',
-      tags: row.tags ?? [],
-      license: row.license,
-      priceCents: Number(row.price_cents),
-      currency: row.currency,
-      fileSize: Number(row.file_size),
-      viewCount: Number(row.view_count),
-      downloadCount: Number(row.download_count),
-      likeCount: Number(row.like_count),
-      posterUrl: row.poster_hash ? `${baseCdn}/poster.webp` : undefined,
-      previewUrl: row.preview_hash ? `${baseCdn}/${row.preview_hash}.glb` : undefined,
-      fileUrl: isPaid ? undefined : `${baseCdn}/${row.file_hash}.glb`,
-      createdAt: row.created_at,
-    };
-  });
+  const models = modelsRes.rows.map((row) =>
+    formatModelResponse(
+      {
+        ...row,
+        creator: displayName,
+      },
+      avatarUrl,
+    ),
+  );
 
   const totalDownloads = models.reduce((sum, m) => sum + m.downloadCount, 0);
   const totalLikes = models.reduce((sum, m) => sum + m.likeCount, 0);

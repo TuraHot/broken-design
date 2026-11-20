@@ -1,8 +1,8 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { db } from '../../config/db';
-import { env } from '../../config/env';
 import { requireAuth } from '../../middlewares/auth.middleware';
 import { AppError } from '../../middlewares/error.middleware';
+import { formatModelResponse, type ModelPresenterRow } from './model.presenter';
 
 export const modelsRouter = Router();
 
@@ -13,56 +13,6 @@ const MAX_PAGE_SIZE = 100;
 
 function likePattern(q: string): string {
   return `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
-}
-
-interface ModelRow {
-  id: string;
-  owner_id: string;
-  creator: string;
-  creator_avatar_hash?: string | null;
-  title: string;
-  description: string | null;
-  tags: string[];
-  license: string;
-  file_hash: string;
-  file_size: string | number;
-  preview_hash: string | null;
-  poster_hash: string | null;
-  price_cents: number;
-  currency: string;
-  view_count: string | number;
-  download_count: string | number;
-  like_count: string | number;
-  created_at: Date | string;
-}
-
-function formatModelResponse(row: ModelRow) {
-  const isPaid = row.price_cents > 0;
-  const baseCdn = `${env.cdnServiceUrl}/cdn/models/${row.id}`;
-
-  return {
-    id: row.id,
-    ownerId: row.owner_id,
-    creator: row.creator,
-    creatorAvatarUrl: row.creator_avatar_hash?.trim()
-      ? `${env.cdnServiceUrl}/cdn/users/${row.owner_id}/avatar.webp?v=${row.creator_avatar_hash.trim().slice(0, 12)}`
-      : undefined,
-    title: row.title,
-    description: row.description ?? '',
-    tags: row.tags ?? [],
-    license: row.license,
-    priceCents: Number(row.price_cents),
-    currency: row.currency,
-    fileSize: Number(row.file_size),
-    viewCount: Number(row.view_count),
-    downloadCount: Number(row.download_count),
-    likeCount: Number(row.like_count),
-    posterUrl: row.poster_hash ? `${baseCdn}/poster.webp` : undefined,
-    previewUrl: row.preview_hash ? `${baseCdn}/${row.preview_hash}.glb` : undefined,
-    // ห้ามส่งลิงก์ไฟล์เต็มของโมเดลเสียเงิน
-    fileUrl: isPaid ? undefined : `${baseCdn}/${row.file_hash}.glb`,
-    createdAt: row.created_at,
-  };
 }
 
 // [Member 4] GET /api/models?q=&tag=&license=&price=free|paid&page=
@@ -134,7 +84,7 @@ modelsRouter.get('/', async (req, res, next) => {
          ${whereClause}`,
         params,
       ),
-      db.query<ModelRow>(
+      db.query<ModelPresenterRow>(
         `SELECT
            m.id,
            m.owner_id,
@@ -165,7 +115,7 @@ modelsRouter.get('/', async (req, res, next) => {
     const total = Number.parseInt(countResult.rows[0]?.total ?? '0', 10);
 
     res.json({
-      items: listResult.rows.map(formatModelResponse),
+      items: listResult.rows.map((row) => formatModelResponse(row)),
       page,
       pageSize,
       total,
@@ -202,7 +152,7 @@ modelsRouter.get('/:id', async (req, res, next) => {
       throw new AppError(404, 'MODEL_NOT_FOUND', 'Model not found');
     }
 
-    const result = await db.query<ModelRow>(
+    const result = await db.query<ModelPresenterRow>(
       `SELECT
          m.id,
          m.owner_id,

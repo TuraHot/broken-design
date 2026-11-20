@@ -77,7 +77,13 @@ export default function AccountMenu() {
       headers: { Authorization: `Bearer ${token}` },
       cache: 'no-store',
     })
-      .then((res) => (res.ok ? res.json() : null))
+      .then((res) => {
+        if (!cancelled && (res.status === 401 || res.status === 403)) {
+          clearSession();
+          return null;
+        }
+        return res.ok ? res.json() : null;
+      })
       .then((data) => {
         if (!cancelled && data?.user) {
           updateSessionUser(data.user);

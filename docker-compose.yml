@@ -5,8 +5,6 @@ services:
     ports:
       - "4000:4000"
     env_file:
-      - path: ./services/core-api/.env.example
-        required: false
       - path: ./services/core-api/.env
         required: false
     healthcheck:
@@ -23,8 +21,6 @@ services:
     ports:
       - "4001:4001"
     env_file:
-      - path: ./services/cdn-service/.env.example
-        required: false
       - path: ./services/cdn-service/.env
         required: false
     healthcheck:
@@ -44,8 +40,6 @@ services:
     ports:
       - "3000:3000"
     env_file:
-      - path: ./frontend/.env.example
-        required: false
       - path: ./frontend/.env.local
         required: false
     environment:

@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Heart, Bell, X } from 'lucide-react';
 import type { Socket } from 'socket.io-client';
+import { useT } from '@/lib/i18n/client';
 import { getSocket } from '@/lib/socket';
 import { SESSION_UPDATED_EVENT } from '@/lib/session';
 
@@ -16,10 +17,13 @@ interface RealtimeNotice {
 }
 
 export default function RealtimeNotificationToast() {
+  const t = useT();
   const [notices, setNotices] = useState<RealtimeNotice[]>([]);
+  const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   useEffect(() => {
     let boundSocket: Socket | null = null;
+    const timers = timersRef.current;
 
     const handleNotification = (data: any) => {
       if (!data || !data.title) return;
@@ -35,9 +39,11 @@ export default function RealtimeNotificationToast() {
       setNotices((prev) => [newNotice, ...prev.slice(0, 4)]);
 
       // Auto remove after 6 seconds
-      setTimeout(() => {
+      const timer = setTimeout(() => {
+        timers.delete(newNotice.id);
         setNotices((prev) => prev.filter((n) => n.id !== newNotice.id));
       }, 6000);
+      timers.set(newNotice.id, timer);
     };
 
     const bind = () => {
@@ -60,10 +66,17 @@ export default function RealtimeNotificationToast() {
       window.removeEventListener('storage', bind);
       window.removeEventListener(SESSION_UPDATED_EVENT, bind);
       if (boundSocket) boundSocket.off('notification', handleNotification);
+      for (const timer of timers.values()) clearTimeout(timer);
+      timers.clear();
     };
   }, []);
 
   const dismiss = (id: string) => {
+    const timer = timersRef.current.get(id);
+    if (timer) {
+      clearTimeout(timer);
+      timersRef.current.delete(id);
+    }
     setNotices((prev) => prev.filter((n) => n.id !== id));
   };
 
@@ -99,7 +112,7 @@ export default function RealtimeNotificationToast() {
             type="button"
             onClick={() => dismiss(n.id)}
             className="rounded p-1 text-white/40 hover:text-white transition-colors"
-            aria-label="Close notification"
+            aria-label={t('modal.close')}
           >
             <X className="h-3.5 w-3.5" />
           </button>

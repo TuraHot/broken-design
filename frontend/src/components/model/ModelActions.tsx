@@ -5,9 +5,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
-import { CDN_SERVICE_URL, CORE_API_URL } from "@/lib/api";
+import { CORE_API_URL } from "@/lib/api";
 import { useT } from "@/lib/i18n/client";
 import type { MessageKey } from "@/lib/i18n/messages";
+import { DownloadError, downloadModelGlb } from "@/lib/model-assets";
 import { readSession, SESSION_UPDATED_EVENT, type Session } from "@/lib/session";
 
 const UUID_RE =
@@ -75,8 +76,7 @@ export default function ModelActions({
         ? session.user.id === ownerId
         : Boolean(
             creator &&
-              (session.user.display_name?.trim().toLowerCase() === creator.trim().toLowerCase() ||
-                (session.user as any).handle?.trim().toLowerCase() === creator.trim().toLowerCase()),
+              session.user.display_name?.trim().toLowerCase() === creator.trim().toLowerCase(),
           )),
   );
 
@@ -87,32 +87,16 @@ export default function ModelActions({
   };
 
   const performDownload = async (id: string, token: string) => {
-    const res = await fetch(
-      `${CDN_SERVICE_URL}/cdn/models/${encodeURIComponent(id)}/download`,
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      },
-    );
-
-    if (!res.ok) {
-      const body = await res.json().catch(() => null);
-      if (body?.error?.message) throw new Error(body.error.message);
-      throw new UiMessage("model.dlFailedStatus", { status: res.status });
+    try {
+      await downloadModelGlb(id, title, token);
+      setStatus({ key: "model.dlStarted" });
+    } catch (err) {
+      if (err instanceof DownloadError) {
+        if (err.serverMessage) throw new Error(err.serverMessage);
+        throw new UiMessage("model.dlFailedStatus", { status: err.status });
+      }
+      throw err;
     }
-
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    const safeName =
-      title.replace(/[^\w\u0E00-\u0E7F-]+/g, "_").replace(/^_+|_+$/g, "") ||
-      "model";
-    a.download = `${safeName}.glb`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-    setStatus({ key: "model.dlStarted" });
   };
 
   const handleDownload = async () => {

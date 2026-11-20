@@ -8,7 +8,7 @@ import { payEn, payTh } from './messages/pay';
 import { discoverEn, discoverTh } from './messages/discover';
 import { systemEn, systemTh } from './messages/system';
 
-export const LOCALES = ['en', 'th'] as const;
+const LOCALES = ['en', 'th'] as const;
 export type Locale = (typeof LOCALES)[number];
 export const DEFAULT_LOCALE: Locale = 'en';
 export const LOCALE_COOKIE = 'lang';
@@ -32,7 +32,6 @@ const en = {
   'menu.account': 'Account menu for {name}',
   'menu.admin': 'Admin dashboard',
   'menu.library': 'Library',
-  'menu.seller': 'Seller dashboard',
   'menu.creatorProfile': 'Creator profile',
   'menu.settings': 'Settings',
   'menu.report': 'Report a problem',
@@ -341,7 +340,6 @@ const en = {
   'admin.noWord': 'No',
   'admin.you': 'This is you',
   'admin.restore': 'Restore',
-  'admin.hide': 'Hide',
   'admin.suspend': 'Suspend',
   'admin.actionOn': '{action} {name}',
   'admin.search.models': 'Search title or owner',
@@ -435,7 +433,6 @@ const th: Record<MessageKey, string> = {
   'menu.account': 'เมนูบัญชีของ {name}',
   'menu.admin': 'แดชบอร์ดผู้ดูแล',
   'menu.library': 'คลังของฉัน',
-  'menu.seller': 'แดชบอร์ดผู้ขาย',
   'menu.creatorProfile': 'โปรไฟล์ครีเอเตอร์',
   'menu.settings': 'ตั้งค่า',
   'menu.report': 'แจ้งปัญหา',
@@ -739,7 +736,6 @@ const th: Record<MessageKey, string> = {
   'admin.noWord': 'ไม่ใช่',
   'admin.you': 'นี่คือคุณ',
   'admin.restore': 'คืนสถานะ',
-  'admin.hide': 'ซ่อน',
   'admin.suspend': 'ระงับ',
   'admin.actionOn': '{action} {name}',
   'admin.search.models': 'ค้นหาชื่อโมเดลหรือเจ้าของ',

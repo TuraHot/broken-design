@@ -17,7 +17,7 @@ const HASH_RE = /^[0-9a-f]{64}$/;
 // purchases.embed_key is VARCHAR(64); payments currently issues 48 hex chars.
 const EMBED_KEY_RE = /^[A-Za-z0-9_-]{16,64}$/;
 
-export const isUuid = (v: string) => UUID_RE.test(v);
+const isUuid = (v: string) => UUID_RE.test(v);
 export const isContentHash = (v: string) => HASH_RE.test(v);
 
 export interface CdnModel {

@@ -20,6 +20,9 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_hash CHAR(64);
+-- Supabase exposes public tables via PostgREST: enabling RLS with no anon policy blocks direct client access
+-- while core-api/cdn-service (DATABASE_URL owner role or service_role/sb_secret_ key) continue working normally.
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 
 -- 3. Models Table (เพิ่ม hidden_at สำหรับแอดมินซ่อนโมเดล)
 CREATE TABLE IF NOT EXISTS models (
@@ -45,6 +48,7 @@ CREATE TABLE IF NOT EXISTS models (
 CREATE INDEX IF NOT EXISTS idx_models_tags ON models USING GIN (tags);
 CREATE INDEX IF NOT EXISTS idx_models_owner ON models (owner_id);
 CREATE INDEX IF NOT EXISTS idx_models_active ON models (created_at DESC) WHERE deleted_at IS NULL AND hidden_at IS NULL;
+ALTER TABLE models ENABLE ROW LEVEL SECURITY;
 
 -- 4. Purchases Table (Single-Item Purchase + License & Watermark Tracking)
 CREATE TABLE IF NOT EXISTS purchases (
@@ -71,6 +75,7 @@ ALTER TABLE purchases ADD COLUMN IF NOT EXISTS watermark_hash VARCHAR(128);
 ALTER TABLE purchases ADD COLUMN IF NOT EXISTS paid_at TIMESTAMPTZ;
 
 CREATE INDEX IF NOT EXISTS idx_purchases_embed_key ON purchases (embed_key);
+ALTER TABLE purchases ENABLE ROW LEVEL SECURITY;
 
 -- 5. Likes Table / Favorites
 CREATE TABLE IF NOT EXISTS likes (
@@ -79,6 +84,7 @@ CREATE TABLE IF NOT EXISTS likes (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (user_id, model_id)
 );
+ALTER TABLE likes ENABLE ROW LEVEL SECURITY;
 
 -- 6. Comments Table
 CREATE TABLE IF NOT EXISTS comments (
@@ -90,6 +96,7 @@ CREATE TABLE IF NOT EXISTS comments (
 );
 
 CREATE INDEX IF NOT EXISTS idx_comments_model_id ON comments (model_id);
+ALTER TABLE comments ENABLE ROW LEVEL SECURITY;
 
 -- 6.1 Complaints Table (คำร้องเรียนจากผู้ใช้ — แอดมินดูและปิดเรื่องที่ /admin/complaints)
 CREATE TABLE IF NOT EXISTS complaints (
@@ -107,6 +114,7 @@ CREATE TABLE IF NOT EXISTS complaints (
 
 CREATE INDEX IF NOT EXISTS idx_complaints_status ON complaints (status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_complaints_reporter ON complaints (reporter_id, created_at DESC);
+ALTER TABLE complaints ENABLE ROW LEVEL SECURITY;
 
 -- 6.2 Creator Withdrawals Table (เงินที่เว็บถือไว้ให้ครีเอเตอร์ + คำนวณส่วนต่างค่าธรรมเนียมแพลตฟอร์มก่อนถอน)
 CREATE TABLE IF NOT EXISTS creator_withdrawals (
@@ -125,6 +133,7 @@ CREATE TABLE IF NOT EXISTS creator_withdrawals (
 );
 
 CREATE INDEX IF NOT EXISTS idx_creator_withdrawals_seller ON creator_withdrawals (seller_id, created_at DESC);
+ALTER TABLE creator_withdrawals ENABLE ROW LEVEL SECURITY;
 
 -- 6.3 Creator Applications Table (คำขอสมัครเป็น Creator รอแอดมินอนุมัติ)
 CREATE TABLE IF NOT EXISTS creator_applications (

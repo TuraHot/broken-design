@@ -60,9 +60,11 @@ if (!isTest) {
     });
 
   if (env.storageProvider === "supabase" && supabase) {
-    void ensureSupabaseModelsBucket(env.supabaseStorageBucket).catch((err) => {
-      console.warn("[CDN-Service] Could not enforce Supabase bucket settings:", err?.message || err);
-    });
+    for (const bucket of [env.supabaseStorageBucket, env.supabaseAvatarBucket]) {
+      void ensureSupabaseModelsBucket(bucket).catch((err) => {
+        console.warn(`[CDN-Service] Could not enforce Supabase bucket "${bucket}" settings:`, err?.message || err);
+      });
+    }
   }
 
   app.listen(env.port, () => {

@@ -365,8 +365,12 @@ authRouter.post('/forgot-password', passwordResetLimiter, async (req, res) => {
        VALUES ($1, $2, NOW() + ($3 || ' minutes')::interval)`,
       [user.id, hashOtp(user.id, otp), String(OTP_TTL_MINUTES)],
     );
-    console.log(`[password-reset] OTP for ${user.email} (valid ${OTP_TTL_MINUTES} min): ${otp}`);
-    if (mockMailbox) devOtp = otp;
+    if (mockMailbox) {
+      console.log(`[password-reset] OTP for ${user.email} (valid ${OTP_TTL_MINUTES} min): ${otp}`);
+      devOtp = otp;
+    } else {
+      console.warn('[password-reset] Password reset OTP generated in production without a configured mail provider.');
+    }
   }
 
   res.json({

@@ -3,7 +3,7 @@
 // /admin — the platform at a glance: what needs attention, key numbers, catalogue mix, people, recent activity
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { AlertCircle, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { AlertCircle, ArrowRight } from 'lucide-react';
 import { Badge } from '@/components/admin/ui';
 import { adminFetch, type AdminOverview } from '@/lib/admin-api';
 import { formatCount, formatDate, formatMoney } from '@/lib/format';
@@ -80,17 +80,6 @@ export default function AdminOverviewPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const attention = data
-    ? [
-        { id: 'apps', n: data.pendingApplications ?? 0, text: t((data.pendingApplications ?? 0) === 1 ? 'admin.ov.application.one' : 'admin.ov.application.many'), href: '/admin/creator-approvals' },
-        { id: 'wd', n: data.pendingWithdrawals ?? 0, text: t((data.pendingWithdrawals ?? 0) === 1 ? 'admin.ov.withdrawal.one' : 'admin.ov.withdrawal.many'), href: '/admin/withdrawals' },
-        { id: 'complaints', n: data.openComplaints, text: t(data.openComplaints === 1 ? 'admin.ov.complaint.one' : 'admin.ov.complaint.many'), href: '/admin/complaints' },
-        { id: 'suspended', n: data.suspendedUsers, text: t(data.suspendedUsers === 1 ? 'admin.ov.suspended.one' : 'admin.ov.suspended.many'), href: '/admin/users' },
-        { id: 'hidden', n: data.hiddenModels, text: t(data.hiddenModels === 1 ? 'admin.ov.hidden.one' : 'admin.ov.hidden.many'), href: '/admin/models' },
-        { id: 'unpaid', n: data.pendingPurchases, text: t(data.pendingPurchases === 1 ? 'admin.ov.unpaid.one' : 'admin.ov.unpaid.many'), href: '/admin/purchases' },
-      ].filter((a) => a.n > 0)
-    : [];
-
   return (
     <div>
       <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-accent">[ {t('admin.label')} ]</p>
@@ -106,27 +95,6 @@ export default function AdminOverviewPage() {
 
       {data && (
         <div className="mt-8 grid grid-cols-[minmax(0,1fr)] gap-6">
-          <Panel title={t('admin.ov.needs')}>
-            {attention.length === 0 ? (
-              <p className="flex items-center gap-2 text-sm text-ink-soft">
-                <CheckCircle2 aria-hidden className="h-4 w-4 shrink-0" />
-                {t('admin.ov.nothing')}
-              </p>
-            ) : (
-              <ul className="flex flex-wrap gap-3">
-                {attention.map((a) => (
-                  <li key={a.id}>
-                    <Link href={a.href} className="inline-flex items-center gap-2 rounded-lg border border-warn/50 px-3 py-2 text-sm text-warn transition-colors hover:bg-ink/5">
-                      <AlertCircle aria-hidden className="h-4 w-4 shrink-0" />
-                      <span><strong className="font-medium">{formatCount(a.n)}</strong> {a.text}</span>
-                      <ArrowRight aria-hidden className="h-4 w-4" />
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Panel>
-
           <div>
             <h2 className={`${LABEL} mb-3`}>{t('admin.ov.totals')}</h2>
             <div className="grid grid-cols-[minmax(0,1fr)] gap-4 sm:grid-cols-2 xl:grid-cols-4">

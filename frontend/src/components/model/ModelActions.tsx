@@ -218,15 +218,11 @@ export default function ModelActions({
   return (
     <div className="space-y-2">
       {hasPurchased ? (
-        <>
-          <button
-            type="button"
-            disabled
-            className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-accent/30 bg-accent/10 px-3.5 text-[15px] font-medium text-accent cursor-not-allowed"
-          >
+        <div className="space-y-2">
+          <div className="flex items-center justify-center gap-2 rounded-lg border border-accent/30 bg-accent/10 px-3.5 py-2 text-sm font-medium text-accent">
             <CheckCircle2 aria-hidden className="h-4 w-4 shrink-0 text-accent" />
             <span>{t("model.alreadyPurchased")}</span>
-          </button>
+          </div>
 
           <button
             type="button"
@@ -241,40 +237,27 @@ export default function ModelActions({
             )}
             {busy ? t("model.processing") : t("model.downloadGlb")}
           </button>
-        </>
+        </div>
       ) : (
-        <>
-          <button
-            type="button"
-            disabled={!ready || !signedIn || busy || isOwner || checkingPurchased}
-            onClick={free ? handleDownload : handleBuy}
-            className={`inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg px-3.5 text-[15px] font-medium transition-colors ${
-              isOwner
-                ? "border border-line bg-ink/5 text-ink/40 cursor-not-allowed"
-                : "bg-ink text-canvas hover:bg-ink/85 disabled:cursor-not-allowed disabled:opacity-50"
-            }`}
-          >
-            {busy && <Loader2 aria-hidden className="h-4 w-4 animate-spin motion-reduce:animate-none" />}
-            {busy
-              ? t("model.processing")
-              : isOwner
-                ? t("model.ownerDisabled")
-                : free
-                  ? t("model.getFree")
-                  : t("model.buy", { price: priceLabel })}
-          </button>
-
-          {!free && isRealModel && !isOwner && (
-            <button
-              type="button"
-              disabled={!ready || !signedIn || busy || checkingPurchased}
-              onClick={handleDownload}
-              className="h-9 w-full rounded-lg border border-line bg-ink/5 px-3 text-xs font-mono uppercase tracking-wider text-ink/80 transition-colors hover:bg-ink/10 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {t("model.alreadyBought")}
-            </button>
-          )}
-        </>
+        <button
+          type="button"
+          disabled={!ready || !signedIn || busy || isOwner || checkingPurchased}
+          onClick={free ? handleDownload : handleBuy}
+          className={`inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg px-3.5 text-[15px] font-medium transition-colors ${
+            isOwner
+              ? "border border-line bg-ink/5 text-ink/40 cursor-not-allowed"
+              : "bg-ink text-canvas hover:bg-ink/85 disabled:cursor-not-allowed disabled:opacity-50"
+          }`}
+        >
+          {busy && <Loader2 aria-hidden className="h-4 w-4 animate-spin motion-reduce:animate-none" />}
+          {busy
+            ? t("model.processing")
+            : isOwner
+              ? t("model.ownerDisabled")
+              : free
+                ? t("model.getFree")
+                : t("model.buy", { price: priceLabel })}
+        </button>
       )}
 
       {ready && !signedIn && (

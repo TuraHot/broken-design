@@ -417,7 +417,7 @@ export const discoverTh: Record<keyof typeof discoverEn, string> = {
   'model.buySample': 'ซื้อได้เฉพาะโมเดลที่อัปโหลดจริง',
   'model.buyLogin': 'กรุณาล็อกอินก่อนเพื่อซื้อหรือดาวน์โหลดโมเดลแบบเสียเงินนี้',
   'model.alreadyOwn': 'คุณเป็นเจ้าของ model นี้แล้ว — กำลังเริ่มดาวน์โหลด…',
-  'model.alreadyPurchased': 'คุณเป็นเจ้าของ model นี้แล้ว',
+  'model.alreadyPurchased': 'คุณได้ซื้อโมเดลนี้แล้ว',
   'model.downloadGlb': 'ดาวน์โหลด .glb',
   'model.buyNoUrl': 'ไม่พบลิงก์ชำระเงิน',
   'model.buyFailed': 'ดำเนินการสั่งซื้อไม่สำเร็จ',

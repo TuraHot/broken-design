@@ -3,12 +3,12 @@
 // User Dashboard — profile overview, purchased models, embed keys & GLB downloads
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import NoticeBox from '@/components/notifications/NoticeBox';
 import {
   Check,
   Code2,
   Copy,
   Download,
+  Image as ImageIcon,
   KeyRound,
   Layers,
   RefreshCw,
@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import UserAvatar from '@/components/ui/UserAvatar';
 import {
+  CDN_SERVICE_URL,
   fetchMyPurchases,
   fetchSellerStatus,
   regenerateEmbedKey,
@@ -194,9 +195,6 @@ export default function MePage() {
 
   return (
     <main className="mx-auto max-w-[1200px] px-4 pb-16 pt-24 md:px-6">
-      {/* Notices from admins: a suspension or its end, a license change, with the reason */}
-      <NoticeBox token={token} />
-
       {/* Toast / Notification */}
       {statusMsg && (
         <div className="mb-6 flex items-center justify-between rounded-lg border border-accent/30 bg-accent/10 px-4 py-3 text-sm text-accent">
@@ -321,29 +319,54 @@ export default function MePage() {
                 modelId: item.modelId,
                 embedKey: item.embedKey,
               });
+              const posterSrc =
+                item.posterUrl ||
+                (item.modelId
+                  ? `${CDN_SERVICE_URL}/cdn/models/${encodeURIComponent(item.modelId)}/poster.webp`
+                  : null);
 
               return (
                 <div key={item.id} className={`${CARD} min-w-0 space-y-4`}>
-                  {/* Top Bar: Title, License, Price, Actions */}
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <Link
-                          href={`/models/${item.modelId}`}
-                          className="font-display text-lg uppercase text-ink transition-colors hover:text-accent"
-                        >
-                          {item.title}
-                        </Link>
-                        <span className="rounded border border-line px-1.5 py-0.5 font-mono text-[10px] uppercase text-ink-soft">
-                          {item.licenseType}
-                        </span>
+                  {/* Top Bar: Thumbnail, Title, License, Price, Actions */}
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="flex items-start gap-4 min-w-0">
+                      <Link
+                        href={`/models/${item.modelId}`}
+                        className="relative h-20 w-20 sm:h-24 sm:w-24 shrink-0 overflow-hidden rounded-lg border border-line bg-ink/5 transition-transform hover:scale-[1.02]"
+                      >
+                        {posterSrc ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={posterSrc}
+                            alt={item.title}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-ink/30">
+                            <ImageIcon className="h-8 w-8" />
+                          </div>
+                        )}
+                      </Link>
+
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Link
+                            href={`/models/${item.modelId}`}
+                            className="font-display text-lg uppercase text-ink transition-colors hover:text-accent truncate max-w-full"
+                          >
+                            {item.title}
+                          </Link>
+                          <span className="rounded border border-line px-1.5 py-0.5 font-mono text-[10px] uppercase text-ink-soft shrink-0">
+                            {item.licenseType}
+                          </span>
+                        </div>
+                        <p className="mt-1 font-mono text-xs text-ink/40">
+                          {t('me.purchasedFor', { price: formatPrice(item.amountCents || item.priceCents), id: item.modelId })}
+                        </p>
                       </div>
-                      <p className="mt-1 font-mono text-xs text-ink/40">
-                        {t('me.purchasedFor', { price: formatPrice(item.amountCents || item.priceCents), id: item.modelId })}
-                      </p>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 shrink-0">
                       <button
                         type="button"
                         disabled={busyAction === `dl-${item.modelId}`}

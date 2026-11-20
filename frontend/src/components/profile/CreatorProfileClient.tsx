@@ -22,7 +22,6 @@ import {
   X,
 } from 'lucide-react';
 import ModelCard from '@/components/gallery/ModelCard';
-import NoticeBox from '@/components/notifications/NoticeBox';
 import DonateCard from '@/components/profile/DonateCard';
 import UserAvatar from '@/components/ui/UserAvatar';
 import {
@@ -528,8 +527,6 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
             {/* TAB 2: Seller Dashboard (Owner Only) */}
             {currentTab === 'dashboard' && showOwnerTabs && (
               <section className="mt-6 space-y-8">
-                {token && <NoticeBox token={token} />}
-
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                   <div className={CARD}>
                     <div className="flex items-center justify-between text-ink-soft">

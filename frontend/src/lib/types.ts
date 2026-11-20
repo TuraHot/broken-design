@@ -56,6 +56,7 @@ export interface PurchaseItem {
   embedKey: string;
   paidAt: string;
   purchasedAt: string;
+  posterUrl?: string | null;
 }
 
 export interface PurchaseDetail {

@@ -1,10 +1,10 @@
 'use client';
 
 // Bell next to the profile picture in the Navbar: a badge with the unread count and a dropdown with the latest notices.
-// The count comes from AccountMenu (it already loads it on every page change); the list is loaded when the bell opens.
+// Clicking any notice closes the dropdown and opens its full detail in a centered popup/modal dialog via createPortal.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
-import { Bell } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Bell, X } from 'lucide-react';
 import { fetchNotices, markAllNoticesRead, markNoticeRead, type NoticeItem } from '@/lib/api';
 import { formatDate } from '@/lib/format';
 import { useT } from '@/lib/i18n/client';
@@ -20,11 +20,17 @@ export default function NotificationBell({
   onUnreadChange: (n: number) => void;
 }) {
   const t = useT();
+  const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<NoticeItem[] | null>(null);
+  const [selectedNotice, setSelectedNotice] = useState<NoticeItem | null>(null);
   const [error, setError] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -66,6 +72,14 @@ export default function NotificationBell({
       await load();
     } catch {
       setError(t('notice.errSave'));
+    }
+  };
+
+  const handleSelectNotice = (n: NoticeItem) => {
+    setOpen(false); // Close dropdown immediately so it doesn't stay on the right
+    setSelectedNotice(n);
+    if (!n.readAt) {
+      void run(() => markNoticeRead(n.id, token));
     }
   };
 
@@ -121,21 +135,34 @@ export default function NotificationBell({
                 return (
                   <li
                     key={n.id}
-                    className={`rounded-lg border p-3 ${isNew ? 'border-warn/50 bg-ink/[0.04]' : 'border-line opacity-75'}`}
+                    onClick={() => handleSelectNotice(n)}
+                    className={`group cursor-pointer rounded-lg border p-3 transition-colors ${
+                      isNew
+                        ? 'border-warn/50 bg-ink/[0.04] hover:bg-ink/[0.08]'
+                        : 'border-line opacity-75 hover:opacity-100 hover:bg-ink/[0.03]'
+                    }`}
                   >
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-ink/50">
-                      {isNew && (
-                        <span className="rounded border border-warn/50 px-1.5 py-0.5 font-mono uppercase tracking-[0.12em] text-warn">
-                          {t('notice.new')}
-                        </span>
-                      )}
-                      <time dateTime={n.createdAt}>{formatDate(n.createdAt)}</time>
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-ink/50">
+                      <div className="flex items-center gap-2">
+                        {isNew && (
+                          <span className="rounded border border-warn/50 px-1.5 py-0.5 font-mono uppercase tracking-[0.12em] text-warn">
+                            {t('notice.new')}
+                          </span>
+                        )}
+                        <time dateTime={n.createdAt}>{formatDate(n.createdAt)}</time>
+                      </div>
+                      <span className="text-[11px] font-mono opacity-0 group-hover:opacity-80 text-accent transition-opacity">
+                        View &rarr;
+                      </span>
                     </div>
                     <NoticeContent n={n} />
                     {isNew && (
                       <button
                         type="button"
-                        onClick={() => run(() => markNoticeRead(n.id, token))}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          run(() => markNoticeRead(n.id, token));
+                        }}
                         className="mt-2.5 h-8 rounded-lg border border-ink/15 px-3 text-sm text-ink/80 hover:border-ink/40 hover:text-ink"
                       >
                         {t('notice.markRead')}
@@ -146,13 +173,64 @@ export default function NotificationBell({
               })}
             </ul>
           </div>
-
-          <div className="border-t border-line px-4 py-2.5 text-right">
-            <Link href="/me" onClick={() => setOpen(false)} className="text-xs text-accent hover:underline">
-              {t('bell.viewAll')}
-            </Link>
-          </div>
         </div>
+      )}
+
+      {/* Centered Modal / Pop-up mounted directly to document.body via Portal */}
+      {mounted && selectedNotice && createPortal(
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={t('notice.title')}
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+          onClick={() => setSelectedNotice(null)}
+        >
+          <div
+            className="w-full max-w-lg rounded-2xl border border-line bg-canvas p-6 shadow-2xl text-ink animate-in fade-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-line pb-3">
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-xs uppercase tracking-wider text-accent">
+                  {t('notice.title')}
+                </span>
+                {!selectedNotice.readAt && (
+                  <span className="rounded border border-warn/50 px-1.5 py-0.5 font-mono text-[10px] uppercase text-warn">
+                    {t('notice.new')}
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedNotice(null)}
+                aria-label={t('modal.close')}
+                className="rounded p-1 text-ink/50 hover:bg-ink/10 hover:text-ink transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              <time className="block text-xs font-mono text-ink/50" dateTime={selectedNotice.createdAt}>
+                {formatDate(selectedNotice.createdAt)}
+              </time>
+              <div className="rounded-xl border border-line bg-ink/[0.03] p-4 text-ink leading-relaxed">
+                <NoticeContent n={selectedNotice} />
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setSelectedNotice(null)}
+                className="h-9 rounded-lg bg-ink px-4 text-xs font-medium text-canvas hover:bg-ink/85 transition-colors"
+              >
+                {t('modal.close')}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

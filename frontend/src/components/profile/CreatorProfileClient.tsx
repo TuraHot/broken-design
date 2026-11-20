@@ -434,7 +434,7 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                       setBioStatus(null);
                     }
                   }}
-                  className={`mt-1.5 text-sm leading-relaxed text-ink/60 ${
+                  className={`mt-1.5 text-sm leading-relaxed text-ink/60 whitespace-pre-line break-words ${
                     showOwnerTabs ? 'cursor-pointer rounded p-1 hover:bg-ink/5 hover:text-ink transition-colors' : ''
                   }`}
                   title={showOwnerTabs ? 'คลิกเพื่อแก้ไข Bio' : undefined}

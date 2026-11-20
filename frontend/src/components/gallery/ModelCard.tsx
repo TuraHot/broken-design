@@ -110,13 +110,13 @@ export default function ModelCard({ model }: { model: Model }) {
     <div
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className={`group block overflow-hidden rounded-lg border bg-white/5 transition-colors ${
-        opening ? 'border-hud/50 cursor-wait' : 'border-white/10 hover:border-white/30'
+      className={`group block overflow-hidden rounded-lg border bg-card transition-colors ${
+        opening ? 'border-accent/50 cursor-wait' : 'border-line hover:border-ink/40'
       }`}
     >
       {/* Media / 3D Canvas Viewport */}
       <div
-        className="relative aspect-[4/3] w-full overflow-hidden bg-black/60 select-none"
+        className="relative aspect-[4/3] w-full overflow-hidden bg-canvas/60 select-none"
         onDragStart={(e) => e.preventDefault()}
       >
         {/* Interactive 3D Model Viewer on Hover */}
@@ -159,7 +159,7 @@ export default function ModelCard({ model }: { model: Model }) {
             ) : (
               <div
                 aria-hidden
-                className="flex h-full w-full flex-col items-center justify-center gap-2 bg-white/[0.06] text-white/40"
+                className="flex h-full w-full flex-col items-center justify-center gap-2 bg-ink/[0.06] text-ink/40"
               >
                 <ImageIcon className="h-7 w-7" />
                 <span className="text-sm">{t('card.image')}</span>
@@ -186,24 +186,24 @@ export default function ModelCard({ model }: { model: Model }) {
 
       {/* Model Metadata Section (Clickable Link) */}
       <Link href={targetHref} onClick={onLinkClick} className="block p-3 cursor-pointer">
-        <h3 className="truncate text-sm font-medium text-white group-hover:text-hud transition-colors">
+        <h3 className="truncate text-sm font-medium text-ink group-hover:text-accent transition-colors">
           {model.title}
         </h3>
         <div className="mt-1.5 flex items-center gap-1.5">
           <UserAvatar name={model.creator} avatarUrl={model.creatorAvatarUrl} size="xs" />
-          <p className="min-w-0 truncate text-sm text-white/65">{model.creator}</p>
+          <p className="min-w-0 truncate text-sm text-ink-soft">{model.creator}</p>
         </div>
         <div className="mt-3 flex items-center justify-between">
           <span
             className={
               free
-                ? 'rounded border border-hud/40 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-hud'
-                : 'rounded border border-white/25 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-white'
+                ? 'rounded border border-accent/40 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-accent'
+                : 'rounded border border-ink/25 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink'
             }
           >
             {free ? t('gallery.free') : price(model.priceCents)}
           </span>
-          <span className="inline-flex items-center gap-1 font-mono text-[11px] text-white/65">
+          <span className="inline-flex items-center gap-1 font-mono text-[11px] text-ink-soft">
             <Heart aria-hidden className="h-4 w-4" />
             <span className="sr-only">{t('card.likes')}</span>
             {model.likeCount}

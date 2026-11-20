@@ -914,6 +914,70 @@ adminRouter.patch('/creator-applications/:id', async (req, res) => {
   });
 });
 
+// ─── Admin notifications: what is waiting for an admin right now ────────────
+// There is no table of notices for admins. The items are the things that need an admin and have not been handled yet:
+// creator applications still pending and complaints still open, newest first. An item stops being listed the moment it is
+// handled, so "unread" means "still needs action" and is the same for every admin. Each item says what it is; the page
+// links it to the page that handles it (/admin/creator-approvals, /admin/complaints). Applications of deleted accounts
+// are skipped (nothing left to approve).
+const WAITING_COUNTS_SQL = `SELECT
+     (SELECT COUNT(*)::int FROM creator_applications ca
+        JOIN users u ON u.id = ca.user_id
+        WHERE ca.status = 'pending' AND u.deleted_at IS NULL) AS creator_applications,
+     (SELECT COUNT(*)::int FROM complaints WHERE status = 'open') AS complaints`;
+
+function waitingCounts(row: { creator_applications: number; complaints: number }) {
+  return {
+    creatorApplications: row.creator_applications,
+    complaints: row.complaints,
+    total: row.creator_applications + row.complaints,
+  };
+}
+
+// Counts only: the sidebar asks for this every minute.
+adminRouter.get('/notifications/summary', async (_req, res) => {
+  const result = await db.query(WAITING_COUNTS_SQL);
+  res.json(waitingCounts(result.rows[0]));
+});
+
+adminRouter.get('/notifications', async (_req, res) => {
+  const [counts, items] = await Promise.all([
+    db.query(WAITING_COUNTS_SQL),
+    db.query(
+      `SELECT * FROM (
+         SELECT 'creator_application'::text AS kind, ca.id, ca.created_at,
+                u.id AS person_id, u.display_name AS person_name, COALESCE(u.original_email, u.email) AS person_email,
+                ca.note AS text, NULL::text AS category, NULL::text AS model_title
+         FROM creator_applications ca
+         JOIN users u ON u.id = ca.user_id
+         WHERE ca.status = 'pending' AND u.deleted_at IS NULL
+         UNION ALL
+         SELECT 'complaint'::text, c.id, c.created_at,
+                u.id, u.display_name, COALESCE(u.original_email, u.email),
+                c.message, c.category::text, m.title
+         FROM complaints c
+         JOIN users u ON u.id = c.reporter_id
+         LEFT JOIN models m ON m.id = c.model_id
+         WHERE c.status = 'open'
+       ) waiting
+       ORDER BY created_at DESC
+       LIMIT 50`,
+    ),
+  ]);
+  res.json({
+    counts: waitingCounts(counts.rows[0]),
+    items: items.rows.map((r) => ({
+      kind: r.kind,
+      id: r.id,
+      createdAt: r.created_at,
+      person: { id: r.person_id, displayName: r.person_name, email: r.person_email },
+      text: r.text ? String(r.text).slice(0, 300) : '',
+      category: r.category,
+      modelTitle: r.model_title,
+    })),
+  });
+});
+
 // ─── Creator Invite Codes (Admin) ───────────────────────────────────────────
 
 adminRouter.get('/invite-codes', async (_req, res) => {

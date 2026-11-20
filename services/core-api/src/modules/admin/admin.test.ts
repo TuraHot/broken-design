@@ -1135,6 +1135,72 @@ test('admin routes - an admin whose own account was deleted is refused with 401 
   );
 });
 
+// ─── GET /api/admin/notifications (what waits for an admin) ──────────────────────────
+test('GET /api/admin/notifications/summary - counts pending applications and open complaints', async () => {
+  let sql = '';
+  await withServer(
+    ACTIVE_ADMIN,
+    (q) => {
+      if (!q.includes('AS creator_applications')) return undefined;
+      sql = q;
+      return { rowCount: 1, rows: [{ creator_applications: 3, complaints: 2 }] };
+    },
+    async (base) => {
+      const res = await fetch(`${base}/notifications/summary`, { headers: { Authorization: `Bearer ${token()}` } });
+      assert.equal(res.status, 200);
+      assert.deepEqual(await res.json(), { creatorApplications: 3, complaints: 2, total: 5 });
+    },
+  );
+  assert.match(sql, /ca\.status = 'pending'/);
+  assert.match(sql, /u\.deleted_at IS NULL/); // an applicant whose account was deleted is not waiting for anyone
+  assert.match(sql, /status = 'open'/);
+});
+
+test('GET /api/admin/notifications - lists the waiting items newest first with the counts, and needs an admin', async () => {
+  let feedSql = '';
+  await withServer(
+    ACTIVE_ADMIN,
+    (q) => {
+      if (q.includes('AS creator_applications') && !q.includes('UNION')) {
+        return { rowCount: 1, rows: [{ creator_applications: 1, complaints: 1 }] };
+      }
+      if (q.includes('UNION ALL')) {
+        feedSql = q;
+        return {
+          rowCount: 2,
+          rows: [
+            { kind: 'complaint', id: 'c1', created_at: '2026-11-20T10:00:00.000Z', person_id: TARGET_ID, person_name: 'Bob', person_email: 'bob@example.com', text: 'x'.repeat(400), category: 'copyright', model_title: 'Robot' },
+            { kind: 'creator_application', id: 'a1', created_at: '2026-11-19T10:00:00.000Z', person_id: TARGET_ID, person_name: 'Alice', person_email: 'alice@example.com', text: 'I make robots', category: null, model_title: null },
+          ],
+        };
+      }
+      return undefined;
+    },
+    async (base) => {
+      const res = await fetch(`${base}/notifications`, { headers: { Authorization: `Bearer ${token()}` } });
+      assert.equal(res.status, 200);
+      const body = await res.json();
+      assert.deepEqual(body.counts, { creatorApplications: 1, complaints: 1, total: 2 });
+      assert.equal(body.items.length, 2);
+      assert.equal(body.items[0].kind, 'complaint');
+      assert.equal(body.items[0].text.length, 300); // long messages are cut for the list
+      assert.equal(body.items[0].modelTitle, 'Robot');
+      assert.deepEqual(body.items[1].person, { id: TARGET_ID, displayName: 'Alice', email: 'alice@example.com' });
+      assert.equal(JSON.stringify(body).includes('password'), false);
+    },
+  );
+  assert.match(feedSql, /ORDER BY created_at DESC/);
+  assert.match(feedSql, /LIMIT 50/);
+  assert.match(feedSql, /ca\.status = 'pending' AND u\.deleted_at IS NULL/);
+
+  await withServer({ role: 'user', suspended_at: null }, () => undefined, async (base) => {
+    const res = await fetch(`${base}/notifications`, { headers: { Authorization: `Bearer ${token()}` } });
+    assert.equal(res.status, 403);
+    const sum = await fetch(`${base}/notifications/summary`, { headers: { Authorization: `Bearer ${token()}` } });
+    assert.equal(sum.status, 403);
+  });
+});
+
 test('creator applications - an application of a deleted account is not listed and cannot be approved', async () => {
   let listSql = '';
   let updated = false;

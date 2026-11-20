@@ -1,8 +1,9 @@
 'use client';
 
-// /admin/users — suspend or restore accounts
+// /admin/users — suspend, restore or delete accounts
 import { useEffect, useState } from 'react';
 import AdminList, { type Column, type RowApi } from '@/components/admin/AdminList';
+import DeleteUserDialog from '@/components/admin/DeleteUserDialog';
 import SuspendDialog from '@/components/admin/SuspendDialog';
 import { Badge } from '@/components/admin/ui';
 import type { AdminUser } from '@/lib/admin-api';
@@ -36,6 +37,33 @@ function SuspendAction({ user, api }: { user: AdminUser; api: RowApi<AdminUser> 
   );
 }
 
+// Opens the dialog where the admin writes why. A deleted account keeps its row as history, so the row shows "Deleted".
+function DeleteAction({ user, api }: { user: AdminUser; api: RowApi<AdminUser> }) {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label={t('admin.actionOn', { action: t('admin.delete'), name: user.displayName })}
+        className="h-8 whitespace-nowrap rounded-lg border border-red-400/50 px-3 text-sm text-red-300 transition-colors hover:border-red-400 hover:bg-red-400/10"
+      >
+        {t('admin.delete')}
+      </button>
+      {open && (
+        <DeleteUserDialog
+          user={user}
+          onClose={() => setOpen(false)}
+          onDeleted={(reason) =>
+            api.update(user.id, (row) => ({ ...row, deletedAt: new Date().toISOString(), deletedReason: reason }))
+          }
+        />
+      )}
+    </>
+  );
+}
+
 function buildColumns(myId: string | null): Column<AdminUser>[] {
   return [
     {
@@ -52,7 +80,17 @@ function buildColumns(myId: string | null): Column<AdminUser>[] {
     {
       header: 'admin.col.status',
       cell: (u, _api, t) =>
-        u.suspendedAt ? (
+        u.deletedAt ? (
+          <span className="flex flex-col items-start gap-1">
+            <Badge tone="danger">{t('admin.deleted')}</Badge>
+            <span className="text-xs text-white/65">{t('admin.deletedOn', { date: formatDate(u.deletedAt) })}</span>
+            {u.deletedReason && (
+              <span title={u.deletedReason} className="line-clamp-2 max-w-[28ch] break-words text-xs text-white/50">
+                {u.deletedReason}
+              </span>
+            )}
+          </span>
+        ) : u.suspendedAt ? (
           <span className="flex flex-col items-start gap-1">
             <Badge tone="danger">{t('admin.suspended')}</Badge>
             <span className="text-xs text-white/65">
@@ -72,10 +110,16 @@ function buildColumns(myId: string | null): Column<AdminUser>[] {
     {
       header: 'admin.col.action',
       cell: (u, api, t) => {
+        if (u.deletedAt) return <span className="text-sm text-white/40">—</span>; // a deleted account has no actions
         if (u.id === myId) return <span className="text-sm text-white/65">{t('admin.you')}</span>;
-        // An admin account cannot be suspended (the server refuses too); one suspended earlier can still be restored.
+        // An admin account cannot be suspended or deleted (the server refuses too); one suspended earlier can still be restored.
         if (u.role === 'admin' && u.suspendedAt === null) return <span title={t('admin.noAdminSuspend')} className="text-sm text-white/40">—</span>;
-        return <SuspendAction user={u} api={api} />;
+        return (
+          <span className="flex flex-wrap items-center gap-2">
+            <SuspendAction user={u} api={api} />
+            {u.role !== 'admin' && <DeleteAction user={u} api={api} />}
+          </span>
+        );
       },
     },
   ];

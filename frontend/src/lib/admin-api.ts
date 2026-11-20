@@ -60,6 +60,9 @@ export interface AdminUser {
   suspendedUntil: string | null;
   suspensionReason: string | null;
   createdAt: string;
+  /** Set when an admin deleted the account (the row stays as history; `email` is then the address it had). */
+  deletedAt: string | null;
+  deletedReason: string | null;
 }
 
 export interface AdminModel {
@@ -158,6 +161,16 @@ export const setUserSuspended = (id: string, body: { suspended: boolean; reason?
     `/users/${encodeURIComponent(id)}/suspend`,
     { method: 'PATCH', body: JSON.stringify(body) },
   );
+
+/**
+ * Delete an account but keep its history (reason required, 10-1000 characters). The email is freed: signing up with it
+ * again makes a brand-new account. Admins and your own account are refused by the server.
+ */
+export const deleteUser = (id: string, reason: string) =>
+  adminFetch<{ id: string; isDeleted: boolean }>(`/users/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    body: JSON.stringify({ reason }),
+  });
 
 /** Hide (reason required, the owner is notified) or restore (reason optional). */
 export const setModelHidden = (id: string, body: { hidden: boolean; reason?: string }) =>

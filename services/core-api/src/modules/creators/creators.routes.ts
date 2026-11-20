@@ -29,8 +29,9 @@ creatorsRouter.get('/:handle', async (req, res) => {
     display_name: string | null;
     email: string;
     avatar_hash: string | null;
+    bio: string | null;
   }>(
-    `SELECT u.id, u.display_name, u.email, u.avatar_hash
+    `SELECT u.id, u.display_name, u.email, u.avatar_hash, COALESCE(u.bio, '') AS bio
      FROM users u
      WHERE ${ownerActiveSql('u')}
        AND u.role <> 'admin'
@@ -100,7 +101,7 @@ creatorsRouter.get('/:handle', async (req, res) => {
     handle: toCreatorHandle(displayName),
     name: displayName,
     avatarUrl,
-    bio: '',
+    bio: creator.bio || '',
     models,
     totalDownloads,
     totalLikes,

@@ -76,13 +76,22 @@ const checkEmailSchema = z.object({
   email: z.string().trim().email().max(255),
 });
 
-const updateProfileSchema = z.object({
-  displayName: z
-    .string()
-    .trim()
-    .min(1, 'Display name cannot be empty')
-    .max(100, 'Display name must not exceed 100 characters'),
-});
+const updateProfileSchema = z
+  .object({
+    displayName: z
+      .string()
+      .trim()
+      .min(1, 'Display name cannot be empty')
+      .max(100, 'Display name must not exceed 100 characters')
+      .optional(),
+    bio: z
+      .string()
+      .max(1000, 'Bio must not exceed 1000 characters')
+      .optional(),
+  })
+  .refine((data) => data.displayName !== undefined || data.bio !== undefined, {
+    message: 'At least one field (displayName or bio) must be provided',
+  });
 
 // POST /api/auth/check-email
 // ตรวจสอบว่า Email มีบัญชีอยู่ในระบบแล้วหรือไม่
@@ -132,7 +141,7 @@ authRouter.post('/register', registerLimiter, async (req, res) => {
     const result = await db.query(
       `INSERT INTO users (email, password_hash, display_name)
        VALUES ($1, $2, $3)
-       RETURNING id, email, display_name, role, is_seller, avatar_hash`,
+       RETURNING id, email, display_name, COALESCE(bio, '') AS bio, role, is_seller, avatar_hash`,
       [normalizedEmail, passwordHash, displayName],
     );
 
@@ -156,6 +165,7 @@ authRouter.post('/register', registerLimiter, async (req, res) => {
         id: user.id,
         email: user.email,
         display_name: user.display_name,
+        bio: user.bio || '',
         role: user.role,
         is_seller: user.is_seller,
         avatar_url: buildAvatarUrl(user.id, user.avatar_hash),
@@ -186,7 +196,7 @@ authRouter.post('/login', loginLimiter, async (req, res) => {
   const { email, password } = parsed.data;
 
   const result = await db.query(
-    `SELECT id, email, password_hash, display_name, role, is_seller, avatar_hash, suspended_at, suspended_until, suspension_reason
+    `SELECT id, email, password_hash, display_name, COALESCE(bio, '') AS bio, role, is_seller, avatar_hash, suspended_at, suspended_until, suspension_reason
      FROM users
      WHERE email = $1`,
     [email.toLowerCase()],
@@ -244,6 +254,7 @@ authRouter.post('/login', loginLimiter, async (req, res) => {
       id: user.id,
       email: user.email,
       display_name: user.display_name,
+      bio: user.bio || '',
       role: user.role,
       is_seller: user.is_seller,
       avatar_url: buildAvatarUrl(user.id, user.avatar_hash),
@@ -254,7 +265,7 @@ authRouter.post('/login', loginLimiter, async (req, res) => {
 // GET /api/auth/me — return latest profile & avatar URL for the signed-in account
 authRouter.get('/me', requireAuth, async (req, res) => {
   const result = await db.query(
-    `SELECT id, email, display_name, role, is_seller, avatar_hash, suspended_at
+    `SELECT id, email, display_name, COALESCE(bio, '') AS bio, role, is_seller, avatar_hash, suspended_at
      FROM users
      WHERE id = $1`,
     [req.user!.id],
@@ -273,6 +284,7 @@ authRouter.get('/me', requireAuth, async (req, res) => {
       id: user.id,
       email: user.email,
       display_name: user.display_name,
+      bio: user.bio || '',
       role: user.role,
       is_seller: user.is_seller,
       avatar_url: buildAvatarUrl(user.id, user.avatar_hash),
@@ -280,7 +292,7 @@ authRouter.get('/me', requireAuth, async (req, res) => {
   });
 });
 
-// PATCH /api/auth/profile — update display_name for the signed-in account
+// PATCH /api/auth/profile — update display_name and/or bio for the signed-in account
 // (User avatar binaries are managed separately by cdn-service in the `profile_logo` bucket.)
 authRouter.patch('/profile', requireAuth, async (req, res) => {
   const parsed = updateProfileSchema.safeParse(req.body);
@@ -304,12 +316,26 @@ authRouter.patch('/profile', requireAuth, async (req, res) => {
     throw new AppError(403, 'ACCOUNT_SUSPENDED', 'This account has been suspended');
   }
 
+  const updates: string[] = [];
+  const values: any[] = [];
+  let paramIdx = 1;
+
+  if (parsed.data.displayName !== undefined) {
+    updates.push(`display_name = $${paramIdx++}`);
+    values.push(parsed.data.displayName);
+  }
+  if (parsed.data.bio !== undefined) {
+    updates.push(`bio = $${paramIdx++}`);
+    values.push(parsed.data.bio.trim());
+  }
+  values.push(req.user!.id);
+
   const updated = await db.query(
     `UPDATE users
-     SET display_name = $1
-     WHERE id = $2
-     RETURNING id, email, display_name, role, is_seller, avatar_hash`,
-    [parsed.data.displayName, req.user!.id],
+     SET ${updates.join(', ')}
+     WHERE id = $${paramIdx}
+     RETURNING id, email, display_name, COALESCE(bio, '') AS bio, role, is_seller, avatar_hash`,
+    values,
   );
   const user = updated.rows[0];
 
@@ -319,6 +345,7 @@ authRouter.patch('/profile', requireAuth, async (req, res) => {
       id: user.id,
       email: user.email,
       display_name: user.display_name,
+      bio: user.bio || '',
       role: user.role,
       is_seller: user.is_seller,
       avatar_url: buildAvatarUrl(user.id, user.avatar_hash),

@@ -7,10 +7,12 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import {
   AlertCircle,
+  Check,
   Coins,
   Download,
   Image as ImageIcon,
   Layers,
+  Loader2,
   Pencil,
   Plus,
   RefreshCw,
@@ -35,10 +37,10 @@ import {
   updateSellerModel,
 } from '@/lib/api';
 import { creatorHandle, type CreatorProfile } from '@/lib/creators';
-import type { AuthUser } from '@/lib/auth';
+import { updateProfile, type AuthUser } from '@/lib/auth';
 import { formatCount, formatMoney, formatPrice } from '@/lib/format';
 import { useLocale, useT } from '@/lib/i18n/client';
-import { readSession } from '@/lib/session';
+import { readSession, updateSessionUser } from '@/lib/session';
 import type {
   SellerModelItem,
   SellerSalesSummary,
@@ -76,6 +78,31 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [deletedIds, setDeletedIds] = useState<Set<string>>(() => new Set());
+
+  const [currentBio, setCurrentBio] = useState<string>(() => initialCreator?.bio || '');
+  const [editingBio, setEditingBio] = useState(false);
+  const [bioInput, setBioInput] = useState('');
+  const [savingBio, setSavingBio] = useState(false);
+  const [bioStatus, setBioStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  const handleSaveBio = async () => {
+    if (!token) return;
+    try {
+      setSavingBio(true);
+      setBioStatus(null);
+      const res = await updateProfile({ bio: bioInput.trim() }, token);
+      const nextBio = res.bio ?? bioInput.trim();
+      setCurrentBio(nextBio);
+      updateSessionUser({ bio: nextBio });
+      setEditingBio(false);
+      setBioStatus({ type: 'success', message: 'Bio updated' });
+      setTimeout(() => setBioStatus(null), 3000);
+    } catch (err: any) {
+      setBioStatus({ type: 'error', message: err?.message || 'Failed to update bio' });
+    } finally {
+      setSavingBio(false);
+    }
+  };
 
   const [editingModel, setEditingModel] = useState<SellerModelItem | null>(null);
   const [deletingModel, setDeletingModel] = useState<SellerModelItem | null>(null);
@@ -181,6 +208,10 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
     setUser(u);
     setToken(session.token);
 
+    if (!initialCreator?.bio && u.bio) {
+      setCurrentBio(u.bio);
+    }
+
     const myHandle = creatorHandle(u.display_name?.trim() || u.email);
     const isMine = myHandle === handle;
     if (!isMine) return;
@@ -249,7 +280,7 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
     ? initialCreator.totalDownloads
     : models.reduce((sum, m) => sum + Number(m.downloadCount || 0), 0);
   const totalLikes = initialCreator?.totalLikes ?? 0;
-  const bio = initialCreator?.bio || t('profile.bioFallback');
+  const bio = currentBio || initialCreator?.bio || t('profile.bioFallback');
 
   const showOwnerTabs = isOwnerCreator && !previewPublic;
   const currentTab: TabKey = showOwnerTabs ? activeTab : 'models';
@@ -336,12 +367,92 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
 
             <div className="mt-4 border-t border-line pt-4">
               <div className="flex items-center justify-between text-xs font-medium text-ink/80">
-                <span>{t('profile.aboutMe')}</span>
+                <div className="flex items-center gap-2">
+                  <span>{t('profile.aboutMe')}</span>
+                  {showOwnerTabs && !editingBio && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingBio(true);
+                        setBioInput(currentBio || initialCreator?.bio || '');
+                        setBioStatus(null);
+                      }}
+                      className="inline-flex items-center gap-1 rounded bg-ink/10 px-2 py-0.5 font-mono text-[11px] text-ink hover:bg-ink/15"
+                    >
+                      <Pencil className="h-3 w-3" />
+                      <span>{t('admin.edit')}</span>
+                    </button>
+                  )}
+                </div>
                 <span className="font-mono text-[11px] text-ink/45">
                   {formatCount(totalLikes)} {t('creators.likes')}
                 </span>
               </div>
-              <p className="mt-1.5 text-sm leading-relaxed text-ink/60">{bio}</p>
+
+              {editingBio ? (
+                <div className="mt-2 space-y-2">
+                  <textarea
+                    value={bioInput}
+                    onChange={(e) => setBioInput(e.target.value)}
+                    maxLength={1000}
+                    rows={3}
+                    placeholder={t('profile.bioFallback')}
+                    className="w-full rounded-lg border border-line bg-canvas p-2.5 text-xs text-ink placeholder:text-ink/40 focus:border-ink/50 focus:outline-none"
+                  />
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-[10px] text-ink/40">{bioInput.length}/1000</span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingBio(false);
+                          setBioStatus(null);
+                        }}
+                        disabled={savingBio}
+                        className="rounded-md border border-line px-2.5 py-1 text-xs text-ink-soft hover:bg-ink/5 disabled:opacity-50"
+                      >
+                        {t('creator.apply.cancel')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSaveBio}
+                        disabled={savingBio}
+                        className="inline-flex items-center gap-1 rounded-md bg-ink px-2.5 py-1 text-xs font-medium text-canvas hover:bg-ink/85 disabled:opacity-50"
+                      >
+                        {savingBio && <Loader2 className="h-3 w-3 animate-spin" />}
+                        {savingBio ? t('profile.saving') : t('profile.saveChanges')}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p
+                  onClick={() => {
+                    if (showOwnerTabs) {
+                      setEditingBio(true);
+                      setBioInput(currentBio || initialCreator?.bio || '');
+                      setBioStatus(null);
+                    }
+                  }}
+                  className={`mt-1.5 text-sm leading-relaxed text-ink/60 ${
+                    showOwnerTabs ? 'cursor-pointer rounded p-1 hover:bg-ink/5 hover:text-ink transition-colors' : ''
+                  }`}
+                  title={showOwnerTabs ? 'คลิกเพื่อแก้ไข Bio' : undefined}
+                >
+                  {bio}
+                </p>
+              )}
+
+              {bioStatus && (
+                <p
+                  className={`mt-2 text-xs ${
+                    bioStatus.type === 'success' ? 'text-emerald-500' : 'text-red-400'
+                  }`}
+                >
+                  {bioStatus.message}
+                </p>
+              )}
+
               <Link
                 href="/creator"
                 className="mt-3 inline-block font-mono text-[11px] uppercase tracking-wider text-accent hover:text-accent"

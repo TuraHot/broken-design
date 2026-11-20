@@ -9,6 +9,7 @@ export interface AuthUser {
   role: string;
   is_seller: boolean;
   avatar_url?: string | null;
+  bio?: string;
 }
 
 // ผลลัพธ์เมื่อ Login หรือ Register สำเร็จ
@@ -149,18 +150,31 @@ async function accountRequest(url: string, init: RequestInit): Promise<any> {
   return data;
 }
 
-// อัปเดตชื่อที่แสดงของบัญชีปัจจุบัน (PATCH /api/auth/profile)
+export interface UpdateProfileInput {
+  displayName?: string;
+  bio?: string;
+}
+
+// อัปเดตชื่อที่แสดง และ/หรือ Bio ของบัญชีปัจจุบัน (PATCH /api/auth/profile)
 export async function updateProfile(
-  displayName: string,
+  payload: string | UpdateProfileInput,
   token: string,
 ): Promise<AuthUser> {
+  const body =
+    typeof payload === 'string'
+      ? { displayName: payload.trim() }
+      : {
+          ...(payload.displayName !== undefined ? { displayName: payload.displayName.trim() } : {}),
+          ...(payload.bio !== undefined ? { bio: payload.bio.trim() } : {}),
+        };
+
   const data = await accountRequest(`${CORE_API_URL}/api/auth/profile`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ displayName: displayName.trim() }),
+    body: JSON.stringify(body),
   });
 
   return data.user as AuthUser;

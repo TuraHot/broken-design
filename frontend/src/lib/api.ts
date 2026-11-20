@@ -188,6 +188,32 @@ export async function fetchMyPurchases(token: string): Promise<PurchaseItem[]> {
   return data.purchases || [];
 }
 
+/** Check if the current user has already purchased a specific model (`GET /api/models/:id/purchase`). */
+export async function checkModelPurchased(
+  modelId: string,
+  token: string,
+): Promise<{ purchased: boolean; purchase?: { id: string; embedKey: string; paidAt: string } | null }> {
+  try {
+    return await coreApiFetch<{ purchased: boolean; purchase?: { id: string; embedKey: string; paidAt: string } | null }>(
+      `/api/models/${encodeURIComponent(modelId)}/purchase`,
+      token,
+      { cache: 'no-store' },
+    );
+  } catch {
+    // Fallback: check /api/me/purchases
+    try {
+      const purchases = await fetchMyPurchases(token);
+      const found = purchases.find((p) => p.modelId === modelId);
+      return {
+        purchased: Boolean(found),
+        purchase: found ? { id: found.id, embedKey: found.embedKey, paidAt: found.paidAt } : null,
+      };
+    } catch {
+      return { purchased: false, purchase: null };
+    }
+  }
+}
+
 /** Regenerate embed_key for a purchase (`POST /api/purchases/:id/regenerate-key`). */
 export async function regenerateEmbedKey(
   purchaseId: string,

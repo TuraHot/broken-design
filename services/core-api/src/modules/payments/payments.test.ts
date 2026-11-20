@@ -63,6 +63,7 @@ test('payments - rejects malformed non-UUID ids with 400 INVALID_ID before hitti
     const headers = { Authorization: `Bearer ${makeToken()}` };
     for (const [method, path] of [
       ['POST', '/api/models/not-a-uuid/checkout'],
+      ['GET', '/api/models/not-a-uuid/purchase'],
       ['POST', '/api/purchases/not-a-uuid/confirm-mock'],
       ['POST', '/api/models/not-a-uuid/pay-mock'],
       ['POST', '/api/purchases/not-a-uuid/qr'],
@@ -312,6 +313,56 @@ test('POST /api/models/:id/checkout - prevents duplicate purchase if already pai
     assert.equal(res.status, 409);
     const body = await res.json();
     assert.equal(body.error?.code, 'ALREADY_PURCHASED');
+  } finally {
+    server.close();
+    db.query = originalQuery;
+  }
+});
+
+test('GET /api/models/:id/purchase - returns purchased=true when user has paid purchase', async () => {
+  const originalQuery = db.query.bind(db);
+  (db as any).query = async (sql: string) => {
+    if (sql.includes("FROM purchases WHERE user_id = $1 AND model_id = $2 AND status = 'paid'")) {
+      return {
+        rowCount: 1,
+        rows: [{ id: PURCHASE_1, status: 'paid', embed_key: 'embed-key-123', paid_at: '2026-11-20T00:00:00.000Z' }],
+      };
+    }
+    return { rowCount: 0, rows: [] };
+  };
+
+  const server = app.listen(0);
+  const port = (server.address() as any).port;
+  try {
+    const res = await fetch(`http://localhost:${port}/api/models/${MODEL_PAID}/purchase`, {
+      headers: { Authorization: `Bearer ${makeToken()}` },
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.purchased, true);
+    assert.equal(body.purchase?.id, PURCHASE_1);
+  } finally {
+    server.close();
+    db.query = originalQuery;
+  }
+});
+
+test('GET /api/models/:id/purchase - returns purchased=false when user has not bought model', async () => {
+  const originalQuery = db.query.bind(db);
+  (db as any).query = async () => {
+    return { rowCount: 0, rows: [] };
+  };
+
+  const server = app.listen(0);
+  const port = (server.address() as any).port;
+  try {
+    const res = await fetch(`http://localhost:${port}/api/models/${MODEL_1}/purchase`, {
+      headers: { Authorization: `Bearer ${makeToken()}` },
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.purchased, false);
+    assert.equal(body.purchase, null);
   } finally {
     server.close();
     db.query = originalQuery;

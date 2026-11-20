@@ -115,7 +115,7 @@ Agent ทุกตัว **ห้ามละเมิด** กฎต่อไ�
 - **Seller (`/api/seller`):**
   - `POST /api/seller/enable` — เปิดโหมดคนขาย (`is_seller = true`)
   - `GET /api/seller/status` — ตรวจสถานะคนขาย
-  - `GET /api/seller/models` — รายการโมเดลของคนขาย
+  - `GET /api/seller/models` — รายการโมเดลของคนขาย (ไม่รวมโมเดลที่ถูก Soft Delete)
   - `GET /api/seller/sales` — สรุปรายได้และประวัติการขาย
 - **Admin (`/api/admin`):** *(ทุก Route ตรวจ `role === 'admin'` และ `suspended_at IS NULL` จากฐานข้อมูลจริงผ่าน `requireActiveAdmin`)*
   - `GET /api/admin/overview` — สรุปยอดรวมระบบ, สถิติ 7 วันล่าสุด, สัดส่วน Free/Paid & License, Top 5 โมเดล, รายการซื้อและผู้ใช้ล่าสุด, คำร้องเรียนที่เปิดอยู่

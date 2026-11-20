@@ -4,6 +4,7 @@
 // Full-width cover banner -> left sidebar (avatar, handle, stats, bio) + right underline tabs
 // (Models | Dashboard | Wallet & Withdraw for creator owner), with Donate at the bottom.
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
   AlertCircle,
@@ -58,6 +59,7 @@ interface Props {
 export default function CreatorProfileClient({ handle, initialCreator }: Props) {
   const t = useT();
   const locale = useLocale();
+  const router = useRouter();
   const dateFmt = (v: string) => new Date(v).toLocaleDateString(locale === 'th' ? 'th-TH' : 'en-US');
 
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -202,7 +204,9 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
       setStatusMsg(null);
       await deleteModel(modelId, token);
       setModels((prev) => prev.filter((m) => m.id !== modelId));
+      // Hide it from the server-rendered public list right away, then re-fetch so the cached RSC data catches up.
       setDeletedIds((prev) => new Set(prev).add(modelId));
+      router.refresh();
       setStatusMsg(t('profile.deletedMsg', { title }));
       setDeletingModel(null);
     } catch (err: any) {
@@ -243,11 +247,11 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
   const displayName = creatorName || handle;
   const avatarUrl = (isOwnerCreator ? user?.avatar_url : null) ?? initialCreator?.avatarUrl ?? null;
   const publicModels = (initialCreator?.models ?? []).filter((m) => !deletedIds.has(m.id));
-  const activeSellerModels = models.filter((m) => !m.isDeleted && !deletedIds.has(m.id));
+  const activeSellerModels = models;
   const modelCount = initialCreator ? publicModels.length : activeSellerModels.length;
   const totalDownloads = initialCreator
     ? initialCreator.totalDownloads
-    : models.reduce((sum, m) => sum + Number(m.downloadCount || 0), 0);
+    : activeSellerModels.reduce((sum, m) => sum + Number(m.downloadCount || 0), 0);
   const totalLikes = initialCreator?.totalLikes ?? 0;
   const bio = initialCreator?.bio || t('profile.bioFallback');
 
@@ -456,9 +460,9 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
 
                 {/* My 3D Models Table */}
                 <div>
-                  <div className="flex items-center justify-between border-b border-white/10 pb-3">
-                    <h2 className="font-display text-base uppercase text-white">
-                      {t('seller.myModels')} <span className="ml-1 font-mono text-xs text-white/50">({activeSellerModels.length})</span>
+                  <div className="flex items-center justify-between border-b border-line pb-3">
+                    <h2 className="font-display text-base uppercase text-ink">
+                      {t('seller.myModels')} <span className="ml-1 font-mono text-xs text-ink-soft">({activeSellerModels.length})</span>
                     </h2>
                     <button
                       type="button"
@@ -485,16 +489,16 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                             <th className="px-4 py-3 text-right">{t('seller.thActions')}</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-white/5">
+                        <tbody className="divide-y divide-line">
                           {activeSellerModels.map((m) => (
-                            <tr key={m.id} className="hover:bg-white/[0.02]">
-                              <td className="px-4 py-3 font-medium text-white">
+                            <tr key={m.id} className="hover:bg-ink/[0.02]">
+                              <td className="px-4 py-3 font-medium text-ink">
                                 <Link
                                   href={`/models/${m.id}`}
-                                  className="group flex items-center gap-3 transition-colors hover:text-hud"
+                                  className="group flex items-center gap-3 transition-colors hover:text-accent"
                                 >
-                                  <div className="relative flex h-11 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10 bg-white/5 group-hover:border-hud/40">
-                                    <ImageIcon className="h-4 w-4 text-white/30" />
+                                  <div className="relative flex h-11 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md border border-line bg-ink/5 group-hover:border-accent/40">
+                                    <ImageIcon className="h-4 w-4 text-ink/30" />
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img
                                       src={m.posterUrl || `${CDN_SERVICE_URL}/cdn/models/${m.id}/poster.webp`}
@@ -519,9 +523,7 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                                 </span>
                               </td>
                               <td className="px-4 py-3 font-mono text-[11px] uppercase">
-                                {m.isDeleted ? (
-                                  <span className="text-danger">{t('seller.statusDeleted')}</span>
-                                ) : m.isHidden ? (
+                                {m.isHidden ? (
                                   <span className="text-warn">{t('seller.statusHidden')}</span>
                                 ) : (
                                   <span className="text-emerald-500">{t('seller.statusLive')}</span>
@@ -529,29 +531,25 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                               </td>
                               <td className="px-4 py-3 text-right">
                                 <div className="flex items-center justify-end gap-2">
-                                  {!m.isDeleted && (
-                                    <button
-                                      type="button"
-                                      onClick={() => openEditModal(m)}
-                                      className="rounded border border-line px-2 py-1 text-xs text-ink/75 hover:bg-ink/10 hover:text-ink"
-                                      title={t('profile.editBtn')}
-                                      aria-label={t('profile.editBtn')}
-                                    >
-                                      <Pencil className="inline h-3 w-3" />
-                                    </button>
-                                  )}
-                                  {!m.isDeleted && (
-                                    <button
-                                      type="button"
-                                      disabled={busyAction === `delete-${m.id}`}
-                                      onClick={() => setDeletingModel(m)}
-                                      className="rounded border border-danger/30 bg-danger/10 px-2 py-1 text-xs text-danger hover:bg-danger/20 disabled:opacity-50"
-                                      title={t('profile.deleteBtn')}
-                                      aria-label={t('profile.deleteBtn')}
-                                    >
-                                      <Trash2 className="inline h-3 w-3" />
-                                    </button>
-                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => openEditModal(m)}
+                                    className="rounded border border-line px-2 py-1 text-xs text-ink/75 hover:bg-ink/10 hover:text-ink"
+                                    title={t('profile.editBtn')}
+                                    aria-label={t('profile.editBtn')}
+                                  >
+                                    <Pencil className="inline h-3 w-3" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={busyAction === `delete-${m.id}`}
+                                    onClick={() => setDeletingModel(m)}
+                                    className="rounded border border-danger/30 bg-danger/10 px-2 py-1 text-xs text-danger hover:bg-danger/20 disabled:opacity-50"
+                                    title={t('profile.deleteBtn')}
+                                    aria-label={t('profile.deleteBtn')}
+                                  >
+                                    <Trash2 className="inline h-3 w-3" />
+                                  </button>
                                 </div>
                               </td>
                             </tr>

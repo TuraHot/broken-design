@@ -1135,6 +1135,39 @@ test('admin routes - an admin whose own account was deleted is refused with 401 
   );
 });
 
+test('creator applications - an application of a deleted account is not listed and cannot be approved', async () => {
+  let listSql = '';
+  let updated = false;
+  const APP_ID = '66666666-6666-4666-8666-666666666666';
+  await withServer(
+    ACTIVE_ADMIN,
+    (sql) => {
+      if (sql.includes('FROM creator_applications ca') && sql.includes('LIMIT 100')) {
+        listSql = sql;
+        return { rowCount: 0, rows: [] };
+      }
+      if (sql.includes('FROM creator_applications ca') && sql.includes('WHERE ca.id = $1')) {
+        return { rowCount: 1, rows: [{ id: APP_ID, user_id: TARGET_ID, status: 'pending', deleted_at: '2026-11-20T00:00:00.000Z' }] };
+      }
+      if (sql.includes('UPDATE')) updated = true;
+      return undefined;
+    },
+    async (base) => {
+      const list = await fetch(`${base}/creator-applications`, { headers: { Authorization: `Bearer ${token()}` } });
+      assert.equal(list.status, 200);
+      const res = await fetch(`${base}/creator-applications/${APP_ID}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'approved' }),
+      });
+      assert.equal(res.status, 409);
+      assert.equal((await res.json()).error.code, 'ACCOUNT_DELETED');
+    },
+  );
+  assert.match(listSql, /u\.deleted_at IS NULL/);
+  assert.equal(updated, false); // neither the application nor the user was changed
+});
+
 test('GET /api/admin/users - a deleted account shows the address it had, not the placeholder, and can be searched by it', async () => {
   let where = '';
   await withServer(

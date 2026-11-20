@@ -832,6 +832,7 @@ adminRouter.get('/creator-applications', async (req, res) => {
      FROM creator_applications ca
      JOIN users u ON u.id = ca.user_id
      WHERE ($1 = 'all' OR ca.status = $1)
+       AND u.deleted_at IS NULL -- the applicant's account was deleted: nothing left to approve
      ORDER BY ca.created_at DESC
      LIMIT 100`,
     [status],
@@ -865,7 +866,10 @@ adminRouter.patch('/creator-applications/:id', async (req, res) => {
   }
 
   const existing = await db.query(
-    `SELECT id, user_id, status FROM creator_applications WHERE id = $1`,
+    `SELECT ca.id, ca.user_id, ca.status, u.deleted_at
+     FROM creator_applications ca
+     JOIN users u ON u.id = ca.user_id
+     WHERE ca.id = $1`,
     [id],
   );
   if (existing.rowCount === 0) {
@@ -873,6 +877,10 @@ adminRouter.patch('/creator-applications/:id', async (req, res) => {
   }
 
   const appRow = existing.rows[0];
+  // An admin deleted this account: it must not be turned into a seller again.
+  if (appRow.deleted_at) {
+    throw new AppError(409, 'ACCOUNT_DELETED', 'The applicant\'s account has been deleted');
+  }
   const updated = await db.query(
     `UPDATE creator_applications
      SET status = $2,

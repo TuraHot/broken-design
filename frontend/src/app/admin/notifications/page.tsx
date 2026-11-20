@@ -13,7 +13,7 @@ import { adminErrorText } from '@/lib/i18n/admin-error';
 import { useT } from '@/lib/i18n/client';
 
 const LINK =
-  'inline-flex h-8 items-center whitespace-nowrap rounded-lg border border-white/15 px-3 text-sm text-white/80 transition-colors hover:border-white/40 hover:text-white';
+  'inline-flex h-8 items-center whitespace-nowrap rounded-lg border border-line px-3 text-sm text-ink/80 transition-colors hover:border-ink/40 hover:text-ink';
 
 export default function AdminNotificationsPage() {
   const t = useT();
@@ -42,9 +42,9 @@ export default function AdminNotificationsPage() {
 
   return (
     <section>
-      <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud">[ {t('admin.label')} ]</p>
+      <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-accent">[ {t('admin.label')} ]</p>
       <h1 className="mt-3 font-display text-[clamp(28px,4vw,48px)] uppercase leading-[1.02]">{t('admin.nav.notifications')}</h1>
-      <p className="mt-3 max-w-[60ch] text-[15px] text-white/65">{t('admin.notif.lead')}</p>
+      <p className="mt-3 max-w-[60ch] text-[15px] text-ink-soft">{t('admin.notif.lead')}</p>
 
       <div className="mt-6 flex flex-wrap items-center gap-3">
         {data && (
@@ -61,7 +61,7 @@ export default function AdminNotificationsPage() {
           type="button"
           onClick={() => setAttempt((n) => n + 1)}
           disabled={loading}
-          className="ml-auto inline-flex h-8 items-center gap-2 rounded-lg border border-white/15 px-3 text-sm text-white/80 transition-colors hover:border-white/40 hover:text-white disabled:opacity-50"
+          className="ml-auto inline-flex h-8 items-center gap-2 rounded-lg border border-line px-3 text-sm text-ink/80 transition-colors hover:border-ink/40 hover:text-ink disabled:opacity-50"
         >
           <RefreshCw aria-hidden className={`h-4 w-4 ${loading ? 'animate-spin motion-reduce:animate-none' : ''}`} />
           {t('admin.notif.refresh')}
@@ -69,23 +69,23 @@ export default function AdminNotificationsPage() {
       </div>
 
       {error && !data ? (
-        <div role="alert" className="mt-6 rounded-lg border border-white/10 bg-white/5 p-10 text-center">
-          <p className="flex items-center justify-center gap-2 text-red-300">
+        <div role="alert" className="mt-6 rounded-lg border border-line bg-ink/5 p-10 text-center">
+          <p className="flex items-center justify-center gap-2 text-danger">
             <AlertCircle aria-hidden className="h-4 w-4 shrink-0" />
             {error}
           </p>
           <button
             type="button"
             onClick={() => setAttempt((n) => n + 1)}
-            className="mt-6 h-9 rounded-lg bg-white px-3.5 text-[15px] font-medium text-black transition-colors hover:bg-white/85"
+            className="mt-6 h-9 rounded-lg bg-ink px-3.5 text-[15px] font-medium text-canvas transition-colors hover:bg-ink/85"
           >
             {t('admin.tryAgain')}
           </button>
         </div>
       ) : !data ? (
-        <p role="status" className="mt-6 text-sm text-white/65">{t('admin.loading')}</p>
+        <p role="status" className="mt-6 text-sm text-ink-soft">{t('admin.loading')}</p>
       ) : data.items.length === 0 ? (
-        <p className="mt-6 rounded-lg border border-white/10 bg-white/5 p-10 text-center text-white/65">{t('admin.notif.empty')}</p>
+        <p className="mt-6 rounded-lg border border-line bg-ink/5 p-10 text-center text-ink-soft">{t('admin.notif.empty')}</p>
       ) : (
         <ul aria-busy={loading} className={`mt-6 grid gap-3 ${loading ? 'opacity-60' : ''}`}>
           {data.items.map((item) => {
@@ -95,25 +95,25 @@ export default function AdminNotificationsPage() {
             return (
               <li
                 key={`${item.kind}-${item.id}`}
-                className="flex flex-col gap-3 rounded-lg border border-white/10 bg-white/5 p-4 sm:flex-row sm:items-start sm:justify-between"
+                className="flex flex-col gap-3 rounded-lg border border-line bg-ink/5 p-4 sm:flex-row sm:items-start sm:justify-between"
               >
                 <div className="flex min-w-0 gap-3">
-                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-white/15 text-hud">
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-line text-accent">
                     <Icon aria-hidden className="h-4 w-4" />
                   </span>
                   <div className="min-w-0">
-                    <p className="flex flex-wrap items-center gap-2 font-medium text-white">
+                    <p className="flex flex-wrap items-center gap-2 font-medium text-ink">
                       {t(application ? 'admin.notif.newApplication' : 'admin.notif.newComplaint')}
                       {category && <Badge>{t(CATEGORY_LABELS[category as keyof typeof CATEGORY_LABELS])}</Badge>}
                     </p>
-                    <p className="mt-0.5 break-words text-sm text-white/65">
-                      {item.person.displayName} <span className="font-mono text-xs text-white/50">({item.person.email})</span>
+                    <p className="mt-0.5 break-words text-sm text-ink-soft">
+                      {item.person.displayName} <span className="font-mono text-xs text-ink/50">({item.person.email})</span>
                     </p>
                     {item.modelTitle && (
-                      <p className="mt-0.5 break-words text-sm text-white/65">{t('admin.notif.aboutModel', { title: item.modelTitle })}</p>
+                      <p className="mt-0.5 break-words text-sm text-ink-soft">{t('admin.notif.aboutModel', { title: item.modelTitle })}</p>
                     )}
-                    {item.text && <p className="mt-1.5 line-clamp-3 break-words text-sm text-white/80">{item.text}</p>}
-                    <p className="mt-1.5 font-mono text-[12px] text-white/50">{formatDate(item.createdAt)}</p>
+                    {item.text && <p className="mt-1.5 line-clamp-3 break-words text-sm text-ink/80">{item.text}</p>}
+                    <p className="mt-1.5 font-mono text-[12px] text-ink/50">{formatDate(item.createdAt)}</p>
                   </div>
                 </div>
                 <Link href={application ? '/admin/creator-approvals' : '/admin/complaints'} className={LINK}>

@@ -113,11 +113,11 @@ export default function AdminCreatorApprovalsPage() {
 
   return (
     <section>
-      <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud">[ {t('admin.label')} ]</p>
+      <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-accent">[ {t('admin.label')} ]</p>
       <h1 className="mt-3 font-display text-[clamp(28px,4vw,48px)] uppercase leading-[1.02]">{t('admin.nav.creatorApprovals')}</h1>
-      <p className="mt-3 max-w-[60ch] text-[15px] text-white/65">{t('admin.ca.lead')}</p>
+      <p className="mt-3 max-w-[60ch] text-[15px] text-ink-soft">{t('admin.ca.lead')}</p>
 
-      <div role="status" className="mt-4 min-h-5 text-sm text-hud">{notice}</div>
+      <div role="status" className="mt-4 min-h-5 text-sm text-accent">{notice}</div>
 
       <div role="group" aria-label={t('admin.statusLabel')} className="mt-2 flex flex-wrap gap-2">
         {FILTERS.map((f) => (
@@ -127,7 +127,7 @@ export default function AdminCreatorApprovalsPage() {
             aria-pressed={filter === f.value}
             onClick={() => setFilter(f.value)}
             className={`${BTN} ${
-              filter === f.value ? 'border-white bg-white text-black' : 'border-white/15 text-white/80 hover:border-white/40 hover:text-white'
+              filter === f.value ? 'border-ink bg-ink text-canvas' : 'border-line text-ink/80 hover:border-ink/40 hover:text-ink'
             }`}
           >
             {t(f.label)}
@@ -136,42 +136,42 @@ export default function AdminCreatorApprovalsPage() {
       </div>
 
       {error && !apps ? (
-        <div role="alert" className="mt-6 rounded-lg border border-white/10 bg-white/5 p-10 text-center">
-          <p className="flex items-center justify-center gap-2 text-red-300">
+        <div role="alert" className="mt-6 rounded-lg border border-line bg-ink/5 p-10 text-center">
+          <p className="flex items-center justify-center gap-2 text-danger">
             <AlertCircle aria-hidden className="h-4 w-4 shrink-0" />
             {error}
           </p>
           <button
             type="button"
             onClick={() => setAttempt((n) => n + 1)}
-            className="mt-6 h-9 rounded-lg bg-white px-3.5 text-[15px] font-medium text-black transition-colors hover:bg-white/85"
+            className="mt-6 h-9 rounded-lg bg-ink px-3.5 text-[15px] font-medium text-canvas transition-colors hover:bg-ink/85"
           >
             {t('admin.tryAgain')}
           </button>
         </div>
       ) : !apps ? (
-        <p role="status" className="mt-6 text-sm text-white/65">{t('admin.loading')}</p>
+        <p role="status" className="mt-6 text-sm text-ink-soft">{t('admin.loading')}</p>
       ) : apps.length === 0 ? (
-        <p className="mt-6 rounded-lg border border-white/10 bg-white/5 p-10 text-center text-white/65">{t('admin.ca.empty')}</p>
+        <p className="mt-6 rounded-lg border border-line bg-ink/5 p-10 text-center text-ink-soft">{t('admin.ca.empty')}</p>
       ) : (
         <ul className="mt-6 grid gap-3">
           {apps.map((app) => (
             <li
               key={app.id}
-              className="flex flex-col justify-between gap-3 rounded-lg border border-white/10 bg-white/5 p-4 sm:flex-row sm:items-center"
+              className="flex flex-col justify-between gap-3 rounded-lg border border-line bg-ink/5 p-4 sm:flex-row sm:items-center"
             >
               <div className="min-w-0">
-                <p className="flex flex-wrap items-center gap-2 font-medium text-white">
+                <p className="flex flex-wrap items-center gap-2 font-medium text-ink">
                   {app.displayName}
                   <Badge tone={app.status === 'pending' ? 'warn' : 'neutral'}>{t(STATUS_LABEL[app.status])}</Badge>
                 </p>
-                <p className="break-all font-mono text-xs text-white/55">{app.email}</p>
-                <p className="mt-1.5 break-words text-sm text-white/80">{app.note || <span className="text-white/45">{t('admin.ca.noNote')}</span>}</p>
-                <p className="mt-1.5 font-mono text-[12px] text-white/50">
+                <p className="break-all font-mono text-xs text-ink/55">{app.email}</p>
+                <p className="mt-1.5 break-words text-sm text-ink/80">{app.note || <span className="text-ink/45">{t('admin.ca.noNote')}</span>}</p>
+                <p className="mt-1.5 font-mono text-[12px] text-ink/50">
                   {t('admin.ca.applied', { date: formatDate(app.createdAt) })}
                   {app.reviewedAt && ` · ${t('admin.ca.reviewed', { date: formatDate(app.reviewedAt) })}`}
                 </p>
-                {app.adminNote && <p className="mt-1 break-words text-xs text-white/50">{app.adminNote}</p>}
+                {app.adminNote && <p className="mt-1 break-words text-xs text-ink/50">{app.adminNote}</p>}
               </div>
               {app.status === 'pending' && (
                 <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -180,7 +180,7 @@ export default function AdminCreatorApprovalsPage() {
                     disabled={busyId === app.id}
                     onClick={() => review(app, 'approved')}
                     aria-label={t('admin.actionOn', { action: t('admin.ca.approve'), name: app.displayName })}
-                    className={`${BTN} border-white bg-white font-medium text-black hover:bg-white/85`}
+                    className={`${BTN} border-ink bg-ink font-medium text-canvas hover:bg-ink/85`}
                   >
                     {t('admin.ca.approve')}
                   </button>
@@ -197,29 +197,29 @@ export default function AdminCreatorApprovalsPage() {
         </ul>
       )}
 
-      <div className="mt-12 rounded-lg border border-white/10 bg-white/5 p-5">
+      <div className="mt-12 rounded-lg border border-line bg-ink/5 p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud">{t('admin.ca.codes.title')}</h2>
-            <p className="mt-1.5 max-w-[60ch] text-sm text-white/65">{t('admin.ca.codes.lead')}</p>
+            <h2 className="font-mono text-[11px] uppercase tracking-[0.16em] text-accent">{t('admin.ca.codes.title')}</h2>
+            <p className="mt-1.5 max-w-[60ch] text-sm text-ink-soft">{t('admin.ca.codes.lead')}</p>
           </div>
           <button
             type="button"
             disabled={creatingCode}
             onClick={generate}
-            className={`${BTN} border-hud/40 bg-hud/10 font-mono text-xs uppercase tracking-wider text-hud hover:bg-hud/20`}
+            className={`${BTN} border-accent/40 bg-accent/10 font-mono text-xs uppercase tracking-wider text-accent hover:bg-accent/20`}
           >
             {creatingCode ? t('admin.working') : t('admin.ca.codes.generate')}
           </button>
         </div>
         {codes && codes.length === 0 ? (
-          <p className="mt-4 text-sm text-white/50">{t('admin.ca.codes.empty')}</p>
+          <p className="mt-4 text-sm text-ink/50">{t('admin.ca.codes.empty')}</p>
         ) : (
           <ul className="mt-4 flex flex-wrap gap-2">
             {(codes ?? []).slice(0, 12).map((c) => (
-              <li key={c.id} className="rounded-md border border-white/15 bg-black/60 px-2.5 py-1 font-mono text-xs text-white/85">
+              <li key={c.id} className="rounded-md border border-line bg-canvas/60 px-2.5 py-1 font-mono text-xs text-ink/85">
                 <span className="select-all">{c.code}</span>{' '}
-                <span className="text-white/50">{t('admin.ca.codes.uses', { used: c.usedCount, max: c.maxUses })}</span>
+                <span className="text-ink/50">{t('admin.ca.codes.uses', { used: c.usedCount, max: c.maxUses })}</span>
               </li>
             ))}
           </ul>

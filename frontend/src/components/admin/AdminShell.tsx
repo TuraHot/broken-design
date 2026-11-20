@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Bell, Box, Flag, LayoutDashboard, LogOut, Receipt, UserCheck, Users, type LucideIcon } from 'lucide-react';
 import LanguageSwitch from '@/components/LanguageSwitch';
+import ThemeToggle from '@/components/ThemeToggle';
 import { fetchWaitingSummary, WAITING_CHANGED_EVENT, type AdminWaitingCounts } from '@/lib/admin-api';
 import { useT } from '@/lib/i18n/client';
 import type { MessageKey } from '@/lib/i18n/messages';
@@ -29,15 +30,15 @@ const TABS: { href: string; label: MessageKey; icon: LucideIcon; count?: Count }
 
 const REFRESH_MS = 60_000;
 
-const PRIMARY = 'inline-flex h-9 items-center rounded-lg bg-white px-3.5 text-[15px] font-medium text-black transition-colors hover:bg-white/85';
+const PRIMARY = 'inline-flex h-9 items-center rounded-lg bg-ink px-3.5 text-[15px] font-medium text-canvas transition-colors hover:bg-ink/85';
 const SIDE_LINK = 'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-[15px] transition-colors';
 
 function Notice({ code, text, action }: { code: string; text: string; action: React.ReactNode }) {
   return (
     <main className="grid min-h-dvh place-items-center px-4">
-      <div className="w-full max-w-md rounded-lg border border-white/10 bg-white/5 p-10 text-center">
-        <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-white/65">[ {code} ]</p>
-        <p className="mt-3 text-white/65">{text}</p>
+      <div className="w-full max-w-md rounded-lg border border-line bg-ink/5 p-10 text-center">
+        <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-ink-soft">[ {code} ]</p>
+        <p className="mt-3 text-ink-soft">{text}</p>
         <div className="mt-6 flex justify-center">{action}</div>
       </div>
     </main>
@@ -87,7 +88,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   if (!ready) {
     return (
       <main className="grid min-h-dvh place-items-center px-4">
-        <p role="status" className="text-sm text-white/65">{t('admin.loading')}</p>
+        <p role="status" className="text-sm text-ink-soft">{t('admin.loading')}</p>
       </main>
     );
   }
@@ -114,7 +115,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
           {withIcon && <Icon aria-hidden className="h-4 w-4 shrink-0" />}
           {t(label)}
           {n > 0 && (
-            <span className="ml-2 grid h-5 min-w-5 place-items-center rounded-full border border-amber/50 px-1.5 font-mono text-[11px] text-amber md:ml-auto">
+            <span className="ml-2 grid h-5 min-w-5 place-items-center rounded-full border border-warn/50 px-1.5 font-mono text-[11px] text-warn md:ml-auto">
               <span aria-hidden>{n > 99 ? '99+' : n}</span>
               <span className="sr-only">{t('admin.waitingCount', { n })}</span>
             </span>
@@ -126,28 +127,29 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   return (
     <div className="min-h-dvh">
       {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-60 flex-col border-r border-white/10 bg-black p-4 md:flex">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-60 flex-col border-r border-line bg-canvas p-4 md:flex">
         <div className="px-3 pb-6 pt-2">
-          <p className="text-base font-semibold tracking-wide text-white">Lixyte</p>
-          <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.16em] text-hud">[ {t('admin.label')} ]</p>
+          <p className="text-base font-semibold tracking-wide text-ink">Lixyte</p>
+          <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.16em] text-accent">[ {t('admin.label')} ]</p>
         </div>
 
         <nav aria-label={t('admin.navLabel')} className="grid gap-1">
           {tabLinks(
-            (active) => `${SIDE_LINK} ${active ? 'bg-white/10 text-white' : 'text-white/65 hover:bg-white/5 hover:text-white'}`,
+            (active) => `${SIDE_LINK} ${active ? 'bg-ink/10 text-ink' : 'text-ink-soft hover:bg-ink/5 hover:text-ink'}`,
             true,
           )}
         </nav>
 
-        <div className="mt-auto grid gap-1 border-t border-white/10 pt-4">
+        <div className="mt-auto grid gap-1 border-t border-line pt-4">
           <div className="px-3 pb-2">
-            <p className="truncate text-sm text-white">{name}</p>
-            {name !== session.user.email && <p className="truncate text-xs text-white/65">{session.user.email}</p>}
+            <p className="truncate text-sm text-ink">{name}</p>
+            {name !== session.user.email && <p className="truncate text-xs text-ink-soft">{session.user.email}</p>}
           </div>
-          <div className="px-3 pb-2">
+          <div className="flex items-center gap-2 px-3 pb-2">
             <LanguageSwitch />
+            <ThemeToggle />
           </div>
-          <button type="button" onClick={logOut} className={`${SIDE_LINK} text-white/65 hover:bg-white/5 hover:text-white`}>
+          <button type="button" onClick={logOut} className={`${SIDE_LINK} text-ink-soft hover:bg-ink/5 hover:text-ink`}>
             <LogOut aria-hidden className="h-4 w-4 shrink-0" />
             {t('admin.logout')}
           </button>
@@ -155,22 +157,23 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
       </aside>
 
       {/* Phone top bar */}
-      <header className="fixed inset-x-0 top-0 z-40 border-b border-white/10 bg-black/90 backdrop-blur md:hidden">
+      <header className="fixed inset-x-0 top-0 z-40 border-b border-line bg-canvas/90 backdrop-blur md:hidden">
         <div className="flex h-14 items-center gap-3 px-4">
-          <p className="text-[15px] font-semibold tracking-wide text-white">Lixyte</p>
-          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud">[ {t('admin.label')} ]</p>
+          <p className="text-[15px] font-semibold tracking-wide text-ink">Lixyte</p>
+          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-accent">[ {t('admin.label')} ]</p>
           <div className="ml-auto flex items-center gap-1">
             <LanguageSwitch />
-            <button type="button" onClick={logOut} aria-label={t('admin.logout')} className="grid h-9 w-9 place-items-center rounded-lg text-white/80 hover:text-white">
+            <ThemeToggle />
+            <button type="button" onClick={logOut} aria-label={t('admin.logout')} className="grid h-9 w-9 place-items-center rounded-lg text-ink-soft hover:text-ink">
               <LogOut aria-hidden className="h-5 w-5" />
             </button>
           </div>
         </div>
-        <nav aria-label={t('admin.navLabel')} className="flex gap-1 overflow-x-auto border-t border-white/10 px-2">
+        <nav aria-label={t('admin.navLabel')} className="flex gap-1 overflow-x-auto border-t border-line px-2">
           {tabLinks(
             (active) =>
               `-mb-px inline-flex items-center whitespace-nowrap border-b-2 px-3 py-2 text-[15px] transition-colors ${
-                active ? 'border-white text-white' : 'border-transparent text-white/65 hover:text-white'
+                active ? 'border-ink text-ink' : 'border-transparent text-ink-soft hover:text-ink'
               }`,
             false,
           )}

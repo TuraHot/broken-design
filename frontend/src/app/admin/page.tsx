@@ -10,16 +10,16 @@ import { formatCount, formatDate, formatMoney } from '@/lib/format';
 import { adminErrorText } from '@/lib/i18n/admin-error';
 import { useT } from '@/lib/i18n/client';
 
-const LABEL = 'font-mono text-[11px] uppercase tracking-[0.16em] text-white/65';
+const LABEL = 'font-mono text-[11px] uppercase tracking-[0.16em] text-ink-soft';
 
 function Panel({ title, action, children }: { title: string; action?: { href: string; label: string }; children: React.ReactNode }) {
   const id = `panel-${title.toLowerCase().replace(/\s+/g, '-')}`;
   return (
-    <section aria-labelledby={id} className="rounded-lg border border-white/10 bg-white/5 p-5">
+    <section aria-labelledby={id} className="rounded-lg border border-line bg-ink/5 p-5">
       <div className="flex items-center justify-between gap-3">
         <h2 id={id} className={LABEL}>{title}</h2>
         {action && (
-          <Link href={action.href} className="inline-flex items-center gap-1 text-sm text-white/65 transition-colors hover:text-white">
+          <Link href={action.href} className="inline-flex items-center gap-1 text-sm text-ink-soft transition-colors hover:text-ink">
             {action.label}
             <ArrowRight aria-hidden className="h-4 w-4" />
           </Link>
@@ -35,11 +35,11 @@ function Stat({ label, value, note, href }: { label: string; value: string; note
     <>
       <p className={LABEL}>{label}</p>
       <p className="mt-3 font-display text-2xl">{value}</p>
-      <p className="mt-2 min-h-5 text-sm text-white/65">{note}</p>
+      <p className="mt-2 min-h-5 text-sm text-ink-soft">{note}</p>
     </>
   );
-  const cls = 'block rounded-lg border border-white/10 bg-white/5 p-5';
-  return href ? <Link href={href} className={`${cls} transition-colors hover:border-white/30`}>{body}</Link> : <div className={cls}>{body}</div>;
+  const cls = 'block rounded-lg border border-line bg-ink/5 p-5';
+  return href ? <Link href={href} className={`${cls} transition-colors hover:border-ink/30`}>{body}</Link> : <div className={cls}>{body}</div>;
 }
 
 /** A labelled bar. The numbers are printed, so the bar is decoration. */
@@ -48,18 +48,18 @@ function Bar({ label, value, total }: { label: string; value: number; total: num
   return (
     <li>
       <div className="flex items-baseline justify-between gap-3 text-sm">
-        <span className="text-white/80">{label}</span>
-        <span className="font-mono text-[13px] text-white/65">{formatCount(value)} · {pct}%</span>
+        <span className="text-ink/80">{label}</span>
+        <span className="font-mono text-[13px] text-ink-soft">{formatCount(value)} · {pct}%</span>
       </div>
-      <div aria-hidden className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/10">
-        <div className="h-full rounded-full bg-hud/70" style={{ width: `${pct}%` }} />
+      <div aria-hidden className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-ink/10">
+        <div className="h-full rounded-full bg-accent/70" style={{ width: `${pct}%` }} />
       </div>
     </li>
   );
 }
 
 function Empty({ children }: { children: React.ReactNode }) {
-  return <p className="text-sm text-white/65">{children}</p>;
+  return <p className="text-sm text-ink-soft">{children}</p>;
 }
 
 export default function AdminOverviewPage() {
@@ -91,22 +91,22 @@ export default function AdminOverviewPage() {
 
   return (
     <div>
-      <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud">[ {t('admin.label')} ]</p>
+      <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-accent">[ {t('admin.label')} ]</p>
       <h1 className="mt-3 font-display text-[clamp(28px,4vw,48px)] uppercase leading-[1.02]">{t('admin.nav.overview')}</h1>
 
       {error && (
-        <p role="status" className="mt-8 flex items-center gap-2 text-red-300">
+        <p role="status" className="mt-8 flex items-center gap-2 text-danger">
           <AlertCircle aria-hidden className="h-4 w-4 shrink-0" />
           {error}
         </p>
       )}
-      {!data && !error && <p role="status" className="mt-8 text-sm text-white/65">{t('admin.loading')}</p>}
+      {!data && !error && <p role="status" className="mt-8 text-sm text-ink-soft">{t('admin.loading')}</p>}
 
       {data && (
         <div className="mt-8 grid grid-cols-[minmax(0,1fr)] gap-6">
           <Panel title={t('admin.ov.needs')}>
             {attention.length === 0 ? (
-              <p className="flex items-center gap-2 text-sm text-white/65">
+              <p className="flex items-center gap-2 text-sm text-ink-soft">
                 <CheckCircle2 aria-hidden className="h-4 w-4 shrink-0" />
                 {t('admin.ov.nothing')}
               </p>
@@ -114,7 +114,7 @@ export default function AdminOverviewPage() {
               <ul className="flex flex-wrap gap-3">
                 {attention.map((a) => (
                   <li key={a.href}>
-                    <Link href={a.href} className="inline-flex items-center gap-2 rounded-lg border border-amber/50 px-3 py-2 text-sm text-amber transition-colors hover:bg-white/5">
+                    <Link href={a.href} className="inline-flex items-center gap-2 rounded-lg border border-warn/50 px-3 py-2 text-sm text-warn transition-colors hover:bg-ink/5">
                       <AlertCircle aria-hidden className="h-4 w-4 shrink-0" />
                       <span><strong className="font-medium">{formatCount(a.n)}</strong> {a.text}</span>
                       <ArrowRight aria-hidden className="h-4 w-4" />
@@ -168,7 +168,7 @@ export default function AdminOverviewPage() {
                   ))}
                 </ul>
               )}
-              <p className="mt-6 text-sm text-white/65">
+              <p className="mt-6 text-sm text-ink-soft">
                 {t('admin.ov.totalsLine', { downloads: formatCount(data.totalDownloads), views: formatCount(data.totalViews) })}
               </p>
             </Panel>
@@ -183,16 +183,16 @@ export default function AdminOverviewPage() {
               {data.recentUsers.length === 0 ? (
                 <Empty>{t('admin.ov.noMembers')}</Empty>
               ) : (
-                <ul className="divide-y divide-white/10">
+                <ul className="divide-y divide-line">
                   {data.recentUsers.map((u) => (
                     <li key={u.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
                       <span className="min-w-0">
-                        <span className="block truncate text-white">{u.displayName}</span>
-                        <span className="block truncate text-white/65">{u.email}</span>
+                        <span className="block truncate text-ink">{u.displayName}</span>
+                        <span className="block truncate text-ink-soft">{u.email}</span>
                       </span>
                       <span className="flex shrink-0 items-center gap-3">
                         <Badge>{u.role}</Badge>
-                        <span className="hidden font-mono text-[13px] text-white/65 sm:inline">{formatDate(u.createdAt)}</span>
+                        <span className="hidden font-mono text-[13px] text-ink-soft sm:inline">{formatDate(u.createdAt)}</span>
                       </span>
                     </li>
                   ))}
@@ -204,15 +204,15 @@ export default function AdminOverviewPage() {
               {data.topModels.length === 0 ? (
                 <Empty>{t('admin.ov.noModels')}</Empty>
               ) : (
-                <ol className="divide-y divide-white/10">
+                <ol className="divide-y divide-line">
                   {data.topModels.map((m, i) => (
                     <li key={m.id} className="flex items-center gap-3 py-2.5 text-sm">
-                      <span className="w-5 shrink-0 font-mono text-[13px] text-white/65">{i + 1}</span>
+                      <span className="w-5 shrink-0 font-mono text-[13px] text-ink-soft">{i + 1}</span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-white">{m.title}</span>
-                        <span className="block truncate text-white/65">{t('admin.by', { name: m.ownerName })}</span>
+                        <span className="block truncate text-ink">{m.title}</span>
+                        <span className="block truncate text-ink-soft">{t('admin.by', { name: m.ownerName })}</span>
                       </span>
-                      <span className="shrink-0 text-right font-mono text-[13px] text-white/65">
+                      <span className="shrink-0 text-right font-mono text-[13px] text-ink-soft">
                         {t('admin.ov.nDownloads', { n: formatCount(m.downloadCount) })}
                       </span>
                     </li>
@@ -225,14 +225,14 @@ export default function AdminOverviewPage() {
               {data.recentPurchases.length === 0 ? (
                 <Empty>{t('admin.ov.noPurchases')}</Empty>
               ) : (
-                <ul className="divide-y divide-white/10">
+                <ul className="divide-y divide-line">
                   {data.recentPurchases.map((p) => (
                     <li key={p.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
                       <span className="min-w-0">
-                        <span className="block truncate text-white">{p.model.title}</span>
-                        <span className="block truncate text-white/65">{p.buyerName} · {formatDate(p.paidAt)}</span>
+                        <span className="block truncate text-ink">{p.model.title}</span>
+                        <span className="block truncate text-ink-soft">{p.buyerName} · {formatDate(p.paidAt)}</span>
                       </span>
-                      <span className="shrink-0 text-white/80">{formatMoney(p.amountCents, p.currency)}</span>
+                      <span className="shrink-0 text-ink/80">{formatMoney(p.amountCents, p.currency)}</span>
                     </li>
                   ))}
                 </ul>

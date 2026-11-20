@@ -5,13 +5,14 @@ import { AppError } from '../../middlewares/error.middleware';
 
 export const creatorsRouter = Router();
 
-/** Mirrors frontend `creatorHandle()` so URLs like `/creators/tomas-vega` resolve deterministically. */
+/** Mirrors frontend `creatorHandle()` so URLs like `/creators/tomas-vega` and Thai handles resolve deterministically. */
 export function toCreatorHandle(name: string): string {
   return name
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
+    .normalize('NFC')
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/[^\p{L}\p{M}\p{N}]+/gu, '-')
     .replace(/^-+|-+$/g, '');
 }
 
@@ -22,7 +23,7 @@ function buildAvatarUrl(userId: string, avatarHash?: string | null): string | un
 
 // GET /api/creators/:handle — public creator profile + all visible models (works even for creators with 0 models or >100 total catalog models)
 creatorsRouter.get('/:handle', async (req, res) => {
-  const targetHandle = String(req.params.handle || '').trim().toLowerCase();
+  const targetHandle = String(req.params.handle || '').normalize('NFC').trim().toLowerCase();
   if (!targetHandle || targetHandle.length > 120) {
     throw new AppError(404, 'CREATOR_NOT_FOUND', 'Creator not found');
   }

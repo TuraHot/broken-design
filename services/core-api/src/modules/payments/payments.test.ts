@@ -345,15 +345,16 @@ test('POST /api/purchases/:id/confirm-mock - confirms payment and changes status
   }
 });
 
-test('POST /api/purchases/:id/confirm-mock - prevents duplicate confirmation (cannot get new key)', async () => {
+test('POST /api/purchases/:id/confirm-mock - prevents duplicate confirmation and blocks unavailable models', async () => {
   const originalQuery = db.query.bind(db);
+  let checkRow: any = { status: 'paid', deleted_at: null, hidden_at: null, owner_suspended_at: null };
   (db as any).query = async (sql: string) => {
     if (sql.includes('suspended_at') && sql.includes('FROM users WHERE id = $1')) return { rowCount: 1, rows: [{ suspended_at: null, role: 'user' }] };
     if (sql.includes('UPDATE purchases')) {
       return { rowCount: 0, rows: [] };
     }
-    if (sql.includes('SELECT status FROM purchases WHERE id = $1 AND user_id = $2')) {
-      return { rowCount: 1, rows: [{ status: 'paid' }] };
+    if (sql.includes('SELECT p.status') && sql.includes('FROM purchases p')) {
+      return { rowCount: 1, rows: [checkRow] };
     }
     return { rowCount: 0, rows: [] };
   };
@@ -368,6 +369,15 @@ test('POST /api/purchases/:id/confirm-mock - prevents duplicate confirmation (ca
     assert.equal(res.status, 409);
     const body = await res.json();
     assert.equal(body.error?.code, 'ALREADY_PAID');
+
+    // Pending purchase whose model was hidden or owner suspended before confirmation -> 400 MODEL_UNAVAILABLE
+    checkRow = { status: 'pending', deleted_at: null, hidden_at: '2026-11-20T00:00:00.000Z', owner_suspended_at: null };
+    const unavailableRes = await fetch(`http://localhost:${port}/api/purchases/${PURCHASE_1}/confirm-mock`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${makeToken()}` },
+    });
+    assert.equal(unavailableRes.status, 400);
+    assert.equal((await unavailableRes.json()).error?.code, 'MODEL_UNAVAILABLE');
   } finally {
     server.close();
     db.query = originalQuery;

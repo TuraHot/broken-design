@@ -190,21 +190,35 @@ paymentsRouter.post('/purchases/:id/confirm-mock', requireAuth, requireMockProvi
   requireUuid(purchaseId);
 
   const result = await db.query(
-    `UPDATE purchases
+    `UPDATE purchases p
      SET status = 'paid', paid_at = NOW()
-     WHERE id = $1 AND user_id = $2 AND status = 'pending'
-     RETURNING id, model_id, embed_key, amount_cents, currency, license_type, paid_at`,
+     FROM models m
+     LEFT JOIN users o ON o.id = m.owner_id
+     WHERE p.id = $1 AND p.user_id = $2 AND p.status = 'pending'
+       AND m.id = p.model_id
+       AND m.deleted_at IS NULL AND m.hidden_at IS NULL AND o.suspended_at IS NULL
+     RETURNING p.id, p.model_id, p.embed_key, p.amount_cents, p.currency, p.license_type, p.paid_at`,
     [purchaseId, userId],
   );
 
   if (result.rowCount === 0) {
-    // อาจจ่ายไปแล้ว หรือไม่ใช่ของตัวเอง
+    // อาจจ่ายไปแล้ว, โมเดลถูกซ่อน/ลบ/เจ้าของถูกระงับ, หรือไม่ใช่ของตัวเอง
     const check = await db.query(
-      `SELECT status FROM purchases WHERE id = $1 AND user_id = $2`,
+      `SELECT p.status, m.deleted_at, m.hidden_at, o.suspended_at AS owner_suspended_at
+       FROM purchases p
+       LEFT JOIN models m ON m.id = p.model_id
+       LEFT JOIN users o ON o.id = m.owner_id
+       WHERE p.id = $1 AND p.user_id = $2`,
       [purchaseId, userId],
     );
-    if (check.rowCount! > 0 && check.rows[0].status === 'paid') {
-      throw new AppError(409, 'ALREADY_PAID', 'This purchase has already been paid');
+    if (check.rowCount! > 0) {
+      const row = check.rows[0];
+      if (row.status === 'paid') {
+        throw new AppError(409, 'ALREADY_PAID', 'This purchase has already been paid');
+      }
+      if (row.deleted_at || row.hidden_at || row.owner_suspended_at) {
+        throw new AppError(400, 'MODEL_UNAVAILABLE', 'This model is no longer available');
+      }
     }
     throw new AppError(404, 'PURCHASE_NOT_FOUND', 'Purchase not found');
   }
@@ -229,28 +243,42 @@ paymentsRouter.post('/models/:id/pay-mock', requireAuth, requireMockProvider, re
   requireUuid(modelId);
 
   const result = await db.query(
-    `UPDATE purchases
+    `UPDATE purchases p
      SET status = 'paid', paid_at = NOW()
-     WHERE model_id = $1 AND user_id = $2 AND status = 'pending'
-     RETURNING id, model_id, embed_key, amount_cents, currency, license_type, paid_at`,
+     FROM models m
+     LEFT JOIN users o ON o.id = m.owner_id
+     WHERE p.model_id = $1 AND p.user_id = $2 AND p.status = 'pending'
+       AND m.id = p.model_id
+       AND m.deleted_at IS NULL AND m.hidden_at IS NULL AND o.suspended_at IS NULL
+     RETURNING p.id, p.model_id, p.embed_key, p.amount_cents, p.currency, p.license_type, p.paid_at`,
     [modelId, userId],
   );
 
   if (result.rowCount === 0) {
     const check = await db.query(
-      `SELECT id, model_id, embed_key, status, paid_at FROM purchases WHERE model_id = $1 AND user_id = $2`,
+      `SELECT p.id, p.model_id, p.embed_key, p.status, p.paid_at,
+              m.deleted_at, m.hidden_at, o.suspended_at AS owner_suspended_at
+       FROM purchases p
+       LEFT JOIN models m ON m.id = p.model_id
+       LEFT JOIN users o ON o.id = m.owner_id
+       WHERE p.model_id = $1 AND p.user_id = $2`,
       [modelId, userId],
     );
-    if (check.rowCount! > 0 && check.rows[0].status === 'paid') {
-      const paidRow = check.rows[0];
-      res.json({
-        message: 'Payment already confirmed',
-        purchaseId: paidRow.id,
-        modelId: paidRow.model_id,
-        embedKey: paidRow.embed_key,
-        paidAt: paidRow.paid_at,
-      });
-      return;
+    if (check.rowCount! > 0) {
+      const row = check.rows[0];
+      if (row.status === 'paid') {
+        res.json({
+          message: 'Payment already confirmed',
+          purchaseId: row.id,
+          modelId: row.model_id,
+          embedKey: row.embed_key,
+          paidAt: row.paid_at,
+        });
+        return;
+      }
+      if (row.deleted_at || row.hidden_at || row.owner_suspended_at) {
+        throw new AppError(400, 'MODEL_UNAVAILABLE', 'This model is no longer available');
+      }
     }
     throw new AppError(404, 'PURCHASE_NOT_FOUND', 'Pending purchase not found for this model');
   }

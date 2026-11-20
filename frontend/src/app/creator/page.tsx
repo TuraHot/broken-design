@@ -1,5 +1,4 @@
-// Creator landing — what you can do as a creator, with an interactive 3D model preview and a Get started button.
-// Content only: nothing here calls an API (auth and upload are not connected yet).
+// Creator landing — what you can do as a creator, interactive 3D preview, and 2-step creator application CTA.
 import type { Metadata } from 'next';
 import { CodeXml, Coins, LayoutDashboard, Scale, Upload, Zap, type LucideIcon } from 'lucide-react';
 import SectionHeading from '@/components/landing/SectionHeading';
@@ -128,28 +127,6 @@ export default async function CreatorPage() {
             ))}
           </ol>
         </section>
-
-        {/* <section
-          aria-label="Become a creator"
-          className="border border-hud/40 bg-[rgba(4,8,18,0.66)] p-6 backdrop-blur-sm md:p-10"
-          style={{ clipPath: HUD_CLIP }}
-        >
-          <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70">[ Join ]</p>
-              <h2 className="mt-3 font-display text-[clamp(20px,2.6vw,30px)] uppercase leading-snug text-white">
-                Ready to publish?
-              </h2>
-              <p className="mt-3 max-w-[52ch] text-[15px] leading-relaxed text-white/65">
-                Create a free account and upload your first model in minutes.
-              </p>
-            </div>
-            <Link href="/login" className={`${GET_STARTED} shrink-0 self-start md:self-auto`}>
-              Get started
-              <ArrowRight aria-hidden className="h-4 w-4" />
-            </Link>
-          </div>
-        </section> */}
       </div>
     </main>
   );

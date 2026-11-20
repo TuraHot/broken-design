@@ -41,19 +41,6 @@ export function initSocketServer(httpServer: HTTPServer): SocketIOServer {
       console.log(`[Socket.IO] Guest connected (socket ${socket.id})`);
     }
 
-    // Client can join a specific model room to listen for live updates
-    socket.on('join:model', (modelId: string) => {
-      if (typeof modelId === 'string' && modelId.trim()) {
-        socket.join(`model:${modelId.trim()}`);
-      }
-    });
-
-    socket.on('leave:model', (modelId: string) => {
-      if (typeof modelId === 'string' && modelId.trim()) {
-        socket.leave(`model:${modelId.trim()}`);
-      }
-    });
-
     socket.on('disconnect', () => {
       if (userId) {
         console.log(`[Socket.IO] User disconnected: ${userId}`);

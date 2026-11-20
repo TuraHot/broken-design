@@ -1,4 +1,4 @@
-// Text of the buying flow: /checkout/[id], /checkout/success and /pay/mock/[id].
+// Text of the buying flow: /checkout/[id] and /checkout/success.
 export const payEn = {
   'pay.loadingCheckout': 'Loading checkout…',
   'pay.loadingConfirm': 'Loading purchase confirmation…',
@@ -62,31 +62,14 @@ export const payEn = {
   'pay.success.webComponent': 'Web Component (<vm-model>)',
   'pay.success.iframe': 'Iframe',
 
-  // mock pay
+  // mock pay (used on /checkout/[id] when PAYMENT_PROVIDER=mock)
   'pay.mock.alreadyPaid': 'Already Paid',
   'pay.mock.alreadyBody': 'This order ({amount}) was already confirmed on {date}.',
   'pay.mock.viewKey': 'View Embed Key',
-  'pay.mock.back': 'Back to model',
-  'pay.mock.label': '[ Mock Payment ]',
-  'pay.mock.title': 'Complete Purchase',
-  'pay.mock.lead': 'Sandbox checkout for Lixyte. No real card or bank charge will be made.',
   'pay.mock.testPay': 'Mock Test Payment',
   'pay.mock.testMode': 'Test Mode',
-  'pay.mock.unlock1': 'Confirming this payment unlocks your unique',
-  'pay.mock.unlock2': 'and watermarked',
-  'pay.mock.unlock3': 'download immediately.',
   'pay.mock.orderId': 'Order ID',
-  'pay.mock.created': 'Created',
-  'pay.mock.status': 'Status',
-  'pay.mock.confirming': 'Confirming Payment…',
   'pay.mock.confirmPay': 'Confirm & Pay {price}',
-  'pay.mock.cancel': 'Cancel',
-  'pay.mock.summary': '[ Order Summary ]',
-  'pay.mock.single': 'Single-item license',
-  'pay.mock.locked': 'Price & license are locked at checkout.',
-  'pay.status.pending': 'Pending',
-  'pay.status.paid': 'Paid',
-  'pay.status.failed': 'Failed',
 } as const;
 
 export const payTh: Record<keyof typeof payEn, string> = {
@@ -154,25 +137,8 @@ export const payTh: Record<keyof typeof payEn, string> = {
   'pay.mock.alreadyPaid': 'ชำระแล้ว',
   'pay.mock.alreadyBody': 'คำสั่งซื้อนี้ ({amount}) ยืนยันแล้วเมื่อ {date}',
   'pay.mock.viewKey': 'ดู embed key',
-  'pay.mock.back': 'กลับไปหน้าโมเดล',
-  'pay.mock.label': '[ ชำระเงินจำลอง ]',
-  'pay.mock.title': 'ชำระเงินให้เสร็จสิ้น',
-  'pay.mock.lead': 'หน้าชำระเงินแบบทดลองของ Lixyte ไม่มีการตัดบัตรหรือเงินจริง',
   'pay.mock.testPay': 'การชำระเงินทดสอบจำลอง',
   'pay.mock.testMode': 'โหมดทดสอบ',
-  'pay.mock.unlock1': 'เมื่อยืนยันการชำระเงิน คุณจะได้',
-  'pay.mock.unlock2': 'เฉพาะของคุณ และไฟล์',
-  'pay.mock.unlock3': 'ที่ฝังลายน้ำ ทันที',
   'pay.mock.orderId': 'รหัสคำสั่งซื้อ',
-  'pay.mock.created': 'สร้างเมื่อ',
-  'pay.mock.status': 'สถานะ',
-  'pay.mock.confirming': 'กำลังยืนยันการชำระเงิน…',
   'pay.mock.confirmPay': 'ยืนยันและชำระ {price}',
-  'pay.mock.cancel': 'ยกเลิก',
-  'pay.mock.summary': '[ สรุปคำสั่งซื้อ ]',
-  'pay.mock.single': 'สัญญาอนุญาตแบบชิ้นเดียว',
-  'pay.mock.locked': 'ราคาและสัญญาอนุญาตถูกล็อกตั้งแต่ตอนชำระเงิน',
-  'pay.status.pending': 'รอดำเนินการ',
-  'pay.status.paid': 'ชำระแล้ว',
-  'pay.status.failed': 'ล้มเหลว',
 };

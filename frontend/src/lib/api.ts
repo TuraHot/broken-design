@@ -1,5 +1,5 @@
 import { cache } from 'react';
-import { buildProfile, creatorHandle, type CreatorProfile } from './creators';
+import type { CreatorProfile } from './creators';
 import { isPublicModel, PAGE_SIZE, queryModels } from './pagination';
 import {
   GALLERY_TAGS,
@@ -38,23 +38,6 @@ function buildModelSearchParams(params: ModelsParams, pageSize?: number): URLSea
   if (params.page) sp.set('page', String(params.page));
   if (pageSize) sp.set('pageSize', String(pageSize));
   return sp;
-}
-
-const fetchCoreApiModelsCached = cache(async (query: string): Promise<Model[]> => {
-  try {
-    const url = `${getServerCoreApiUrl()}/api/models${query ? `?${query}` : ''}`;
-    const res = await fetch(url, { cache: 'no-store' });
-    if (!res.ok) return [];
-    const data = (await res.json()) as Partial<ModelsPage>;
-    return Array.isArray(data.items) ? data.items.filter(isPublicModel) : [];
-  } catch {
-    return [];
-  }
-});
-
-export async function fetchCoreApiModels(params: ModelsParams = {}, pageSize = 100): Promise<Model[]> {
-  const query = buildModelSearchParams(params, pageSize).toString();
-  return fetchCoreApiModelsCached(query);
 }
 
 const fetchCoreApiModelById = cache(async (id: string, trackView = false): Promise<Model | null> => {
@@ -133,35 +116,27 @@ export async function fetchModel(id: string, trackView = false): Promise<Model |
 
 /** Other models by the same creator (most popular first), for the "More from" row. */
 export async function fetchMoreFromCreator(model: Model, limit = 4): Promise<Model[]> {
-  if (model.ownerId && UUID_RE.test(model.ownerId)) {
-    try {
-      const sp = new URLSearchParams({
-        ownerId: model.ownerId,
-        pageSize: String(limit + 1),
-      });
-      const res = await fetch(`${getServerCoreApiUrl()}/api/models?${sp}`, { cache: 'no-store' });
-      if (res.ok) {
-        const data = (await res.json()) as Partial<ModelsPage>;
-        if (Array.isArray(data.items)) {
-          return queryModels(
-            data.items.filter((m) => isPublicModel(m) && m.id !== model.id),
-            {},
-            limit,
-          ).items;
-        }
+  if (!model.ownerId || !UUID_RE.test(model.ownerId)) return [];
+  try {
+    const sp = new URLSearchParams({
+      ownerId: model.ownerId,
+      pageSize: String(limit + 1),
+    });
+    const res = await fetch(`${getServerCoreApiUrl()}/api/models?${sp}`, { cache: 'no-store' });
+    if (res.ok) {
+      const data = (await res.json()) as Partial<ModelsPage>;
+      if (Array.isArray(data.items)) {
+        return queryModels(
+          data.items.filter((m) => isPublicModel(m) && m.id !== model.id),
+          {},
+          limit,
+        ).items;
       }
-    } catch {
-      // Fall back to empty list if Core API is offline
     }
-    return [];
+  } catch {
+    // Core API offline
   }
-
-  const apiModels = await fetchCoreApiModels();
-  return queryModels(
-    apiModels.filter((m) => m.creator === model.creator && m.id !== model.id),
-    {},
-    limit,
-  ).items;
+  return [];
 }
 
 /** A creator profile by handle (calls GET /api/creators/:handle directly, works even with 0 models or >100 total models). */
@@ -169,14 +144,9 @@ export async function fetchCreator(handle: string): Promise<CreatorProfile | nul
   try {
     const res = await fetch(`${getServerCoreApiUrl()}/api/creators/${encodeURIComponent(handle)}`, { cache: 'no-store' });
     if (res.ok) return (await res.json()) as CreatorProfile;
-    if (res.status === 404) return null;
   } catch {
-    // Fallback below if Core API is temporarily unavailable
+    // Core API offline
   }
-
-  const apiModels = await fetchCoreApiModels();
-  const mine = apiModels.filter((m) => creatorHandle(m.creator) === handle);
-  if (mine.length > 0) return buildProfile(mine[0].creator, mine);
   return null;
 }
 
@@ -258,11 +228,6 @@ export async function createQrPayment(purchaseId: string, token: string): Promis
   return coreApiFetch<QrPaymentResponse>(`/api/purchases/${encodeURIComponent(purchaseId)}/qr`, token, {
     method: 'POST',
   });
-}
-
-/** Enable seller mode for user (`POST /api/seller/enable`). */
-export async function enableSellerMode(token: string): Promise<void> {
-  await coreApiFetch('/api/seller/enable', token, { method: 'POST' });
 }
 
 export interface CreatorApplication {
@@ -394,6 +359,9 @@ export interface NoticeItem {
     model_title?: string;
     message?: string;
     adminNote?: string | null;
+    netAmountCents?: number;
+    currency?: string;
+    payoutMethod?: string;
   };
   readAt: string | null;
   createdAt: string;

@@ -3,7 +3,7 @@
 // The text of one notice (what happened and the admin's reason). Used by the notices box on the dashboards
 // and by the bell in the Navbar, so both show the same words in the same language.
 import type { NoticeItem } from '@/lib/api';
-import { formatDate } from '@/lib/format';
+import { formatDate, formatMoney } from '@/lib/format';
 import { useT } from '@/lib/i18n/client';
 
 export default function NoticeContent({ n }: { n: NoticeItem }) {
@@ -81,6 +81,26 @@ export default function NoticeContent({ n }: { n: NoticeItem }) {
           {t(n.kind === 'creator_application_approved' ? 'notice.creatorApproved' : 'notice.creatorRejected')}
         </p>
         {reason(n.data.adminNote ?? n.data.reason)}
+      </>
+    );
+  }
+
+  if (
+    n.kind === 'withdrawal_approved' ||
+    n.kind === 'withdrawal_paid' ||
+    n.kind === 'withdrawal_rejected'
+  ) {
+    const amount = formatMoney(Number(n.data.netAmountCents ?? 0), n.data.currency || 'USD');
+    const key =
+      n.kind === 'withdrawal_approved'
+        ? 'notice.withdrawalApproved'
+        : n.kind === 'withdrawal_paid'
+          ? 'notice.withdrawalPaid'
+          : 'notice.withdrawalRejected';
+    return (
+      <>
+        <p className="mt-2 text-sm text-ink">{t(key, { amount })}</p>
+        {reason(n.data.reason)}
       </>
     );
   }

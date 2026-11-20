@@ -15,8 +15,17 @@ export function assertProductionSecrets(nodeEnv = process.env.NODE_ENV, rawJwtSe
 
 assertProductionSecrets();
 
+function parseTrustProxy(raw?: string): boolean | number | string {
+  const v = (raw ?? '').trim().toLowerCase();
+  if (!v || v === '0' || v === 'false') return false;
+  if (v === 'true') return true;
+  const n = Number(v);
+  return Number.isInteger(n) && n > 0 ? n : v;
+}
+
 export const env = {
   port: Number(process.env.PORT) || 4000,
+  trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
   databaseUrl: process.env.DATABASE_URL || '',
   jwtSecret: process.env.JWT_SECRET || DEFAULT_DEV_JWT_SECRET,
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',

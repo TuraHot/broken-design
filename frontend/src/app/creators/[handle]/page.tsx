@@ -6,14 +6,22 @@ import { fetchCreator } from '@/lib/api';
 
 type Props = { params: Promise<{ handle: string }> };
 
+function decodeHandle(raw: string): string {
+  try {
+    return decodeURIComponent(raw).normalize('NFC');
+  } catch {
+    return raw.normalize('NFC');
+  }
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { handle } = await params;
+  const handle = decodeHandle((await params).handle);
   const creator = await fetchCreator(handle);
   return { title: creator ? `${creator.name} — Lixyte` : `@${handle} — Lixyte` };
 }
 
 export default async function CreatorProfilePage({ params }: Props) {
-  const { handle } = await params;
+  const handle = decodeHandle((await params).handle);
   const creator = await fetchCreator(handle);
 
   return <CreatorProfileClient handle={handle} initialCreator={creator} />;

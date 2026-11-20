@@ -7,7 +7,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Box, Flag, LayoutDashboard, LogOut, Receipt, Users, type LucideIcon } from 'lucide-react';
+import { Box, Flag, LayoutDashboard, LogOut, Receipt, Users, Wallet, type LucideIcon } from 'lucide-react';
 import LanguageSwitch from '@/components/LanguageSwitch';
 import { useT } from '@/lib/i18n/client';
 import type { MessageKey } from '@/lib/i18n/messages';
@@ -18,6 +18,7 @@ const TABS: { href: string; label: MessageKey; icon: LucideIcon }[] = [
   { href: '/admin/models', label: 'admin.nav.models', icon: Box },
   { href: '/admin/users', label: 'admin.nav.users', icon: Users },
   { href: '/admin/purchases', label: 'admin.nav.purchases', icon: Receipt },
+  { href: '/admin/withdrawals', label: 'admin.nav.withdrawals', icon: Wallet },
   { href: '/admin/complaints', label: 'admin.nav.complaints', icon: Flag },
 ];
 

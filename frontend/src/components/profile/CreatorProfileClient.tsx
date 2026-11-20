@@ -104,13 +104,8 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
     try {
       setBusyAction(`edit-${editingModel.id}`);
       setStatusMsg(null);
-      const res = await updateSellerModel(editingModel.id, token, {
-        title: editTitle.trim(),
-        description: editDescription.trim(),
-        priceCents,
-        license: editLicense,
-      });
 
+      // Upload replacement assets first so adding a preview GLB succeeds before setting a paid price (PREVIEW_REQUIRED).
       let nextPosterUrl = editingModel.posterUrl;
       if (editMainFile || editPreviewFile || editPosterFile) {
         const assetRes = await replaceModelAssets(editingModel.id, token, {
@@ -122,6 +117,13 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
           nextPosterUrl = `${CDN_SERVICE_URL}/cdn/models/${editingModel.id}/poster.webp?v=${Date.now()}`;
         }
       }
+
+      const res = await updateSellerModel(editingModel.id, token, {
+        title: editTitle.trim(),
+        description: editDescription.trim(),
+        priceCents,
+        license: editLicense,
+      });
 
       setModels((prev) =>
         prev.map((item) =>

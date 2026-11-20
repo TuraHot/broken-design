@@ -11,6 +11,10 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const DEFAULT_PAGE_SIZE = 48;
 const MAX_PAGE_SIZE = 100;
 
+function likePattern(q: string): string {
+  return `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+}
+
 interface ModelRow {
   id: string;
   owner_id: string;
@@ -97,8 +101,8 @@ modelsRouter.get('/', async (req, res, next) => {
     }
 
     if (q) {
-      params.push(`%${q}%`);
-      conditions.push(`(m.title ILIKE $${params.length} OR m.description ILIKE $${params.length})`);
+      params.push(likePattern(q));
+      conditions.push(`(m.title ILIKE $${params.length} ESCAPE '\\' OR m.description ILIKE $${params.length} ESCAPE '\\')`);
     }
 
     if (tag) {

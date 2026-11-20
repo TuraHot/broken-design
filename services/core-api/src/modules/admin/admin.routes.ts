@@ -951,3 +951,160 @@ adminRouter.post('/invite-codes', async (req, res) => {
     throw err;
   }
 });
+
+// ─── Creator Withdrawals (Admin Payout Review) ──────────────────────────────
+
+const WITHDRAWAL_STATUSES = ['pending', 'approved', 'paid', 'rejected'] as const;
+const withdrawalStatusQuery = z.enum(WITHDRAWAL_STATUSES).optional();
+const updateWithdrawalBody = z.object({
+  status: z.enum(['approved', 'paid', 'rejected']),
+  reason: z.string().trim().max(500).optional(),
+});
+
+adminRouter.get('/withdrawals', async (req, res) => {
+  const { page, pageSize, offset, q } = parsePaging(req.query);
+  const status = withdrawalStatusQuery.safeParse(req.query.status || undefined);
+  if (!status.success) {
+    throw new AppError(400, 'INVALID_QUERY', 'Unknown withdrawal status');
+  }
+
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+  if (status.data) {
+    params.push(status.data);
+    conditions.push(`w.status = $${params.length}`);
+  }
+  if (q) {
+    params.push(likePattern(q));
+    const n = params.length;
+    conditions.push(
+      `(u.display_name ILIKE $${n} ESCAPE '\\' OR u.email ILIKE $${n} ESCAPE '\\' OR w.payout_account ILIKE $${n} ESCAPE '\\')`,
+    );
+  }
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  const joins = `FROM creator_withdrawals w JOIN users u ON u.id = w.seller_id`;
+
+  const [total, rows] = await Promise.all([
+    db.query(`SELECT COUNT(*)::int AS total ${joins} ${where}`, params),
+    db.query(
+      `SELECT w.id, w.seller_id, w.gross_amount_cents, w.platform_fee_cents, w.net_amount_cents,
+              w.fee_rate_bps, w.currency, w.payout_method, w.payout_account, w.status,
+              w.created_at, w.processed_at,
+              u.display_name AS seller_name, u.email AS seller_email
+       ${joins}
+       ${where}
+       ORDER BY CASE w.status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END, w.created_at DESC
+       LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+      [...params, pageSize, offset],
+    ),
+  ]);
+
+  res.json({
+    items: rows.rows.map((w) => ({
+      id: w.id,
+      grossAmountCents: Number(w.gross_amount_cents),
+      platformFeeCents: Number(w.platform_fee_cents),
+      netAmountCents: Number(w.net_amount_cents),
+      feeRateBps: Number(w.fee_rate_bps),
+      currency: w.currency,
+      payoutMethod: w.payout_method,
+      payoutAccount: w.payout_account,
+      status: w.status,
+      createdAt: w.created_at,
+      processedAt: w.processed_at,
+      seller: {
+        id: w.seller_id,
+        displayName: w.seller_name,
+        email: w.seller_email,
+      },
+    })),
+    page,
+    pageSize,
+    total: total.rows[0].total,
+  });
+});
+
+adminRouter.patch('/withdrawals/:id', async (req, res) => {
+  const id = String(req.params.id);
+  requireUuid(id);
+
+  const parsed = updateWithdrawalBody.safeParse(req.body);
+  if (!parsed.success) {
+    throw new AppError(
+      400,
+      'INVALID_BODY',
+      'Body must be { "status": "approved" | "paid" | "rejected", "reason"?: string }',
+    );
+  }
+  const { status } = parsed.data;
+  const reason = parsed.data.reason ? parsed.data.reason : null;
+
+  // Atomic CTE: lock withdrawal row, validate transition (pending -> approved/paid/rejected; approved -> paid/rejected),
+  // update status/processed_at, and notify the creator. Rejecting automatically restores balance in getSellerWalletTotals.
+  const result = await db.query<{
+    found: number;
+    prev_status: string | null;
+    id: string | null;
+    status: string | null;
+    processed_at: string | null;
+  }>(
+    `WITH target AS (
+       SELECT id, seller_id, net_amount_cents, currency, payout_method, status
+       FROM creator_withdrawals
+       WHERE id = $1
+       FOR UPDATE
+     ),
+     upd AS (
+       UPDATE creator_withdrawals w
+       SET status = $2::varchar,
+           processed_at = CASE WHEN $2::varchar IN ('paid', 'rejected') THEN NOW() ELSE w.processed_at END
+       FROM target t
+       WHERE w.id = t.id
+         AND (
+           (t.status = 'pending' AND $2::varchar IN ('approved', 'paid', 'rejected'))
+           OR (t.status = 'approved' AND $2::varchar IN ('paid', 'rejected'))
+         )
+       RETURNING w.id, w.seller_id, w.net_amount_cents, w.currency, w.payout_method, w.status, w.processed_at
+     ),
+     note AS (
+       INSERT INTO notifications (user_id, kind, data)
+       SELECT u.seller_id,
+              ('withdrawal_' || u.status)::varchar,
+              jsonb_build_object(
+                'netAmountCents', u.net_amount_cents,
+                'currency', u.currency,
+                'payoutMethod', u.payout_method,
+                'reason', $3::text
+              )
+       FROM upd u
+       RETURNING id
+     )
+     SELECT
+       (SELECT COUNT(*) FROM target)::int AS found,
+       (SELECT status FROM target) AS prev_status,
+       u.id,
+       u.status,
+       u.processed_at
+     FROM (SELECT 1) _row
+     LEFT JOIN upd u ON TRUE`,
+    [id, status, reason],
+  );
+
+  const row = result.rows[0];
+  if (!row || row.found === 0) {
+    throw new AppError(404, 'WITHDRAWAL_NOT_FOUND', 'Withdrawal request not found');
+  }
+  if (!row.id) {
+    throw new AppError(
+      409,
+      'INVALID_TRANSITION',
+      `Cannot change withdrawal from "${row.prev_status}" to "${status}"`,
+    );
+  }
+
+  res.json({
+    id: row.id,
+    status: row.status,
+    processedAt: row.processed_at,
+  });
+});

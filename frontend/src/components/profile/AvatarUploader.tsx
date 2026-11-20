@@ -25,7 +25,9 @@ export default function AvatarUploader({
   const [busy, setBusy] = useState(false);
   const t = useT();
   // Either a key of ours or an error from the server; both are turned into text when drawn, so they follow the language.
-  const [error, setError] = useState<{ key: MessageKey } | { err: unknown } | null>(null);
+  const [error, setError] = useState<
+    { key: MessageKey } | { err: unknown } | null
+  >(null);
   const busyRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -44,9 +46,7 @@ export default function AvatarUploader({
       return;
     }
 
-    const token =
-      readSession()?.token ||
-      (typeof window !== "undefined" ? readSession()?.token ?? null : null);
+    const token = readSession()?.token ?? null;
     if (!token) {
       setError({ key: "avatar.errLogin" });
       if (inputRef.current) inputRef.current.value = "";
@@ -75,22 +75,6 @@ export default function AvatarUploader({
       <div className="flex items-center gap-3">
         <div className="relative">
           <UserAvatar name={name} avatarUrl={avatarUrl} size={size} />
-          <button
-            type="button"
-            disabled={busy}
-            onClick={pickFile}
-            aria-label={avatarUrl ? t('avatar.change') : t('avatar.upload')}
-            className="absolute -bottom-1 -right-1 grid h-7 w-7 place-items-center rounded-full border border-hud/60 bg-black text-hud transition-colors hover:border-white hover:text-white disabled:cursor-wait disabled:opacity-60"
-          >
-            {busy ? (
-              <Loader2
-                aria-hidden
-                className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none"
-              />
-            ) : (
-              <Camera aria-hidden className="h-3.5 w-3.5" />
-            )}
-          </button>
         </div>
 
         <input
@@ -108,7 +92,11 @@ export default function AvatarUploader({
           className="inline-flex items-center gap-1.5 text-xs text-red-300"
         >
           <AlertCircle aria-hidden className="h-3.5 w-3.5 shrink-0" />
-          <span>{'key' in error ? t(error.key) : authErrorText(error.err, t, 'avatar.errUpload')}</span>
+          <span>
+            {"key" in error
+              ? t(error.key)
+              : authErrorText(error.err, t, "avatar.errUpload")}
+          </span>
         </p>
       )}
     </div>

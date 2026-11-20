@@ -5,10 +5,12 @@ import { app } from '../../app';
 import { db } from '../../config/db';
 import { toCreatorHandle } from './creators.routes';
 
-test('toCreatorHandle normalizes accents, spaces, and punctuation', () => {
+test('toCreatorHandle normalizes accents, spaces, punctuation, and preserves Thai/Unicode names', () => {
   assert.equal(toCreatorHandle('Tomás Vega'), 'tomas-vega');
   assert.equal(toCreatorHandle('Demo Creator'), 'demo-creator');
   assert.equal(toCreatorHandle('  Studio_3D!!  '), 'studio-3d');
+  assert.equal(toCreatorHandle('สมชาย ใจดี'), 'สมชาย-ใจดี');
+  assert.equal(toCreatorHandle('ภีม 3D'), 'ภีม-3d');
 });
 
 test('GET /api/creators/:handle - returns profile for newly approved creator even with 0 models', async () => {

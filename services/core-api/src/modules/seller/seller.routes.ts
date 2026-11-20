@@ -148,7 +148,7 @@ sellerRouter.get('/status', requireAuth, async (req, res) => {
 
 type Queryable = Pick<typeof db, 'query'>;
 
-async function getSellerAvailableGrossCents(sellerId: string, runner: Queryable = db): Promise<number> {
+async function getSellerWalletTotals(sellerId: string, runner: Queryable = db) {
   const earnedRes = await runner.query(
     `SELECT COALESCE(SUM(COALESCE(NULLIF(p.amount_cents, 0), m.price_cents)), 0) AS gross_earned
      FROM purchases p
@@ -162,9 +162,10 @@ async function getSellerAvailableGrossCents(sellerId: string, runner: Queryable 
      WHERE seller_id = $1 AND status IN ('pending', 'approved', 'paid')`,
     [sellerId],
   );
-  const grossEarned = Number(earnedRes.rows[0]?.gross_earned ?? 0);
-  const grossWithdrawn = Number(withdrawnRes.rows[0]?.gross_withdrawn ?? 0);
-  return Math.max(0, grossEarned - grossWithdrawn);
+  const grossEarnedCents = Number(earnedRes.rows[0]?.gross_earned ?? 0);
+  const withdrawnGrossCents = Number(withdrawnRes.rows[0]?.gross_withdrawn ?? 0);
+  const availableGrossCents = Math.max(0, grossEarnedCents - withdrawnGrossCents);
+  return { grossEarnedCents, withdrawnGrossCents, availableGrossCents };
 }
 
 // ─── 5. GET /api/seller/wallet ──────────────────────────────────────────────
@@ -172,31 +173,17 @@ async function getSellerAvailableGrossCents(sellerId: string, runner: Queryable 
 sellerRouter.get('/wallet', requireAuth, requireActiveSeller, async (req, res) => {
   const userId = req.user!.id;
 
-  const earnedRes = await db.query(
-    `SELECT COALESCE(SUM(COALESCE(NULLIF(p.amount_cents, 0), m.price_cents)), 0) AS gross_earned
-     FROM purchases p
-     JOIN models m ON m.id = p.model_id
-     WHERE m.owner_id = $1 AND p.status = 'paid'`,
-    [userId],
-  );
-  const withdrawnRes = await db.query(
-    `SELECT COALESCE(SUM(gross_amount_cents), 0) AS gross_withdrawn
-     FROM creator_withdrawals
-     WHERE seller_id = $1 AND status IN ('pending', 'approved', 'paid')`,
-    [userId],
-  );
-  const historyRes = await db.query(
-    `SELECT id, gross_amount_cents, platform_fee_cents, net_amount_cents, fee_rate_bps,
-            currency, payout_method, payout_account, status, created_at, processed_at
-     FROM creator_withdrawals
-     WHERE seller_id = $1
-     ORDER BY created_at DESC`,
-    [userId],
-  );
-
-  const grossEarnedCents = Number(earnedRes.rows[0]?.gross_earned ?? 0);
-  const withdrawnGrossCents = Number(withdrawnRes.rows[0]?.gross_withdrawn ?? 0);
-  const availableGrossCents = Math.max(0, grossEarnedCents - withdrawnGrossCents);
+  const [{ grossEarnedCents, withdrawnGrossCents, availableGrossCents }, historyRes] = await Promise.all([
+    getSellerWalletTotals(userId),
+    db.query(
+      `SELECT id, gross_amount_cents, platform_fee_cents, net_amount_cents, fee_rate_bps,
+              currency, payout_method, payout_account, status, created_at, processed_at
+       FROM creator_withdrawals
+       WHERE seller_id = $1
+       ORDER BY created_at DESC`,
+      [userId],
+    ),
+  ]);
   const breakdown = calculateWithdrawalBreakdown(availableGrossCents);
 
   res.json({
@@ -260,7 +247,7 @@ sellerRouter.post('/withdraw', requireAuth, requireActiveSeller, async (req, res
       throw new AppError(403, 'NOT_SELLER', 'You must be an approved creator to access seller tools');
     }
 
-    const availableGrossCents = await getSellerAvailableGrossCents(userId, client);
+    const { availableGrossCents } = await getSellerWalletTotals(userId, client);
     if (availableGrossCents <= 0) {
       throw new AppError(400, 'INSUFFICIENT_BALANCE', 'No available balance to withdraw');
     }

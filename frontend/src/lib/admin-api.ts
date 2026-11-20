@@ -241,3 +241,26 @@ export const createInviteCode = (body: { code?: string; maxUses?: number; expire
     method: 'POST',
     body: JSON.stringify(body),
   });
+
+export type WithdrawalStatus = 'pending' | 'approved' | 'paid' | 'rejected';
+
+export interface AdminWithdrawal {
+  id: string;
+  grossAmountCents: number;
+  platformFeeCents: number;
+  netAmountCents: number;
+  feeRateBps: number;
+  currency: string;
+  payoutMethod: string;
+  payoutAccount: string;
+  status: WithdrawalStatus;
+  createdAt: string;
+  processedAt: string | null;
+  seller: { id: string; displayName: string; email: string };
+}
+
+export const updateWithdrawal = (id: string, status: 'approved' | 'paid' | 'rejected', reason?: string) =>
+  adminFetch<{ id: string; status: WithdrawalStatus; processedAt: string | null }>(
+    `/withdrawals/${encodeURIComponent(id)}`,
+    { method: 'PATCH', body: JSON.stringify(reason ? { status, reason } : { status }) },
+  );

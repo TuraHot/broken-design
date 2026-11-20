@@ -18,6 +18,7 @@ import { startSuspensionSweeper } from "./modules/admin/suspensionSweeper";
 import { errorHandler } from "./middlewares/error.middleware";
 
 export const app = express();
+app.set("trust proxy", env.trustProxy);
 export const httpServer = http.createServer(app);
 export const io = initSocketServer(httpServer);
 

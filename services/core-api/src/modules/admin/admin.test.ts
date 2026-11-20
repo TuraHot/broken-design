@@ -1129,3 +1129,101 @@ test('POST /api/admin/invite-codes - generates cryptographic code and returns 40
     },
   );
 });
+
+const WITHDRAWAL_ID = '77777777-7777-4777-8777-777777777777';
+
+test('GET /api/admin/withdrawals - lists paginated withdrawals with seller info and status filter', async () => {
+  await withServer(
+    ACTIVE_ADMIN,
+    (sql) => {
+      if (sql.includes('COUNT(*)::int AS total FROM creator_withdrawals')) {
+        return { rowCount: 1, rows: [{ total: 1 }] };
+      }
+      if (sql.includes('FROM creator_withdrawals w') && sql.includes('LIMIT')) {
+        return {
+          rowCount: 1,
+          rows: [
+            {
+              id: WITHDRAWAL_ID,
+              seller_id: TARGET_ID,
+              gross_amount_cents: 5000,
+              platform_fee_cents: 350,
+              net_amount_cents: 4650,
+              fee_rate_bps: 700,
+              currency: 'USD',
+              payout_method: 'promptpay',
+              payout_account: '081-234-5678',
+              status: 'pending',
+              created_at: '2026-11-20T00:00:00.000Z',
+              processed_at: null,
+              seller_name: 'Demo Creator',
+              seller_email: 'creator@example.com',
+            },
+          ],
+        };
+      }
+      return undefined;
+    },
+    async (base) => {
+      const bad = await fetch(`${base}/withdrawals?status=bogus`, { headers: authHeaders() });
+      assert.equal(bad.status, 400);
+
+      const res = await fetch(`${base}/withdrawals?status=pending`, { headers: authHeaders() });
+      assert.equal(res.status, 200);
+      const body = await res.json();
+      assert.equal(body.total, 1);
+      assert.equal(body.items[0].id, WITHDRAWAL_ID);
+      assert.equal(body.items[0].netAmountCents, 4650);
+      assert.equal(body.items[0].seller.displayName, 'Demo Creator');
+    },
+  );
+});
+
+test('PATCH /api/admin/withdrawals/:id - transitions atomically with notification and rejects finalized transitions', async () => {
+  let mockRow: any = {
+    found: 1,
+    prev_status: 'pending',
+    id: WITHDRAWAL_ID,
+    status: 'paid',
+    processed_at: '2026-11-20T01:00:00.000Z',
+  };
+  let sawAtomicCte = false;
+
+  await withServer(
+    ACTIVE_ADMIN,
+    (sql) => {
+      if (sql.includes('FROM creator_withdrawals') && sql.includes('FOR UPDATE')) {
+        sawAtomicCte = sql.includes('INSERT INTO notifications');
+        return { rowCount: 1, rows: [mockRow] };
+      }
+      return undefined;
+    },
+    async (base) => {
+      const badId = await fetch(`${base}/withdrawals/not-a-uuid`, {
+        method: 'PATCH',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'paid' }),
+      });
+      assert.equal(badId.status, 400);
+
+      const ok = await fetch(`${base}/withdrawals/${WITHDRAWAL_ID}`, {
+        method: 'PATCH',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'paid' }),
+      });
+      assert.equal(ok.status, 200);
+      assert.equal(sawAtomicCte, true);
+      assert.equal((await ok.json()).status, 'paid');
+
+      // Already paid -> 409 INVALID_TRANSITION
+      mockRow = { found: 1, prev_status: 'paid', id: null, status: null, processed_at: null };
+      const conflict = await fetch(`${base}/withdrawals/${WITHDRAWAL_ID}`, {
+        method: 'PATCH',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'rejected' }),
+      });
+      assert.equal(conflict.status, 409);
+      assert.equal((await conflict.json()).error.code, 'INVALID_TRANSITION');
+    },
+  );
+});

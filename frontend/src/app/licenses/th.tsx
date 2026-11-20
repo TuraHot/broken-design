@@ -15,26 +15,26 @@ const TOC = [
   { id: 'choosing', title: 'การเลือกแบบสำหรับครีเอเตอร์' },
 ];
 
-const A = 'text-white underline underline-offset-4';
+const A = 'text-ink underline underline-offset-4';
 
 function Mark({ value }: { value: Cell }) {
   if (value === 'yes' || value === 'credit') {
     return (
-      <span className="inline-flex items-center gap-1.5 text-white/80">
-        <Check aria-hidden className="h-4 w-4 text-emerald-400" />
+      <span className="inline-flex items-center gap-1.5 text-ink/80">
+        <Check aria-hidden className="h-4 w-4 text-emerald-500" />
         {value === 'yes' ? 'ได้' : 'ได้ โดยให้เครดิต'}
       </span>
     );
   }
   if (value === 'no') {
     return (
-      <span className="inline-flex items-center gap-1.5 text-white/80">
-        <X aria-hidden className="h-4 w-4 text-red-300" />
+      <span className="inline-flex items-center gap-1.5 text-ink/80">
+        <X aria-hidden className="h-4 w-4 text-danger" />
         ไม่ได้
       </span>
     );
   }
-  return <span className="text-white/65">ยังไม่กำหนด*</span>;
+  return <span className="text-ink-soft">ยังไม่กำหนด*</span>;
 }
 
 export default function LicensesTh() {
@@ -57,17 +57,17 @@ export default function LicensesTh() {
             {LICENSES.map((lic) => {
               const info = LICENSE_INFO_TH[lic];
               return (
-                <article key={lic} className="rounded-lg border border-white/10 bg-white/5 p-5">
-                  <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud">{lic}</p>
-                  <h3 className="mt-2 text-[15px] font-medium text-white">{info.name}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-white/65">{info.summary}</p>
+                <article key={lic} className="rounded-lg border border-line bg-ink/5 p-5">
+                  <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-accent">{lic}</p>
+                  <h3 className="mt-2 text-[15px] font-medium text-ink">{info.name}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-ink-soft">{info.summary}</p>
                   <ul className="mt-4 grid gap-2 text-sm">
                     {info.rules.map((r) => (
-                      <li key={r.text} className="flex items-start gap-2 text-white/80">
+                      <li key={r.text} className="flex items-start gap-2 text-ink/80">
                         {r.ok ? (
-                          <Check aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+                          <Check aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
                         ) : (
-                          <X aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-red-300" />
+                          <X aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-danger" />
                         )}
                         <span>
                           <span className="sr-only">{r.ok ? 'ทำได้: ' : 'ทำไม่ได้: '}</span>
@@ -90,7 +90,7 @@ export default function LicensesTh() {
               LICENSE_INFO_TH[lic].name,
               <Mark key="c" value={MATRIX[lic].commercial} />,
               <Mark key="m" value={MATRIX[lic].modify} />,
-              MATRIX[lic].credit === 'credit' ? <span key="cr" className="text-white/80">จำเป็น</span> : <span key="cr">ไม่จำเป็น</span>,
+              MATRIX[lic].credit === 'credit' ? <span key="cr" className="text-ink/80">จำเป็น</span> : <span key="cr">ไม่จำเป็น</span>,
               <Mark key="s" value={MATRIX[lic].resell} />,
             ])}
           />

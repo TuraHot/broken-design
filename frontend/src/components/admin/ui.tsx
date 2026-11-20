@@ -7,9 +7,9 @@ import { useT } from '@/lib/i18n/client';
 type Tone = 'neutral' | 'warn' | 'danger';
 
 const TONES: Record<Tone, string> = {
-  neutral: 'border-white/15 text-white/65',
-  warn: 'border-amber/50 text-amber',
-  danger: 'border-red-400/50 text-red-300',
+  neutral: 'border-line text-ink-soft',
+  warn: 'border-warn/50 text-warn',
+  danger: 'border-danger/50 text-danger',
 };
 
 /** Status label. The text carries the meaning; the colour only backs it up. */
@@ -49,7 +49,7 @@ export function ConfirmAction({
         aria-label={ariaLabel}
         disabled={disabled}
         onClick={() => setAsking(true)}
-        className={`${BTN} border-white/15 text-white/80 hover:border-white/40 hover:text-white`}
+        className={`${BTN} border-line text-ink/80 hover:border-ink/40 hover:text-ink`}
       >
         {label}
       </button>
@@ -58,7 +58,7 @@ export function ConfirmAction({
 
   return (
     <span role="group" aria-label={t('admin.confirmGroup', { label: ariaLabel })} className="inline-flex items-center gap-2">
-      <span className="text-sm text-white/65">{t('admin.sure')}</span>
+      <span className="text-sm text-ink-soft">{t('admin.sure')}</span>
       <button
         type="button"
         disabled={busy}
@@ -71,7 +71,7 @@ export function ConfirmAction({
             setAsking(false);
           }
         }}
-        className={`${BTN} border-red-400/60 text-red-300 hover:bg-red-400/10`}
+        className={`${BTN} border-danger/60 text-danger hover:bg-danger/10`}
       >
         {busy ? t('admin.working') : t('admin.yes')}
       </button>
@@ -80,7 +80,7 @@ export function ConfirmAction({
         autoFocus
         disabled={busy}
         onClick={() => setAsking(false)}
-        className={`${BTN} border-white/15 text-white/80 hover:border-white/40 hover:text-white`}
+        className={`${BTN} border-line text-ink/80 hover:border-ink/40 hover:text-ink`}
       >
         {t('admin.cancel')}
       </button>

@@ -35,18 +35,18 @@ export default function ResetPasswordForm() {
     }
   };
 
-  const cls = `${FIELD} ${error ? 'border-red-400/70 focus:border-red-300' : 'border-white/15 focus:border-white/50'}`;
+  const cls = `${FIELD} ${error ? 'border-danger/70 focus:border-danger' : 'border-line focus:border-ink/50'}`;
 
   return (
     <div className="w-full max-w-[420px]">
-      <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70">{t('auth.label')}</p>
-      <h1 className="mt-4 font-display text-[clamp(26px,4vw,36px)] uppercase leading-[1.05] text-white">{t('auth.reset.title')}</h1>
+      <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-accent">{t('auth.label')}</p>
+      <h1 className="mt-4 font-display text-[clamp(26px,4vw,36px)] uppercase leading-[1.05] text-ink">{t('auth.reset.title')}</h1>
 
-      <div className="mt-8 rounded-lg border border-white/10 bg-white/5 p-5 sm:p-6">
+      <div className="mt-8 rounded-lg border border-line bg-ink/5 p-5 sm:p-6">
         {!token ? (
-          <p className="text-sm text-red-300">{t('auth.reset.noToken')}</p>
+          <p className="text-sm text-danger">{t('auth.reset.noToken')}</p>
         ) : done ? (
-          <p className="text-sm text-hud">{t('auth.reset.done')}</p>
+          <p className="text-sm text-accent">{t('auth.reset.done')}</p>
         ) : (
           <form onSubmit={onSubmit} noValidate className="grid gap-4">
             <Field id="password" label={t('auth.newPassword')} error={error}>
@@ -55,15 +55,15 @@ export default function ResetPasswordForm() {
             <Field id="confirm" label={t('auth.confirmPassword')}>
               <input id="confirm" type="password" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} className={cls} />
             </Field>
-            <button type="submit" disabled={busy} className="h-10 w-full rounded-lg bg-white text-[15px] font-medium text-black transition-colors hover:bg-white/85 disabled:opacity-60">
+            <button type="submit" disabled={busy} className="h-10 w-full rounded-lg bg-ink text-[15px] font-medium text-canvas transition-colors hover:bg-ink/85 disabled:opacity-60">
               {busy ? t('auth.reset.saving') : t('auth.reset.submit')}
             </button>
           </form>
         )}
       </div>
 
-      <p className="mt-6 text-center text-sm text-white/65">
-        <Link href={done ? '/login' : '/forgot-password'} className="text-white underline-offset-4 hover:underline">
+      <p className="mt-6 text-center text-sm text-ink-soft">
+        <Link href={done ? '/login' : '/forgot-password'} className="text-ink underline-offset-4 hover:underline">
           {done ? t('auth.reset.toLogin') : t('auth.reset.newLink')}
         </Link>
       </p>

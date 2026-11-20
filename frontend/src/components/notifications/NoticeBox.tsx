@@ -42,9 +42,9 @@ export default function NoticeBox({ token }: { token: string }) {
   const unread = (items ?? []).filter((n) => !n.readAt);
 
   return (
-    <section aria-labelledby="notices-title" className="mb-6 rounded-lg border border-amber/40 bg-amber/5 p-4 sm:p-5">
+    <section aria-labelledby="notices-title" className="mb-6 rounded-lg border border-warn/40 bg-warn/5 p-4 sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 id="notices-title" className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.16em] text-amber">
+        <h2 id="notices-title" className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.16em] text-warn">
           <BellRing aria-hidden className="h-4 w-4" />
           {t('notice.title')}
           {unread.length > 0 && <span>· {t('notice.unread', { n: unread.length })}</span>}
@@ -53,22 +53,22 @@ export default function NoticeBox({ token }: { token: string }) {
           <button
             type="button"
             onClick={() => run(() => markAllNoticesRead(token))}
-            className="text-sm text-white/65 underline underline-offset-4 hover:text-white"
+            className="text-sm text-ink-soft underline underline-offset-4 hover:text-ink"
           >
             {t('notice.markAll')}
           </button>
         )}
       </div>
 
-      {error && <p role="alert" className="mt-3 text-sm text-red-300">{error}</p>}
+      {error && <p role="alert" className="mt-3 text-sm text-danger">{error}</p>}
 
       <ul className="mt-3 grid gap-3">
         {(items ?? []).map((n) => {
           const isNew = !n.readAt;
           return (
-            <li key={n.id} className={`rounded-lg border p-3 sm:p-4 ${isNew ? 'border-amber/50 bg-black/40' : 'border-white/10 bg-black/20 opacity-75'}`}>
-              <div className="flex flex-wrap items-center gap-2 text-xs text-white/50">
-                {isNew && <span className="rounded border border-amber/50 px-1.5 py-0.5 font-mono uppercase tracking-[0.12em] text-amber">{t('notice.new')}</span>}
+            <li key={n.id} className={`rounded-lg border p-3 sm:p-4 ${isNew ? 'border-warn/50 bg-canvas/40' : 'border-line bg-canvas/20 opacity-75'}`}>
+              <div className="flex flex-wrap items-center gap-2 text-xs text-ink/50">
+                {isNew && <span className="rounded border border-warn/50 px-1.5 py-0.5 font-mono uppercase tracking-[0.12em] text-warn">{t('notice.new')}</span>}
                 <time dateTime={n.createdAt}>{formatDate(n.createdAt)}</time>
               </div>
               <NoticeContent n={n} />
@@ -76,7 +76,7 @@ export default function NoticeBox({ token }: { token: string }) {
                 <button
                   type="button"
                   onClick={() => run(() => markNoticeRead(n.id, token))}
-                  className="mt-3 h-8 rounded-lg border border-white/15 px-3 text-sm text-white/80 hover:border-white/40 hover:text-white"
+                  className="mt-3 h-8 rounded-lg border border-line px-3 text-sm text-ink/80 hover:border-ink/40 hover:text-ink"
                 >
                   {t('notice.markRead')}
                 </button>

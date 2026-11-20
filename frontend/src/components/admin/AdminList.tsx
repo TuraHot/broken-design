@@ -31,7 +31,7 @@ interface FilterDef {
 }
 
 const PAGE_SIZE = 25;
-const NAV_BTN = 'inline-flex items-center gap-2 rounded-lg border border-white/15 px-3 py-1.5 text-sm text-white/65 transition-colors hover:border-white/30 hover:text-white disabled:cursor-not-allowed disabled:text-white/25 disabled:hover:border-white/15';
+const NAV_BTN = 'inline-flex items-center gap-2 rounded-lg border border-line px-3 py-1.5 text-sm text-ink-soft transition-colors hover:border-ink/30 hover:text-ink disabled:cursor-not-allowed disabled:text-ink/25 disabled:hover:border-line';
 
 export default function AdminList<T extends { id: string }>({
   path,
@@ -103,7 +103,7 @@ export default function AdminList<T extends { id: string }>({
 
   return (
     <section>
-      <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud">[ {t('admin.label')} ]</p>
+      <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-accent">[ {t('admin.label')} ]</p>
       <h1 className="mt-3 font-display text-[clamp(28px,4vw,48px)] uppercase leading-[1.02]">{t(heading)}</h1>
 
       <form
@@ -116,7 +116,7 @@ export default function AdminList<T extends { id: string }>({
         }}
       >
         <div className="relative min-w-[200px] max-w-md flex-1">
-          <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/50" />
+          <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink/50" />
           <input
             type="search"
             value={draft}
@@ -124,10 +124,10 @@ export default function AdminList<T extends { id: string }>({
             aria-label={t(searchLabel)}
             placeholder={t(searchLabel)}
             maxLength={100}
-            className="h-9 w-full rounded-lg border border-white/15 bg-white/5 pl-9 pr-3 text-sm text-white placeholder:text-white/40 focus:border-white/50 focus:outline-none"
+            className="h-9 w-full rounded-lg border border-line bg-ink/5 pl-9 pr-3 text-sm text-ink placeholder:text-ink/40 focus:border-ink/50 focus:outline-none"
           />
         </div>
-        <button type="submit" className="h-9 rounded-lg border border-white/15 px-3 text-sm text-white/80 transition-colors hover:border-white/40 hover:text-white">
+        <button type="submit" className="h-9 rounded-lg border border-line px-3 text-sm text-ink/80 transition-colors hover:border-ink/40 hover:text-ink">
           {t('admin.search')}
         </button>
         {filters.map((f) => (
@@ -139,7 +139,7 @@ export default function AdminList<T extends { id: string }>({
               setPage(1);
               setFilterValues((v) => ({ ...v, [f.param]: e.target.value }));
             }}
-            className="h-9 rounded-lg border border-white/15 bg-black px-3 text-sm text-white focus:border-white/50 focus:outline-none"
+            className="h-9 rounded-lg border border-line bg-canvas px-3 text-sm text-ink focus:border-ink/50 focus:outline-none"
           >
             {f.options.map((o) => (
               <option key={o.value} value={o.value}>{t(o.label)}</option>
@@ -149,7 +149,7 @@ export default function AdminList<T extends { id: string }>({
         {dateRange && (
           // One date range: two dates that belong together, kept side by side with visible labels.
           <div role="group" aria-label={t('admin.dateRange')} className="flex flex-wrap items-center gap-x-3 gap-y-2">
-            <label className="flex items-center gap-2 text-sm text-white/65">
+            <label className="flex items-center gap-2 text-sm text-ink-soft">
               {t('admin.dateFromShort')}
               <input
                 type="date"
@@ -159,10 +159,10 @@ export default function AdminList<T extends { id: string }>({
                   setPage(1);
                   setFrom(e.target.value);
                 }}
-                className="h-9 rounded-lg border border-white/15 bg-black px-3 text-sm text-white focus:border-white/50 focus:outline-none"
+                className="h-9 rounded-lg border border-line bg-canvas px-3 text-sm text-ink focus:border-ink/50 focus:outline-none"
               />
             </label>
-            <label className="flex items-center gap-2 text-sm text-white/65">
+            <label className="flex items-center gap-2 text-sm text-ink-soft">
               {t('admin.dateToShort')}
               <input
                 type="date"
@@ -172,7 +172,7 @@ export default function AdminList<T extends { id: string }>({
                   setPage(1);
                   setTo(e.target.value);
                 }}
-                className="h-9 rounded-lg border border-white/15 bg-black px-3 text-sm text-white focus:border-white/50 focus:outline-none"
+                className="h-9 rounded-lg border border-line bg-canvas px-3 text-sm text-ink focus:border-ink/50 focus:outline-none"
               />
             </label>
             {(from || to) && (
@@ -183,7 +183,7 @@ export default function AdminList<T extends { id: string }>({
                   setFrom('');
                   setTo('');
                 }}
-                className="h-9 rounded-lg px-2 text-sm text-white/65 underline underline-offset-4 hover:text-white"
+                className="h-9 rounded-lg px-2 text-sm text-ink-soft underline underline-offset-4 hover:text-ink"
               >
                 {t('admin.dateClear')}
               </button>
@@ -194,7 +194,7 @@ export default function AdminList<T extends { id: string }>({
 
       <div role="status" className="mt-4 min-h-5 text-sm">
         {notice && (
-          <p className="flex items-center gap-2 text-amber">
+          <p className="flex items-center gap-2 text-warn">
             <AlertCircle aria-hidden className="h-4 w-4 shrink-0" />
             {notice}
           </p>
@@ -202,15 +202,15 @@ export default function AdminList<T extends { id: string }>({
       </div>
 
       {error && !data ? (
-        <div className="mt-2 rounded-lg border border-white/10 bg-white/5 p-10 text-center">
-          <p className="flex items-center justify-center gap-2 text-red-300">
+        <div className="mt-2 rounded-lg border border-line bg-ink/5 p-10 text-center">
+          <p className="flex items-center justify-center gap-2 text-danger">
             <AlertCircle aria-hidden className="h-4 w-4 shrink-0" />
             {error}
           </p>
           <button
             type="button"
             onClick={() => setAttempt((n) => n + 1)}
-            className="mt-6 h-9 rounded-lg bg-white px-3.5 text-[15px] font-medium text-black transition-colors hover:bg-white/85"
+            className="mt-6 h-9 rounded-lg bg-ink px-3.5 text-[15px] font-medium text-canvas transition-colors hover:bg-ink/85"
           >
             {t('admin.tryAgain')}
           </button>
@@ -221,14 +221,14 @@ export default function AdminList<T extends { id: string }>({
             role="region"
             aria-label={t('admin.tableLabel', { heading: t(heading) })}
             tabIndex={0}
-            className={`overflow-x-auto rounded-lg border border-white/10 bg-white/5 transition-opacity focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/50 ${loading ? 'opacity-60' : ''}`}
+            className={`overflow-x-auto rounded-lg border border-line bg-ink/5 transition-opacity focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink/50 ${loading ? 'opacity-60' : ''}`}
             aria-busy={loading}
           >
             <table className="w-full min-w-[760px] text-left text-sm">
               <thead>
                 <tr>
                   {columns.map((c) => (
-                    <th key={c.header} scope="col" className="px-4 py-3 font-mono text-[11px] font-normal uppercase tracking-[0.16em] text-white/65">
+                    <th key={c.header} scope="col" className="px-4 py-3 font-mono text-[11px] font-normal uppercase tracking-[0.16em] text-ink-soft">
                       {t(c.header)}
                     </th>
                   ))}
@@ -236,7 +236,7 @@ export default function AdminList<T extends { id: string }>({
               </thead>
               <tbody>
                 {data?.items.map((row) => (
-                  <tr key={row.id} className="border-t border-white/10 align-middle">
+                  <tr key={row.id} className="border-t border-line align-middle">
                     {columns.map((c) => (
                       <td key={c.header} className="px-4 py-3">
                         {c.cell(row, api, t)}
@@ -246,14 +246,14 @@ export default function AdminList<T extends { id: string }>({
                 ))}
                 {data && data.items.length === 0 && (
                   <tr>
-                    <td colSpan={columns.length} className="px-4 py-10 text-center text-white/65">
+                    <td colSpan={columns.length} className="px-4 py-10 text-center text-ink-soft">
                       {q ? t('admin.nothingMatches', { q }) : t('admin.nothingYet')}
                     </td>
                   </tr>
                 )}
                 {!data && loading && (
                   <tr>
-                    <td colSpan={columns.length} className="px-4 py-10 text-center text-white/65">{t('admin.loading')}</td>
+                    <td colSpan={columns.length} className="px-4 py-10 text-center text-ink-soft">{t('admin.loading')}</td>
                   </tr>
                 )}
               </tbody>
@@ -262,13 +262,13 @@ export default function AdminList<T extends { id: string }>({
 
           {data && (
             <nav aria-label={t('admin.pagination')} className="mt-6 flex items-center justify-between gap-4">
-              <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-white/65">{t('admin.total', { n: data.total })}</span>
+              <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-ink-soft">{t('admin.total', { n: data.total })}</span>
               <div className="flex items-center gap-4">
                 <button type="button" className={NAV_BTN} disabled={page <= 1 || loading} onClick={() => setPage((p) => p - 1)}>
                   <ArrowLeft aria-hidden className="h-4 w-4" />
                   {t('admin.prev')}
                 </button>
-                <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-white/65">
+                <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-ink-soft">
                   {t('admin.page', { page: data.page, total: totalPages })}
                 </span>
                 <button type="button" className={NAV_BTN} disabled={page >= totalPages || loading} onClick={() => setPage((p) => p + 1)}>

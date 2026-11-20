@@ -11,7 +11,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: locale === 'th' ? 'ลิขสิทธิ์และ DMCA · Lixyte' : 'Copyright & DMCA · Lixyte' };
 }
 
-const link = 'text-white underline underline-offset-4';
+const link = 'text-ink underline underline-offset-4';
 
 export default async function DmcaPage() {
   const { locale } = await getT();
@@ -31,8 +31,8 @@ function DmcaPageEn() {
           body: (
             <>
               <OL>
-                <li>Log in, then open <strong className="font-medium text-white/80">Report a problem</strong> in the account menu or the footer.</li>
-                <li>Choose <strong className="font-medium text-white/80">A model</strong> and paste the address of the model page.</li>
+                <li>Log in, then open <strong className="font-medium text-ink">Report a problem</strong> in the account menu or the footer.</li>
+                <li>Choose <strong className="font-medium text-ink">A model</strong> and paste the address of the model page.</li>
                 <li>Explain what was copied, where the original is, and why you own it.</li>
               </OL>
               <P>If you cannot log in, write to <C>[TO DECIDE: copyright contact email address]</C>.</P>

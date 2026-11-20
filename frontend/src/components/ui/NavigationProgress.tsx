@@ -98,27 +98,27 @@ function NavigationProgressInner() {
     <>
       <div
         aria-hidden
-        className="fixed inset-x-0 top-0 z-[80] h-0.5 animate-pulse bg-gradient-to-r from-hud via-violet to-amber shadow-[0_0_12px_rgba(143,211,255,0.85)] motion-reduce:animate-none"
+        className="fixed inset-x-0 top-0 z-[80] h-0.5 animate-pulse bg-gradient-to-r from-accent via-violet to-amber shadow-[0_0_12px_rgba(143,211,255,0.85)] motion-reduce:animate-none"
       />
       <div
         role="status"
         aria-live="polite"
         aria-label={t('loader.page')}
-        className="fixed inset-0 z-[65] flex cursor-wait items-center justify-center bg-black/60 p-4 backdrop-blur-[2px]"
+        className="fixed inset-0 z-[65] flex cursor-wait items-center justify-center bg-canvas/60 p-4 backdrop-blur-[2px]"
       >
         <div
-          className="w-full max-w-xs border border-hud/40 bg-[rgba(4,8,18,0.85)] p-5 shadow-2xl"
+          className="w-full max-w-xs border border-accent/40 bg-canvas/90 p-5 shadow-2xl"
           style={{ clipPath: HUD_CLIP }}
         >
           <div className="flex items-center justify-between gap-3">
-            <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud">
+            <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-accent">
               {t('loader.navigating')}
             </span>
-            <Loader2 aria-hidden className="h-4 w-4 animate-spin text-hud motion-reduce:animate-none" />
+            <Loader2 aria-hidden className="h-4 w-4 animate-spin text-accent motion-reduce:animate-none" />
           </div>
-          <p className="mt-3 text-sm text-white/80">{t('loader.view')}</p>
-          <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-white/10">
-            <div className="h-full w-2/3 animate-pulse rounded-full bg-gradient-to-r from-hud via-violet to-amber motion-reduce:animate-none" />
+          <p className="mt-3 text-sm text-ink/80">{t('loader.view')}</p>
+          <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-ink/10">
+            <div className="h-full w-2/3 animate-pulse rounded-full bg-gradient-to-r from-accent via-violet to-amber motion-reduce:animate-none" />
           </div>
         </div>
       </div>

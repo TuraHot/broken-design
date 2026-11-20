@@ -79,10 +79,10 @@ export default function EmbedSnippets({ id, paid }: { id: string; paid: boolean 
 
   return (
     <div>
-      <ol className="space-y-2 text-sm text-white/65">
+      <ol className="space-y-2 text-sm text-ink-soft">
         {steps.map((s, i) => (
           <li key={s} className="flex gap-3">
-            <span className="font-mono text-[11px] leading-5 tracking-[0.16em] text-hud/70">0{i + 1}</span>
+            <span className="font-mono text-[11px] leading-5 tracking-[0.16em] text-accent">0{i + 1}</span>
             <span>{t(s)}</span>
           </li>
         ))}
@@ -99,7 +99,7 @@ export default function EmbedSnippets({ id, paid }: { id: string; paid: boolean 
               aria-selected={kind === tab.id}
               onClick={() => selectKind(tab.id)}
               className={`rounded border px-2 py-1 font-mono text-[11px] transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
-                kind === tab.id ? 'border-white/50 text-white' : 'border-white/15 text-white/65 hover:text-white'
+                kind === tab.id ? 'border-ink/50 text-ink' : 'border-line text-ink-soft hover:text-ink'
               }`}
             >
               {tab.label}
@@ -110,33 +110,33 @@ export default function EmbedSnippets({ id, paid }: { id: string; paid: boolean 
           type="button"
           disabled={!canUseEmbed}
           onClick={copy}
-          className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm text-white/65 transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-45"
+          className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm text-ink-soft transition-colors hover:text-ink disabled:cursor-not-allowed disabled:opacity-45"
         >
-          {copied ? <Check aria-hidden className="h-4 w-4 text-hud" /> : <Copy aria-hidden className="h-4 w-4" />}
+          {copied ? <Check aria-hidden className="h-4 w-4 text-accent" /> : <Copy aria-hidden className="h-4 w-4" />}
           {copied ? t('embed.snip.copied') : t('embed.snip.copy')}
         </button>
       </div>
       <div className="relative mt-2">
         <pre
           aria-hidden={!canUseEmbed}
-          className={`max-w-full overflow-x-auto rounded-lg border border-white/10 bg-black px-4 py-3 font-mono text-[12.5px] leading-relaxed text-white/80 transition ${
+          className={`max-w-full overflow-x-auto rounded-lg border border-line bg-canvas px-4 py-3 font-mono text-[12.5px] leading-relaxed text-ink/80 transition ${
             !canUseEmbed ? 'pointer-events-none min-h-[120px] select-none blur-[4px]' : ''
           }`}
         >
           <code>{code}</code>
         </pre>
         {ready && !signedIn && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-lg border border-white/10 bg-black/75 p-4 text-center backdrop-blur-[2px]">
-            <div className="inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-hud">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-lg border border-line bg-canvas/75 p-4 text-center backdrop-blur-[2px]">
+            <div className="inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-accent">
               <Lock aria-hidden className="h-3.5 w-3.5" />
               {t('embed.snip.loginRequired')}
             </div>
-            <p className="max-w-xs text-xs text-white/75">
+            <p className="max-w-xs text-xs text-ink/75">
               {t('embed.snip.loginHint')}
             </p>
             <Link
               href="/login"
-              className="mt-1 inline-flex h-8 items-center rounded-lg bg-white px-3.5 text-xs font-medium text-black transition-colors hover:bg-white/85"
+              className="mt-1 inline-flex h-8 items-center rounded-lg bg-ink px-3.5 text-xs font-medium text-canvas transition-colors hover:bg-ink/85"
             >
               {t('embed.snip.login')}
             </Link>

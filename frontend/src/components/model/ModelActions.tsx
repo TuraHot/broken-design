@@ -222,9 +222,9 @@ export default function ModelActions({
           <button
             type="button"
             disabled
-            className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-hud/30 bg-hud/10 px-3.5 text-[15px] font-medium text-hud cursor-not-allowed"
+            className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-accent/30 bg-accent/10 px-3.5 text-[15px] font-medium text-accent cursor-not-allowed"
           >
-            <CheckCircle2 aria-hidden className="h-4 w-4 shrink-0 text-hud" />
+            <CheckCircle2 aria-hidden className="h-4 w-4 shrink-0 text-accent" />
             <span>{t("model.alreadyPurchased")}</span>
           </button>
 
@@ -232,7 +232,7 @@ export default function ModelActions({
             type="button"
             disabled={!ready || !signedIn || busy}
             onClick={handleDownload}
-            className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-white px-3.5 text-[15px] font-medium text-black transition-colors hover:bg-white/85 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-ink px-3.5 text-[15px] font-medium text-canvas transition-colors hover:bg-ink/85 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {busy ? (
               <Loader2 aria-hidden className="h-4 w-4 animate-spin motion-reduce:animate-none" />
@@ -250,8 +250,8 @@ export default function ModelActions({
             onClick={free ? handleDownload : handleBuy}
             className={`inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg px-3.5 text-[15px] font-medium transition-colors ${
               isOwner
-                ? "border border-white/15 bg-white/5 text-white/40 cursor-not-allowed"
-                : "bg-white text-black hover:bg-white/85 disabled:cursor-not-allowed disabled:opacity-50"
+                ? "border border-line bg-ink/5 text-ink/40 cursor-not-allowed"
+                : "bg-ink text-canvas hover:bg-ink/85 disabled:cursor-not-allowed disabled:opacity-50"
             }`}
           >
             {busy && <Loader2 aria-hidden className="h-4 w-4 animate-spin motion-reduce:animate-none" />}
@@ -269,7 +269,7 @@ export default function ModelActions({
               type="button"
               disabled={!ready || !signedIn || busy || checkingPurchased}
               onClick={handleDownload}
-              className="h-9 w-full rounded-lg border border-white/20 bg-white/5 px-3 text-xs font-mono uppercase tracking-wider text-white/80 transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+              className="h-9 w-full rounded-lg border border-line bg-ink/5 px-3 text-xs font-mono uppercase tracking-wider text-ink/80 transition-colors hover:bg-ink/10 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {t("model.alreadyBought")}
             </button>
@@ -278,9 +278,9 @@ export default function ModelActions({
       )}
 
       {ready && !signedIn && (
-        <p className="text-xs text-white/65">
+        <p className="text-xs text-ink-soft">
           {t("model.loginPre")}{" "}
-          <Link href="/login" className="font-medium text-hud underline underline-offset-2 hover:text-white">
+          <Link href="/login" className="font-medium text-accent underline underline-offset-2 hover:text-ink">
             {t("model.loginLink")}
           </Link>{" "}
           {t("model.loginPost")}
@@ -288,7 +288,7 @@ export default function ModelActions({
       )}
 
       {status && (
-        <p role="status" className="text-sm text-amber">
+        <p role="status" className="text-sm text-warn">
           {"text" in status ? status.text : t(status.key, status.vars)}
         </p>
       )}

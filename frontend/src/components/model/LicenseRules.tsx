@@ -9,16 +9,16 @@ export default async function LicenseRules({ license }: { license: License }) {
   const info = (locale === 'th' ? LICENSE_INFO_TH : LICENSE_INFO)[license];
   return (
     <div>
-      <h2 className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70">{t('model.licenseLabel')}</h2>
-      <p className="mt-2 text-sm font-medium text-white">{info.name}</p>
-      <p className="mt-1 text-sm text-white/65">{info.summary}</p>
+      <h2 className="font-mono text-[11px] uppercase tracking-[0.16em] text-accent">{t('model.licenseLabel')}</h2>
+      <p className="mt-2 text-sm font-medium text-ink">{info.name}</p>
+      <p className="mt-1 text-sm text-ink-soft">{info.summary}</p>
       <ul className="mt-3 space-y-1.5">
         {info.rules.map((r) => (
-          <li key={r.text} className="flex items-start gap-2 text-sm text-white/80">
+          <li key={r.text} className="flex items-start gap-2 text-sm text-ink/80">
             {r.ok ? (
-              <Check aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-green-400" />
+              <Check aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
             ) : (
-              <X aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-red-300" />
+              <X aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-danger" />
             )}
             <span>
               <span className="sr-only">{r.ok ? t('model.allowed') : t('model.notAllowed')}</span>

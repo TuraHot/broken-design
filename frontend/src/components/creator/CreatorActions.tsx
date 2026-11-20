@@ -29,11 +29,11 @@ import type { MessageKey } from '@/lib/i18n/messages';
 import { readSession, SESSION_UPDATED_EVENT, updateSessionUser, type Session } from '@/lib/session';
 
 const PRIMARY_BTN =
-  'inline-flex items-center gap-2 rounded-lg bg-white px-3.5 py-1.5 text-[15px] font-medium text-black transition-colors hover:bg-white/85';
+  'inline-flex items-center gap-2 rounded-lg bg-ink px-3.5 py-1.5 text-[15px] font-medium text-canvas transition-colors hover:bg-ink/85';
 const PENDING_BTN =
-  'inline-flex items-center gap-2 rounded-lg border border-amber/40 bg-amber/10 px-3.5 py-1.5 text-[15px] font-medium text-amber';
+  'inline-flex items-center gap-2 rounded-lg border border-warn/40 bg-warn/10 px-3.5 py-1.5 text-[15px] font-medium text-warn';
 const OUTLINE_BTN =
-  'border border-white px-3 py-2 font-mono text-[10.5px] uppercase tracking-[0.18em] text-white transition-colors hover:bg-white hover:text-black';
+  'border border-ink px-3 py-2 font-mono text-[10.5px] uppercase tracking-[0.18em] text-ink transition-colors hover:bg-ink hover:text-canvas';
 
 const CREATOR_RULES: { title: MessageKey; body: MessageKey }[] = [
   { title: 'creator.apply.r1Title', body: 'creator.apply.r1Body' },
@@ -174,7 +174,7 @@ export default function CreatorActions() {
       </div>
 
       {!isCreator && application?.status === 'rejected' && (
-        <p className="mt-3 text-xs text-amber">
+        <p className="mt-3 text-xs text-warn">
           {t('creator.apply.rejectedPrefix')}
           {application.adminNote ? `: ${application.adminNote}. ` : '. '}
           {t('creator.apply.rejectedSuffix')}
@@ -187,24 +187,24 @@ export default function CreatorActions() {
           role="dialog"
           aria-modal="true"
           aria-label={t('creator.apply.dialogLabel')}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4 py-6 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-canvas/80 px-4 py-6 backdrop-blur-sm"
         >
           {step === 1 ? (
             <form
               onSubmit={handleStep1Continue}
-              className="max-h-[90dvh] w-full max-w-[520px] overflow-y-auto rounded-2xl border border-white/15 bg-[#0b0d12] p-6 shadow-2xl"
+              className="max-h-[90dvh] w-full max-w-[520px] overflow-y-auto rounded-2xl border border-line bg-card p-6 shadow-2xl"
             >
               <div className="flex items-center justify-between">
-                <span className="inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.16em] text-hud">
+                <span className="inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.16em] text-accent">
                   <ShieldCheck className="h-4 w-4" />
                   {t('creator.apply.rulesEyebrow')}
                 </span>
                 <div className="flex items-center gap-3">
-                  <span className="font-mono text-xs text-white/50">1/2</span>
+                  <span className="font-mono text-xs text-ink-soft">1/2</span>
                   <button
                     type="button"
                     onClick={() => setModalOpen(false)}
-                    className="rounded p-1 text-white/55 hover:bg-white/10 hover:text-white"
+                    className="rounded p-1 text-ink-soft hover:bg-ink/10 hover:text-ink"
                     aria-label={t('creator.apply.close')}
                   >
                     <X className="h-4 w-4" />
@@ -212,10 +212,10 @@ export default function CreatorActions() {
                 </div>
               </div>
 
-              <h2 className="mt-2 font-display text-xl uppercase text-white">
+              <h2 className="mt-2 font-display text-xl uppercase text-ink">
                 {t('creator.apply.rulesTitle')}
               </h2>
-              <p className="mt-1 text-sm text-white/65">
+              <p className="mt-1 text-sm text-ink-soft">
                 {t('creator.apply.rulesLead')}
               </p>
 
@@ -223,24 +223,24 @@ export default function CreatorActions() {
                 {CREATOR_RULES.map((rule) => (
                   <li
                     key={rule.title}
-                    className="rounded-xl border border-white/10 bg-white/[0.03] p-3.5"
+                    className="rounded-xl border border-line bg-ink/[0.03] p-3.5"
                   >
-                    <p className="text-xs font-semibold text-white">{t(rule.title)}</p>
-                    <p className="mt-1 text-xs leading-relaxed text-white/65">{t(rule.body)}</p>
+                    <p className="text-xs font-semibold text-ink">{t(rule.title)}</p>
+                    <p className="mt-1 text-xs leading-relaxed text-ink-soft">{t(rule.body)}</p>
                   </li>
                 ))}
               </ul>
 
-              <label className="mt-4 flex cursor-pointer items-start gap-2.5 rounded-lg border border-white/10 bg-white/[0.02] p-3 text-xs text-white/80">
+              <label className="mt-4 flex cursor-pointer items-start gap-2.5 rounded-lg border border-line bg-ink/[0.02] p-3 text-xs text-ink/80">
                 <input
                   type="checkbox"
                   checked={agreed}
                   onChange={(e) => setAgreed(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 shrink-0 rounded border-white/30 bg-black accent-white"
+                  className="mt-0.5 h-4 w-4 shrink-0 rounded border-ink/30 bg-canvas accent-ink"
                 />
                 <span>
                   {t('creator.apply.agreePrefix')}{' '}
-                  <Link href="/seller-terms" className="text-hud underline underline-offset-2">
+                  <Link href="/seller-terms" className="text-accent underline underline-offset-2">
                     {t('creator.apply.sellerTerms')}
                   </Link>
                   .
@@ -251,14 +251,14 @@ export default function CreatorActions() {
                 <button
                   type="button"
                   onClick={() => setModalOpen(false)}
-                  className="h-10 rounded-lg border border-white/20 px-4 text-xs text-white/80 hover:bg-white/10"
+                  className="h-10 rounded-lg border border-line px-4 text-xs text-ink/80 hover:bg-ink/10"
                 >
                   {t('creator.apply.cancel')}
                 </button>
                 <button
                   type="submit"
                   disabled={!agreed}
-                  className="inline-flex h-10 items-center gap-2 rounded-lg bg-white px-5 text-xs font-semibold text-black transition-colors hover:bg-white/85 disabled:cursor-not-allowed disabled:opacity-45"
+                  className="inline-flex h-10 items-center gap-2 rounded-lg bg-ink px-5 text-xs font-semibold text-canvas transition-colors hover:bg-ink/85 disabled:cursor-not-allowed disabled:opacity-45"
                 >
                   {t('creator.apply.continue')}
                   <ArrowRight className="h-3.5 w-3.5" />
@@ -268,31 +268,31 @@ export default function CreatorActions() {
           ) : (
             <form
               onSubmit={handleFinalSubmit}
-              className="w-full max-w-[440px] rounded-2xl border border-white/15 bg-[#12141c] p-6 shadow-2xl"
+              className="w-full max-w-[440px] rounded-2xl border border-line bg-card p-6 shadow-2xl"
             >
               {/* Top bar: < Back and 2/2 (matching VGen popup) */}
-              <div className="flex items-center justify-between text-white/75">
+              <div className="flex items-center justify-between text-ink/75">
                 <button
                   type="button"
                   onClick={() => {
                     setErrorMsg(null);
                     setStep(1);
                   }}
-                  className="rounded-lg p-1 transition-colors hover:bg-white/10 hover:text-white"
+                  className="rounded-lg p-1 transition-colors hover:bg-ink/10 hover:text-ink"
                   aria-label={t('creator.apply.back')}
                 >
                   <ChevronLeft className="h-5 w-5" />
                 </button>
-                <span className="font-mono text-xs font-semibold text-white/65">2/2</span>
+                <span className="font-mono text-xs font-semibold text-ink-soft">2/2</span>
               </div>
 
-              <h2 className="mt-4 font-display text-2xl font-bold text-white">
+              <h2 className="mt-4 font-display text-2xl font-bold text-ink">
                 {t('creator.apply.finishTitle')}
               </h2>
 
               {/* Toggle row: I have a Creator Invite Code */}
               <div className="mt-5 flex items-center justify-between gap-3">
-                <span className="text-sm font-semibold text-white">
+                <span className="text-sm font-semibold text-ink">
                   {t('creator.apply.hasCode')}
                 </span>
                 <button
@@ -304,11 +304,11 @@ export default function CreatorActions() {
                     setErrorMsg(null);
                   }}
                   className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors ${
-                    hasInviteCode ? 'bg-hud' : 'bg-white/25'
+                    hasInviteCode ? 'bg-accent' : 'bg-ink/25'
                   }`}
                 >
                   <span
-                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                    className={`inline-block h-5 w-5 transform rounded-full bg-ink shadow transition-transform ${
                       hasInviteCode ? 'translate-x-5' : 'translate-x-0.5'
                     }`}
                   />
@@ -317,27 +317,27 @@ export default function CreatorActions() {
 
               {hasInviteCode ? (
                 <div className="mt-4">
-                  <label htmlFor="creator-invite-code" className="block text-xs text-white/70">
+                  <label htmlFor="creator-invite-code" className="block text-xs text-ink/70">
                     {t('creator.apply.codeLabel')}
                   </label>
                   <div className="relative mt-1.5">
-                    <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
+                    <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink/40" />
                     <input
                       id="creator-invite-code"
                       type="text"
                       value={inviteCode}
                       onChange={(e) => setInviteCode(e.target.value)}
                       placeholder={t('creator.apply.codePlaceholder')}
-                      className="h-11 w-full rounded-xl border border-white/15 bg-black/50 pl-9 pr-3 font-mono text-sm uppercase text-white placeholder:normal-case placeholder:text-white/35 focus:border-hud/60 focus:outline-none"
+                      className="h-11 w-full rounded-xl border border-line bg-canvas/50 pl-9 pr-3 font-mono text-sm uppercase text-ink placeholder:normal-case placeholder:text-ink/35 focus:border-accent/60 focus:outline-none"
                     />
                   </div>
-                  <p className="mt-2 text-xs text-white/55">
+                  <p className="mt-2 text-xs text-ink-soft">
                     {t('creator.apply.codeHint')}
                   </p>
                 </div>
               ) : (
                 <div className="mt-4">
-                  <label htmlFor="creator-apply-note" className="block text-xs text-white/70">
+                  <label htmlFor="creator-apply-note" className="block text-xs text-ink/70">
                     {t('creator.apply.noteLabel')}
                   </label>
                   <textarea
@@ -346,16 +346,16 @@ export default function CreatorActions() {
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
                     placeholder={t('creator.apply.notePlaceholder')}
-                    className="mt-1.5 w-full rounded-xl border border-white/15 bg-black/50 p-3 text-xs text-white placeholder:text-white/35 focus:border-hud/60 focus:outline-none"
+                    className="mt-1.5 w-full rounded-xl border border-line bg-canvas/50 p-3 text-xs text-ink placeholder:text-ink/35 focus:border-accent/60 focus:outline-none"
                   />
-                  <p className="mt-2 text-xs text-white/55">
+                  <p className="mt-2 text-xs text-ink-soft">
                     {t('creator.apply.noteHint')}
                   </p>
                 </div>
               )}
 
               {errorMsg && (
-                <p role="alert" className="mt-3 rounded-lg border border-amber/40 bg-amber/10 px-3 py-2 text-xs text-amber">
+                <p role="alert" className="mt-3 rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-xs text-warn">
                   {errorMsg}
                 </p>
               )}
@@ -363,7 +363,7 @@ export default function CreatorActions() {
               <button
                 type="submit"
                 disabled={submitting || (hasInviteCode && !inviteCode.trim())}
-                className="mt-6 inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-white text-sm font-semibold text-black transition-colors hover:bg-white/85 disabled:cursor-not-allowed disabled:opacity-45"
+                className="mt-6 inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-ink text-sm font-semibold text-canvas transition-colors hover:bg-ink/85 disabled:cursor-not-allowed disabled:opacity-45"
               >
                 {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
                 {submitting

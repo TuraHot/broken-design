@@ -19,7 +19,6 @@ import {
 import AvatarUploader from '@/components/profile/AvatarUploader';
 import {
   CDN_SERVICE_URL,
-  enableSellerMode,
   fetchMyPurchases,
   fetchSellerStatus,
   regenerateEmbedKey,
@@ -85,28 +84,6 @@ export default function MePage() {
       mounted = false;
     };
   }, [token]);
-
-  // Handle Enable Seller Mode
-  const handleEnableSeller = async () => {
-    if (!token) return;
-    try {
-      setBusyAction('enable-seller');
-      setStatusMsg(null);
-      await enableSellerMode(token);
-      setUser((prev) => {
-        if (!prev) return prev;
-        const nextRole: AuthUser['role'] = prev.role === 'user' ? 'creator' : prev.role;
-        const updated = { ...prev, is_seller: true, role: nextRole };
-        updateSessionUser({ is_seller: true, role: nextRole });
-        return updated;
-      });
-      setStatusMsg({ key: 'me.sellerOn' });
-    } catch (err: any) {
-      setStatusMsg(fromErr(err, 'me.sellerFail'));
-    } finally {
-      setBusyAction(null);
-    }
-  };
 
   // Handle Regenerate Embed Key
   const handleRegenerateKey = async (purchaseId: string) => {
@@ -279,15 +256,13 @@ export default function MePage() {
               </Link>
             </>
           ) : (
-            <button
-              type="button"
-              disabled={busyAction === 'enable-seller'}
-              onClick={handleEnableSeller}
-              className="flex h-9 items-center gap-2 rounded-lg bg-white px-4 text-xs font-mono uppercase tracking-wider text-black transition-colors hover:bg-white/85 disabled:opacity-60"
+            <Link
+              href="/creator"
+              className="flex h-9 items-center gap-2 rounded-lg bg-white px-4 text-xs font-mono uppercase tracking-wider text-black transition-colors hover:bg-white/85"
             >
               <Sparkles className="h-4 w-4" />
-              {busyAction === 'enable-seller' ? t('me.activating') : t('me.becomeCreator')}
-            </button>
+              {t('me.becomeCreator')}
+            </Link>
           )}
         </div>
       </div>
@@ -303,14 +278,12 @@ export default function MePage() {
                 {t('me.oppBody')}
               </p>
             </div>
-            <button
-              type="button"
-              disabled={busyAction === 'enable-seller'}
-              onClick={handleEnableSeller}
-              className="whitespace-nowrap rounded-lg bg-hud px-4 py-2 font-mono text-xs uppercase tracking-wider text-black font-semibold transition-colors hover:bg-hud/85 disabled:opacity-60"
+            <Link
+              href="/creator"
+              className="inline-flex items-center justify-center whitespace-nowrap rounded-lg bg-hud px-4 py-2 font-mono text-xs uppercase tracking-wider text-black font-semibold transition-colors hover:bg-hud/85"
             >
               {t('me.enableSeller')}
-            </button>
+            </Link>
           </div>
         </div>
       )}

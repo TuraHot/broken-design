@@ -13,17 +13,17 @@ import express, {
   type Response,
   type NextFunction,
 } from "express";
-import jwt from "jsonwebtoken";
 import multer from "multer";
 import rateLimit from "express-rate-limit";
 import { env } from "../../config/env";
 import { AppError } from "../../middlewares/error.middleware";
-import type { AuthUser } from "../../middlewares/auth.middleware";
+import { verifyJwtToken, type AuthUser } from "../../middlewares/auth.middleware";
 import { validateGlbHeader } from "../../utils/glbValidator";
 import {
   embedLicenseAndWatermark,
   verifyGlbWatermark,
 } from "../../utils/glbWatermark";
+import { parseRangeSpec, resolveRange } from "./range";
 import {
   CONTENT_TYPES,
   assertCanDownloadPaid,
@@ -100,6 +100,11 @@ const downloadLimiter = limiter(
   60_000,
   num(process.env.CDN_DOWNLOADS_PER_MIN, 30),
 );
+// Watermark verification loads up to 50 MB in memory and may scan DB vertex signatures.
+export const verifyWatermarkLimiter = limiter(
+  60_000,
+  num(process.env.CDN_VERIFY_RATE_LIMIT_PER_MIN, 15),
+);
 
 export const cdnRouter = Router();
 
@@ -124,7 +129,7 @@ function optionalUser(req: Request): AuthUser | null {
   if (!header.startsWith("Bearer "))
     throw new AppError(401, "UNAUTHORIZED", "Invalid Authorization header");
   try {
-    return jwt.verify(header.slice(7), env.jwtSecret) as AuthUser;
+    return verifyJwtToken(header.slice(7));
   } catch {
     throw new AppError(401, "INVALID_TOKEN", "Invalid or expired JWT token");
   }
@@ -183,8 +188,8 @@ cdnRouter.get("/models/:id/download", downloadLimiter, async (req, res) => {
   const model = await loadModel(String(req.params.id));
   let purchaseInfo: PaidDownloadAccess | null = null;
 
-  // If user has role as creator and is attempting to download their own uploaded model, reject
-  if (user && user.role === "creator" && model.owner_id === user.id) {
+  // Block any authenticated owner from downloading their own uploaded model regardless of stale JWT role
+  if (user && model.owner_id === user.id) {
     throw new AppError(
       403,
       "OWN_MODEL",
@@ -205,9 +210,8 @@ cdnRouter.get("/models/:id/download", downloadLimiter, async (req, res) => {
     assertServable(model);
   }
 
-  // If a paid buyer is downloading the full file (no Range header), dynamically embed their purchaseId & license_type
-  // into the GLB (Layer 1 metadata + Layer 2 vertex steganography) and store watermark_hash in purchases.
-  if (purchaseInfo?.purchaseId && !req.headers.range) {
+  // Always embed buyer's purchaseId & license_type for paid downloads (including Range requests so Range cannot bypass watermarking).
+  if (purchaseInfo?.purchaseId) {
     const rawBuffer = await readAssetBuffer(
       candidateKeys(model.id, "model", model.file_hash),
     );
@@ -224,25 +228,62 @@ cdnRouter.get("/models/:id/download", downloadLimiter, async (req, res) => {
 
       await savePurchaseWatermarkHash(purchaseInfo.purchaseId, signature);
 
-      res.setHeader("ETag", `"${signature}"`);
+      const etag = `"${signature}"`;
+      const totalSize = watermarkedBuffer.length;
+      const ifRange = req.headers["if-range"];
+      const spec =
+        ifRange && ifRange !== etag ? null : parseRangeSpec(req.headers.range);
+
+      let range = null;
+      if (spec) {
+        range = resolveRange(spec, totalSize);
+        if (!range) {
+          res.setHeader("Content-Range", `bytes */${totalSize}`);
+          res.setHeader("Cache-Control", "no-store");
+          throw new AppError(
+            416,
+            "RANGE_NOT_SATISFIABLE",
+            "Requested range is outside the file",
+          );
+        }
+      }
+
+      res.setHeader("ETag", etag);
       res.setHeader("Cache-Control", CACHE.private);
       res.setHeader("Accept-Ranges", "bytes");
       res.setHeader("Content-Type", CONTENT_TYPES.glb);
       res.setHeader("X-Content-Type-Options", "nosniff");
       res.setHeader("Content-Disposition", contentDisposition(model.title));
-      res.setHeader("Content-Length", String(watermarkedBuffer.length));
+
+      const bodyBuffer = range
+        ? watermarkedBuffer.subarray(range.start, range.end + 1)
+        : watermarkedBuffer;
+
+      if (range) {
+        res.status(206);
+        res.setHeader(
+          "Content-Range",
+          `bytes ${range.start}-${range.end}/${totalSize}`,
+        );
+        res.setHeader("Content-Length", String(bodyBuffer.length));
+      } else {
+        res.status(200);
+        res.setHeader("Content-Length", String(totalSize));
+      }
 
       if (req.method === "HEAD") {
-        res.status(200).end();
+        res.end();
         return;
       }
 
-      res.once("finish", () => {
-        incrementDownloadCount(model.id).catch((err) =>
-          console.error("[CDN] download_count update failed:", err.message),
-        );
-      });
-      res.status(200).send(watermarkedBuffer);
+      if (!range || range.start === 0) {
+        res.once("finish", () => {
+          incrementDownloadCount(model.id).catch((err) =>
+            console.error("[CDN] download_count update failed:", err.message),
+          );
+        });
+      }
+      res.send(bodyBuffer);
       return;
     }
   }
@@ -335,6 +376,7 @@ export const verifyWatermarkHandler = async (
 
 cdnRouter.post(
   "/verify-watermark",
+  verifyWatermarkLimiter,
   verifyWatermarkMiddleware,
   verifyWatermarkHandler,
 );

@@ -228,20 +228,31 @@ modelsRouter.get('/:id', async (req, res, next) => {
   }
 });
 
-// PATCH /api/models/:id (Update metadata: title, description, priceCents, license)
+// PATCH /api/models/:id (Update metadata: title, description, tags?, priceCents, license)
 modelsRouter.patch('/:id', requireAuth, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { id } = req.params;
-    const userId = req.user!.id;
-    const userRole = req.user!.role;
+    const id = String(req.params.id);
+    if (!UUID_RE.test(id)) {
+      throw new AppError(404, 'MODEL_NOT_FOUND', 'Model not found');
+    }
 
-    const userCheck = await db.query(`SELECT suspended_at FROM users WHERE id = $1`, [userId]);
-    if (userCheck.rows.length > 0 && userCheck.rows[0].suspended_at !== null) {
+    const userId = req.user!.id;
+
+    // Verify caller role & suspension status from DB (never trust JWT role claims alone)
+    const userCheck = await db.query<{ role: string; suspended_at: Date | string | null }>(
+      `SELECT role, suspended_at FROM users WHERE id = $1`,
+      [userId],
+    );
+    const dbUser = userCheck.rows[0];
+    if (!dbUser) {
+      throw new AppError(401, 'UNAUTHORIZED', 'Account not found');
+    }
+    if (dbUser.suspended_at !== null) {
       throw new AppError(403, 'ACCOUNT_SUSPENDED', 'Your account has been suspended by an administrator');
     }
 
     const existing = await db.query(
-      `SELECT id, owner_id, title, description, price_cents, license, deleted_at
+      `SELECT id, owner_id, title, description, tags, price_cents, license, preview_hash, deleted_at
        FROM models WHERE id = $1`,
       [id],
     );
@@ -250,36 +261,67 @@ modelsRouter.patch('/:id', requireAuth, async (req: Request, res: Response, next
     }
 
     const model = existing.rows[0];
-    if (model.owner_id !== userId && userRole !== 'admin') {
+    if (model.owner_id !== userId && dbUser.role !== 'admin') {
       throw new AppError(403, 'FORBIDDEN', 'You do not have permission to edit this model');
     }
 
     const nextTitle =
       typeof req.body?.title === 'string' && req.body.title.trim() ? req.body.title.trim() : model.title;
+    if (nextTitle.length > 255) {
+      throw new AppError(400, 'BAD_REQUEST', 'Model title must not exceed 255 characters');
+    }
+
     const nextDescription =
-      typeof req.body?.description === 'string' ? req.body.description.trim() : model.description;
+      typeof req.body?.description === 'string' ? req.body.description.trim() : (model.description ?? '');
+    if (nextDescription.length > 5000) {
+      throw new AppError(400, 'BAD_REQUEST', 'Description must not exceed 5000 characters');
+    }
+
     const nextPriceCents =
       req.body?.priceCents !== undefined && req.body?.priceCents !== null
-        ? Math.max(0, Math.round(Number(req.body.priceCents)))
-        : model.price_cents;
+        ? Math.round(Number(req.body.priceCents))
+        : Number(model.price_cents);
 
-    if (!Number.isFinite(nextPriceCents)) {
+    if (!Number.isFinite(nextPriceCents) || nextPriceCents < 0 || nextPriceCents > 100_000_000) {
       throw new AppError(400, 'BAD_REQUEST', 'Invalid priceCents');
     }
 
-    const VALID_LICENSES = ['CC0', 'CC-BY', 'CC-BY-NC', 'COMMERCIAL'];
+    // Core Invariant (AGENT.md §3.2): paid models MUST have a preview GLB so the full file is never leaked publicly
+    if (nextPriceCents > 0 && !model.preview_hash?.trim()) {
+      throw new AppError(
+        400,
+        'PREVIEW_REQUIRED',
+        'Paid models require a preview GLB file before setting a price',
+      );
+    }
+
     const rawLicense =
       typeof req.body?.license === 'string' ? req.body.license.trim().toUpperCase() : model.license;
-    if (!VALID_LICENSES.includes(rawLicense)) {
-      throw new AppError(400, 'INVALID_LICENSE', `Invalid license. Allowed: ${VALID_LICENSES.join(', ')}`);
+    if (!VALID_LICENSES.has(rawLicense)) {
+      throw new AppError(
+        400,
+        'INVALID_LICENSE',
+        `Invalid license. Allowed: ${Array.from(VALID_LICENSES).join(', ')}`,
+      );
+    }
+
+    let nextTags: string[] = Array.isArray(model.tags) ? model.tags : [];
+    if (Array.isArray(req.body?.tags)) {
+      nextTags = Array.from(
+        new Set(
+          req.body.tags
+            .map((t: unknown) => String(t).trim().toLowerCase())
+            .filter((t: string) => t.length > 0 && t.length <= 50),
+        ),
+      ).slice(0, 20) as string[];
     }
 
     const updated = await db.query(
       `UPDATE models
-       SET title = $1, description = $2, price_cents = $3, license = $4
-       WHERE id = $5
-       RETURNING id, title, description, price_cents, license`,
-      [nextTitle, nextDescription, nextPriceCents, rawLicense, id],
+       SET title = $1, description = $2, tags = $3, price_cents = $4, license = $5
+       WHERE id = $6
+       RETURNING id, title, description, tags, price_cents, license`,
+      [nextTitle, nextDescription, nextTags, nextPriceCents, rawLicense, id],
     );
 
     const r = updated.rows[0];
@@ -288,6 +330,7 @@ modelsRouter.patch('/:id', requireAuth, async (req: Request, res: Response, next
         id: r.id,
         title: r.title,
         description: r.description,
+        tags: r.tags ?? [],
         priceCents: r.price_cents,
         license: r.license,
       },
@@ -300,23 +343,30 @@ modelsRouter.patch('/:id', requireAuth, async (req: Request, res: Response, next
 // [Ham] DELETE /api/models/:id (Soft delete: only owner or admin can delete)
 modelsRouter.delete('/:id', requireAuth, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { id } = req.params;
-    const userId = req.user!.id;
-    const userRole = req.user!.role;
+    const id = String(req.params.id);
+    if (!UUID_RE.test(id)) {
+      throw new AppError(404, 'NOT_FOUND', 'Model not found or already deleted');
+    }
 
-    // 0. Ensure user account is not suspended
-    const userCheck = await db.query(
-      `SELECT suspended_at FROM users WHERE id = $1`,
-      [userId]
+    const userId = req.user!.id;
+
+    // 0. Verify caller role & suspension status from DB
+    const userCheck = await db.query<{ role: string; suspended_at: Date | string | null }>(
+      `SELECT role, suspended_at FROM users WHERE id = $1`,
+      [userId],
     );
-    if (userCheck.rows.length > 0 && userCheck.rows[0].suspended_at !== null) {
+    const dbUser = userCheck.rows[0];
+    if (!dbUser) {
+      throw new AppError(401, 'UNAUTHORIZED', 'Account not found');
+    }
+    if (dbUser.suspended_at !== null) {
       throw new AppError(403, 'ACCOUNT_SUSPENDED', 'Your account has been suspended by an administrator');
     }
 
     // 1. Find model and verify existence
     const findResult = await db.query(
       `SELECT id, owner_id, deleted_at FROM models WHERE id = $1`,
-      [id]
+      [id],
     );
 
     if (findResult.rows.length === 0 || findResult.rows[0].deleted_at !== null) {
@@ -325,15 +375,15 @@ modelsRouter.delete('/:id', requireAuth, async (req: Request, res: Response, nex
 
     const model = findResult.rows[0];
 
-    // 2. Only owner or admin can delete
-    if (model.owner_id !== userId && userRole !== 'admin') {
+    // 2. Only owner or active DB-verified admin can delete
+    if (model.owner_id !== userId && dbUser.role !== 'admin') {
       throw new AppError(403, 'FORBIDDEN', 'You can only delete your own models');
     }
 
     // 3. Perform Soft Delete (set deleted_at without removing file from storage)
     const updateResult = await db.query(
       `UPDATE models SET deleted_at = NOW() WHERE id = $1 RETURNING id, owner_id, title, deleted_at`,
-      [id]
+      [id],
     );
 
     res.json({

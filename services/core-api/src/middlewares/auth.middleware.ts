@@ -5,8 +5,6 @@ import { db } from '../config/db';
 import { env } from '../config/env';
 import { AppError } from './error.middleware';
 
-type UserRole = 'user' | 'creator' | 'admin';
-
 export interface AuthUser {
   id: string;
   email: string;
@@ -14,12 +12,37 @@ export interface AuthUser {
   is_seller?: boolean;
 }
 
+const VALID_ROLES = new Set(['user', 'creator', 'admin']);
+
 declare global {
   namespace Express {
     interface Request {
       user?: AuthUser;
     }
   }
+}
+
+export function verifyJwtToken(token: string): AuthUser {
+  const decoded = jwt.verify(token, env.jwtSecret, { algorithms: ['HS256'] });
+  if (typeof decoded !== 'object' || decoded === null) {
+    throw new Error('Malformed JWT payload');
+  }
+  const { id, email, role, is_seller } = decoded as Record<string, unknown>;
+  if (
+    typeof id !== 'string' ||
+    id.trim() === '' ||
+    typeof email !== 'string' ||
+    typeof role !== 'string' ||
+    !VALID_ROLES.has(role)
+  ) {
+    throw new Error('Invalid JWT claims');
+  }
+  return {
+    id,
+    email,
+    role: role as AuthUser['role'],
+    ...(typeof is_seller === 'boolean' ? { is_seller } : {}),
+  };
 }
 
 export function requireAuth(req: Request, _res: Response, next: NextFunction) {
@@ -31,30 +54,57 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction) {
 
   try {
     const token = header.slice(7);
-    req.user = jwt.verify(token, env.jwtSecret) as AuthUser;
+    req.user = verifyJwtToken(token);
     next();
   } catch {
     throw new AppError(401, 'INVALID_TOKEN', 'Invalid or expired JWT token');
   }
 }
 
-export function requireSeller(req: Request, _res: Response, next: NextFunction) {
+/**
+ * Use AFTER requireAuth on seller routes. Always verifies is_seller, role <> 'admin', and suspended_at from the DB.
+ */
+export async function requireActiveSeller(req: Request, _res: Response, next: NextFunction) {
   if (!req.user) {
     throw new AppError(401, 'UNAUTHORIZED', 'Authentication required');
   }
-  const isSeller = Boolean(req.user.is_seller || req.user.role === 'creator' || req.user.role === 'admin');
-  if (!isSeller) {
-    throw new AppError(403, 'FORBIDDEN', 'Seller access required. Please enable seller mode first.');
+  const result = await db.query<{ is_seller: boolean; role: string; suspended_at: Date | string | null }>(
+    `SELECT is_seller, role, suspended_at FROM users WHERE id = $1`,
+    [req.user.id],
+  );
+  const row = result.rows[0];
+  if (!row) {
+    throw new AppError(401, 'UNAUTHORIZED', 'Account not found');
+  }
+  if (row.suspended_at) {
+    throw new AppError(403, 'ACCOUNT_SUSPENDED', 'Your account has been suspended by an administrator');
+  }
+  if (row.role === 'admin') {
+    throw new AppError(403, 'ADMIN_CANNOT_SELL', 'Admin accounts cannot act as sellers');
+  }
+  if (!row.is_seller) {
+    throw new AppError(403, 'NOT_SELLER', 'You must be an approved creator to access seller tools');
   }
   next();
 }
 
-export function requireAdmin(req: Request, _res: Response, next: NextFunction) {
+/**
+ * Use AFTER requireAuth on admin routes. Always verifies role === 'admin' and suspended_at IS NULL from the DB.
+ */
+export async function requireActiveAdmin(req: Request, _res: Response, next: NextFunction) {
   if (!req.user) {
     throw new AppError(401, 'UNAUTHORIZED', 'Authentication required');
   }
-  if (req.user.role !== 'admin') {
+  const result = await db.query<{ role: string; suspended_at: Date | string | null }>(
+    `SELECT role, suspended_at FROM users WHERE id = $1`,
+    [req.user.id],
+  );
+  const row = result.rows[0];
+  if (!row || row.role !== 'admin') {
     throw new AppError(403, 'FORBIDDEN', 'Admin access required');
+  }
+  if (row.suspended_at) {
+    throw new AppError(403, 'ACCOUNT_SUSPENDED', 'Your account has been suspended by an administrator');
   }
   next();
 }

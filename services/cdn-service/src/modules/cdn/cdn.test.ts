@@ -9,7 +9,7 @@ import type { AddressInfo } from "net";
 import express from "express";
 import jwt from "jsonwebtoken";
 import { db } from "../../config/db";
-import { env } from "../../config/env";
+import { assertProductionSecrets, env } from "../../config/env";
 import { errorHandler } from "../../middlewares/error.middleware";
 import { cdnRouter } from "./cdn.routes";
 import { uploadRouter } from "../upload/upload.routes";
@@ -494,7 +494,7 @@ test("download free model: anyone, attachment, counts once", async () => {
   assert.deepEqual(downloadIncrements, [FREE_ID]);
 });
 
-test("download paid model: login + purchase (or owner) required", async () => {
+test("download paid model: login + purchase required, and owner is blocked with 403 OWN_MODEL regardless of JWT role", async () => {
   const anon = await get(`/models/${PAID_ID}/download`);
   assert.equal(anon.status, 401);
   assert.equal(await errCode(anon), "LOGIN_REQUIRED");
@@ -511,23 +511,23 @@ test("download paid model: login + purchase (or owner) required", async () => {
   assert.equal(stranger.status, 403);
   assert.equal(await errCode(stranger), "PURCHASE_REQUIRED");
 
-  for (const who of [BUYER, OWNER]) {
-    const res = await get(`/models/${PAID_ID}/download`, {
-      Authorization: `Bearer ${token(who)}`,
-    });
-    assert.equal(res.status, 200, who);
-    assert.deepEqual(Buffer.from(await res.arrayBuffer()), FULL);
-  }
-  await waitTick();
-  assert.equal(downloadIncrements.length, 2);
-});
-
-test("download: creator role downloading own model is blocked with 403 OWN_MODEL", async () => {
-  const res = await get(`/models/${PAID_ID}/download`, {
-    Authorization: `Bearer ${token(OWNER, "creator")}`,
+  // Buyer downloads successfully
+  const buyerRes = await get(`/models/${PAID_ID}/download`, {
+    Authorization: `Bearer ${token(BUYER)}`,
   });
-  assert.equal(res.status, 403);
-  assert.equal(await errCode(res), "OWN_MODEL");
+  assert.equal(buyerRes.status, 200);
+  assert.deepEqual(Buffer.from(await buyerRes.arrayBuffer()), FULL);
+  await waitTick();
+  assert.equal(downloadIncrements.length, 1);
+
+  // Owner is blocked even with a stale 'user' role in JWT
+  for (const role of ["user", "creator"]) {
+    const ownerRes = await get(`/models/${PAID_ID}/download`, {
+      Authorization: `Bearer ${token(OWNER, role)}`,
+    });
+    assert.equal(ownerRes.status, 403, role);
+    assert.equal(await errCode(ownerRes), "OWN_MODEL", role);
+  }
 });
 
 test("download: suspended downloader is blocked", async () => {
@@ -1032,4 +1032,91 @@ test("patch assets guard: enforces ownership, blocks foreign watermarked replace
   assert.equal(verifiedPreview.isValidMetadata, true);
   assert.equal(verifiedPreview.isValidVertexWatermark, true);
   assert.equal((verifiedPreview.extractedMetadata as any)?.purchaseId, "preview");
+});
+
+// ─── Pack A Security Guards ─────────────────────────────────────────────────
+test("download paid real GLB with Range: bytes=0- STILL embeds buyer watermark and returns 206", async () => {
+  const rawGlb = await createSampleGlbBuffer(72);
+  const realGlbHash = store(rawGlb, "glb");
+  models[PAID_ID].file_hash = realGlbHash;
+  models[PAID_ID].license = "COMMERCIAL";
+
+  const purchaseId = "88888888-8888-4888-8888-888888888888";
+  purchases[0].id = purchaseId;
+  purchases[0].license_type = "COMMERCIAL";
+  delete purchases[0].watermark_hash;
+
+  const dlRes = await get(`/models/${PAID_ID}/download`, {
+    Authorization: `Bearer ${token(BUYER)}`,
+    Range: "bytes=0-",
+  });
+  assert.equal(dlRes.status, 206);
+  const rangeBody = Buffer.from(await dlRes.arrayBuffer());
+  assert.equal(
+    dlRes.headers.get("content-range"),
+    `bytes 0-${rangeBody.length - 1}/${rangeBody.length}`,
+  );
+  assert.ok(purchases[0].watermark_hash, "watermark_hash must be saved even on Range downloads");
+
+  const verified = await verifyGlbWatermark(rangeBody, PAID_ID);
+  assert.equal(verified.isValidMetadata, true);
+  assert.equal(verified.isValidVertexWatermark, true);
+  assert.equal((verified.extractedMetadata as any)?.purchaseId, purchaseId);
+});
+
+test("upload auth: newly approved creator with stale user JWT can upload, while admin & suspended accounts are blocked", async () => {
+  const glb = await createSampleGlbBuffer(72);
+
+  // 1. Newly approved creator in DB holding pre-approval JWT (role='user') -> 201 Created!
+  users[OWNER] = { role: "creator", is_seller: true, suspended_at: null };
+  const formOk = new FormData();
+  formOk.append("file", new Blob([new Uint8Array(glb)], { type: "model/gltf-binary" }), "fresh.glb");
+  formOk.append("title", "Fresh Approved Creator Model");
+  formOk.append("license", "CC0");
+  formOk.append("price_cents", "0");
+  const okRes = await fetch(`${apiBase}/models`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token(OWNER, "user")}` },
+    body: formOk,
+  });
+  assert.equal(okRes.status, 201);
+  await okRes.arrayBuffer();
+
+  // 2. Admin account in DB -> 403 ADMIN_CANNOT_SELL even if JWT says creator
+  users[STRANGER] = { role: "admin", is_seller: true, suspended_at: null };
+  const formAdmin = new FormData();
+  formAdmin.append("file", new Blob([new Uint8Array(glb)], { type: "model/gltf-binary" }), "a.glb");
+  formAdmin.append("title", "Admin Attempt");
+  const adminRes = await fetch(`${apiBase}/models`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token(STRANGER, "creator")}` },
+    body: formAdmin,
+  });
+  assert.equal(adminRes.status, 403);
+  assert.equal(await errCode(adminRes), "ADMIN_CANNOT_SELL");
+
+  // 3. Suspended creator in DB -> 403 ACCOUNT_SUSPENDED
+  users[OWNER] = { role: "creator", is_seller: true, suspended_at: new Date() };
+  const formSusp = new FormData();
+  formSusp.append("file", new Blob([new Uint8Array(glb)], { type: "model/gltf-binary" }), "s.glb");
+  formSusp.append("title", "Suspended Attempt");
+  const suspRes = await fetch(`${apiBase}/models`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token(OWNER, "creator")}` },
+    body: formSusp,
+  });
+  assert.equal(suspRes.status, 403);
+  assert.equal(await errCode(suspRes), "ACCOUNT_SUSPENDED");
+});
+
+test("security: assertProductionSecrets rejects default JWT_SECRET and WATERMARK_SECRET in production", () => {
+  assert.throws(() => assertProductionSecrets("production", "dev-secret", "strong-watermark-secret-123456"), /JWT_SECRET/);
+  assert.throws(
+    () => assertProductionSecrets("production", "strong-jwt-secret-123456", "lixyte-broken-design-watermark-secret-2026"),
+    /WATERMARK_SECRET/,
+  );
+  assert.doesNotThrow(() =>
+    assertProductionSecrets("production", "strong-jwt-secret-123456", "strong-watermark-secret-123456"),
+  );
+  assert.doesNotThrow(() => assertProductionSecrets("development", "dev-secret", ""));
 });

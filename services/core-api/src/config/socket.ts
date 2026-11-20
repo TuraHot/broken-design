@@ -1,8 +1,7 @@
 import { Server as SocketIOServer } from 'socket.io';
 import type { Server as HTTPServer } from 'http';
-import jwt from 'jsonwebtoken';
-import { env } from './env';
 import { allowedOrigins } from './cors';
+import { verifyJwtToken } from '../middlewares/auth.middleware';
 
 let io: SocketIOServer | null = null;
 
@@ -23,7 +22,7 @@ export function initSocketServer(httpServer: HTTPServer): SocketIOServer {
 
     if (token && typeof token === 'string') {
       try {
-        const decoded = jwt.verify(token, env.jwtSecret) as { id: string; role?: string };
+        const decoded = verifyJwtToken(token);
         (socket as any).userId = decoded.id;
       } catch {
         // Allow unauthenticated connection for public model live stats

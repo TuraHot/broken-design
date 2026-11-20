@@ -16,3 +16,5 @@ process.env.JWT_SECRET = "cdn-test-secret";
 process.env.CDN_KEY_FAILURES_PER_15MIN = "10000";
 process.env.CDN_DOWNLOADS_PER_MIN = "10000";
 process.env.CDN_RATE_LIMIT_PER_MIN = "10000";
+process.env.CDN_VERIFY_RATE_LIMIT_PER_MIN = "10000";
+process.env.CDN_UPLOADS_PER_15MIN = "10000";

@@ -5,7 +5,8 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { app } from '../../app';
 import { db } from '../../config/db';
-import { env } from '../../config/env';
+import { assertProductionSecrets, env } from '../../config/env';
+import { verifyJwtToken } from '../../middlewares/auth.middleware';
 
 test('POST /api/auth/check-email - validates email and checks existence', async () => {
   const originalQuery = db.query.bind(db);
@@ -303,4 +304,27 @@ test('POST /api/auth/login - when the sweep lifts nothing (clock difference) the
   assert.equal(body.error.code, 'ACCOUNT_SUSPENDED');
   assert.equal(body.token, undefined);
   assert.match(body.error.message, /Still counts for the database\./);
+});
+
+test('security: assertProductionSecrets rejects dev-secret or short secrets in production', () => {
+  assert.throws(() => assertProductionSecrets('production', 'dev-secret'), /JWT_SECRET/);
+  assert.throws(() => assertProductionSecrets('production', ''), /JWT_SECRET/);
+  assert.throws(() => assertProductionSecrets('production', 'short-key'), /JWT_SECRET/);
+  assert.doesNotThrow(() => assertProductionSecrets('production', 'a-strong-32-char-production-secret'));
+  assert.doesNotThrow(() => assertProductionSecrets('development', 'dev-secret'));
+});
+
+test('security: verifyJwtToken pins HS256 and validates payload claims', () => {
+  const valid = jwt.sign({ id: 'u-1', email: 'a@b.com', role: 'user' }, env.jwtSecret, { algorithm: 'HS256' });
+  const decoded = verifyJwtToken(valid);
+  assert.equal(decoded.id, 'u-1');
+  assert.equal(decoded.role, 'user');
+
+  // HS384 signed with same secret must be rejected when HS256 is pinned
+  const hs384 = jwt.sign({ id: 'u-1', email: 'a@b.com', role: 'user' }, env.jwtSecret, { algorithm: 'HS384' });
+  assert.throws(() => verifyJwtToken(hs384));
+
+  // Missing or unknown role must be rejected
+  const badRole = jwt.sign({ id: 'u-1', email: 'a@b.com', role: 'superadmin' }, env.jwtSecret, { algorithm: 'HS256' });
+  assert.throws(() => verifyJwtToken(badRole));
 });

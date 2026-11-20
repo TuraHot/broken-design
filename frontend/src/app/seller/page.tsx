@@ -22,7 +22,6 @@ import {
 } from 'lucide-react';
 import {
   deleteModel,
-  enableSellerMode,
   fetchSellerModels,
   fetchSellerSales,
   fetchSellerStatus,
@@ -33,7 +32,7 @@ import { creatorHandle } from '@/lib/creators';
 import { formatMoney, formatPrice } from '@/lib/format';
 import { useLocale, useT } from '@/lib/i18n/client';
 import { fromErr, type Msg } from '@/lib/i18n/msg';
-import { readSession, updateSessionUser } from '@/lib/session';
+import { readSession } from '@/lib/session';
 import type {
   AuthUser,
   SellerModelItem,
@@ -108,29 +107,6 @@ export default function SellerPage() {
     }
   }, [token]);
 
-  // Handle Enable Seller
-  const handleEnableSeller = async () => {
-    if (!token) return;
-    try {
-      setBusyAction('enable');
-      await enableSellerMode(token);
-      setIsSeller(true);
-      setUser((prev) => {
-        if (!prev) return prev;
-        const nextRole: typeof prev.role = prev.role === 'user' ? 'creator' : prev.role;
-        const next = { ...prev, is_seller: true, role: nextRole };
-        updateSessionUser({ is_seller: true, role: nextRole });
-        return next;
-      });
-      setStatusMsg({ key: 'seller.enabled' });
-      await loadData(token);
-    } catch (err: any) {
-      setStatusMsg(fromErr(err, 'seller.enableFail'));
-    } finally {
-      setBusyAction(null);
-    }
-  };
-
   // Handle Soft Delete Model
   const handleDeleteModel = async (modelId: string, title: string) => {
     if (!token) return;
@@ -192,15 +168,13 @@ export default function SellerPage() {
           <p className="mt-3 text-[15px] leading-relaxed text-white/65">
             {t('seller.offBody')}
           </p>
-          <button
-            type="button"
-            disabled={busyAction === 'enable'}
-            onClick={handleEnableSeller}
-            className="mt-6 inline-flex items-center gap-2 rounded-lg bg-hud px-6 py-2.5 font-mono text-xs uppercase tracking-wider text-black font-semibold transition-colors hover:bg-hud/85 disabled:opacity-60"
+          <Link
+            href="/creator"
+            className="mt-6 inline-flex items-center gap-2 rounded-lg bg-hud px-6 py-2.5 font-mono text-xs uppercase tracking-wider text-black font-semibold transition-colors hover:bg-hud/85"
           >
             <Plus className="h-4 w-4" />
-            {busyAction === 'enable' ? t('seller.activating') : t('seller.offButton')}
-          </button>
+            {t('seller.offButton')}
+          </Link>
         </div>
       </main>
     );

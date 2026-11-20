@@ -1,8 +1,9 @@
 
 import crypto from 'crypto';
-import { Router } from 'express';
+import { Router, type Request, type Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { db } from '../../config/db';
 import { env } from '../../config/env';
@@ -12,20 +13,52 @@ import { liftExpiredSuspensions } from '../admin/suspensionSweeper';
 
 export const authRouter = Router();
 
+const numEnv = (key: string, fallback: number) => {
+  const n = Number(process.env[key]);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+};
+
+const authLimitHandler = (_req: Request, res: Response) => {
+  res.status(429).json({
+    error: {
+      code: 'RATE_LIMITED',
+      message: 'Too many authentication attempts, please try again later.',
+    },
+  });
+};
+
+const makeAuthLimiter = (
+  limit: number,
+  extra: Partial<Parameters<typeof rateLimit>[0]> = {},
+) =>
+  rateLimit({
+    windowMs: 15 * 60_000,
+    limit,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    skip: () => process.env.NODE_ENV === 'test' && process.env.ENFORCE_AUTH_RATE_LIMIT !== 'true',
+    handler: authLimitHandler,
+    ...extra,
+  });
+
+const checkEmailLimiter = makeAuthLimiter(numEnv('AUTH_CHECK_EMAIL_LIMIT_PER_15MIN', 30));
+const registerLimiter = makeAuthLimiter(numEnv('AUTH_REGISTER_LIMIT_PER_15MIN', 10));
+const loginLimiter = makeAuthLimiter(numEnv('AUTH_LOGIN_LIMIT_PER_15MIN', 20), {
+  skipSuccessfulRequests: true,
+});
+const passwordResetLimiter = makeAuthLimiter(numEnv('AUTH_RESET_LIMIT_PER_15MIN', 10));
+
+function timingSafeHexEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a.trim(), 'utf8');
+  const bufB = Buffer.from(b.trim(), 'utf8');
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
 function buildAvatarUrl(userId: string, avatarHash?: string | null): string | null {
   const clean = avatarHash?.trim();
   return clean ? `${env.cdnServiceUrl}/cdn/users/${userId}/avatar.webp?v=${clean.slice(0, 12)}` : null;
 }
-
-// [Member 1] POST /api/auth/register
-// authRouter.post('/register', async (_req, res) => {
-//   res.status(201).json({ message: 'TODO [Member 1]: Register user with bcrypt & return JWT' });
-// });
-
-// [Member 1] POST /api/auth/login
-// authRouter.post('/login', async (_req, res) => {
-//   res.json({ message: 'TODO [Member 1]: Verify credentials & issue JWT' });
-// });
 
 const registerSchema = z.object({
   email: z.string().trim().email().max(255),
@@ -53,7 +86,7 @@ const updateProfileSchema = z.object({
 
 // POST /api/auth/check-email
 // ตรวจสอบว่า Email มีบัญชีอยู่ในระบบแล้วหรือไม่
-authRouter.post('/check-email', async (req, res) => {
+authRouter.post('/check-email', checkEmailLimiter, async (req, res) => {
   const parsed = checkEmailSchema.safeParse(req.body);
 
   // ตรวจสอบว่า Email ถูกต้องตามรูปแบบหรือไม่
@@ -78,7 +111,7 @@ authRouter.post('/check-email', async (req, res) => {
 });
 
 // POST /api/auth/register
-authRouter.post('/register', async (req, res) => {
+authRouter.post('/register', registerLimiter, async (req, res) => {
   const parsed = registerSchema.safeParse(req.body);
 
   if (!parsed.success) {
@@ -106,9 +139,10 @@ authRouter.post('/register', async (req, res) => {
         id: user.id,
         email: user.email,
         role: user.role,
+        is_seller: Boolean(user.is_seller),
       },
       env.jwtSecret,
-      { expiresIn: '1d' },
+      { algorithm: 'HS256', expiresIn: '1d' },
     );
 
     res.status(201).json({
@@ -138,7 +172,7 @@ authRouter.post('/register', async (req, res) => {
 });
 
 // POST /api/auth/login
-authRouter.post('/login', async (req, res) => {
+authRouter.post('/login', loginLimiter, async (req, res) => {
   const parsed = loginSchema.safeParse(req.body);
 
   if (!parsed.success) {
@@ -193,9 +227,10 @@ authRouter.post('/login', async (req, res) => {
       id: user.id,
       email: user.email,
       role: user.role,
+      is_seller: Boolean(user.is_seller),
     },
     env.jwtSecret,
-    { expiresIn: '1d' },
+    { algorithm: 'HS256', expiresIn: '1d' },
   );
 
   res.json({
@@ -308,7 +343,7 @@ const resetPasswordSchema = z.object({
 // Always answers the same way so it cannot be used to discover which emails have an account.
 // No mail provider is configured: the OTP is logged, and outside production also returned as `devOtp`
 // (mock mailbox) so the page can show it instead of an email.
-authRouter.post('/forgot-password', async (req, res) => {
+authRouter.post('/forgot-password', passwordResetLimiter, async (req, res) => {
   const parsed = forgotPasswordSchema.safeParse(req.body);
   if (!parsed.success) {
     throw new AppError(400, 'INVALID_INPUT', 'Invalid email address');
@@ -342,14 +377,17 @@ authRouter.post('/forgot-password', async (req, res) => {
 
 // POST /api/auth/verify-reset-otp
 // Checks the code (max 5 tries) and swaps it for a one-time reset token to use with /reset-password.
-authRouter.post('/verify-reset-otp', async (req, res) => {
+authRouter.post('/verify-reset-otp', passwordResetLimiter, async (req, res) => {
   const parsed = verifyOtpSchema.safeParse(req.body);
   if (!parsed.success) {
     throw new AppError(400, 'INVALID_INPUT', 'Enter the 6-digit code');
   }
   const invalid = () => new AppError(400, 'INVALID_OTP', 'The code is incorrect or has expired');
 
-  const found = await db.query(`SELECT id FROM users WHERE email = $1`, [parsed.data.email.toLowerCase()]);
+  const found = await db.query(
+    `SELECT id FROM users WHERE email = $1 AND suspended_at IS NULL`,
+    [parsed.data.email.toLowerCase()],
+  );
   const user = found.rows[0];
   if (!user) throw invalid();
 
@@ -363,7 +401,7 @@ authRouter.post('/verify-reset-otp', async (req, res) => {
   ).rows[0];
   if (!row || row.attempts >= MAX_OTP_ATTEMPTS) throw invalid();
 
-  if (row.token_hash !== hashOtp(user.id, parsed.data.otp)) {
+  if (!timingSafeHexEqual(String(row.token_hash), hashOtp(user.id, parsed.data.otp))) {
     await db.query(`UPDATE password_resets SET attempts = attempts + 1 WHERE id = $1`, [row.id]);
     throw invalid();
   }
@@ -379,7 +417,7 @@ authRouter.post('/verify-reset-otp', async (req, res) => {
 });
 
 // POST /api/auth/reset-password
-authRouter.post('/reset-password', async (req, res) => {
+authRouter.post('/reset-password', passwordResetLimiter, async (req, res) => {
   const parsed = resetPasswordSchema.safeParse(req.body);
   if (!parsed.success) {
     throw new AppError(400, 'INVALID_INPUT', 'Password must be at least 8 characters');
@@ -400,7 +438,14 @@ authRouter.post('/reset-password', async (req, res) => {
       await client.query('ROLLBACK');
       throw new AppError(400, 'INVALID_TOKEN', 'This reset link is invalid or has expired');
     }
-    await client.query(`UPDATE users SET password_hash = $1 WHERE id = $2`, [passwordHash, used.rows[0].user_id]);
+    const updUser = await client.query(
+      `UPDATE users SET password_hash = $1 WHERE id = $2 AND suspended_at IS NULL RETURNING id`,
+      [passwordHash, used.rows[0].user_id],
+    );
+    if (updUser.rowCount === 0) {
+      await client.query('ROLLBACK');
+      throw new AppError(403, 'ACCOUNT_SUSPENDED', 'This account has been suspended');
+    }
     await client.query('COMMIT');
   } catch (error) {
     await client.query('ROLLBACK').catch(() => undefined);

@@ -66,7 +66,8 @@ export default function UploadPage() {
 
   const canUpload = Boolean(
     session?.user &&
-      (session.user.is_seller || session.user.role === 'creator' || session.user.role === 'admin'),
+      session.user.role !== 'admin' &&
+      (session.user.is_seller || session.user.role === 'creator'),
   );
   // Model-viewer dynamic import for client-side WebGL
   const [modelViewerLoaded, setModelViewerLoaded] = useState(false);
@@ -416,7 +417,7 @@ export default function UploadPage() {
               {t('upload.offBody')}
             </p>
             <Link
-              href="/seller"
+              href="/creator"
               className="mt-6 inline-block rounded-lg bg-white px-5 py-2 text-sm font-medium text-black transition-colors hover:bg-white/85"
             >
               {t('upload.toSellerDash')}

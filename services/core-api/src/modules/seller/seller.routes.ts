@@ -1,6 +1,6 @@
-// [ภีม] แดชบอร์ดคนขาย — โมเดลของฉัน, ยอดขาย, เปิดโหมดคนขาย
+// [ภีม] แดชบอร์ดคนขาย — โมเดลของฉัน, ยอดขาย, กระเป๋าเงิน, และระบบสมัครเป็นครีเอเตอร์
 import { Router } from 'express';
-import { requireAuth } from '../../middlewares/auth.middleware';
+import { requireActiveSeller, requireAuth } from '../../middlewares/auth.middleware';
 import { db } from '../../config/db';
 import { env } from '../../config/env';
 import { AppError } from '../../middlewares/error.middleware';
@@ -20,61 +20,39 @@ export function calculateWithdrawalBreakdown(grossAmountCents: number, feeRateBp
   };
 }
 
-// ─── Middleware: ตรวจว่าเป็นคนขายแล้ว ──────────────────────────────────────
-function requireSeller(
-  req: import('express').Request,
-  _res: import('express').Response,
-  next: import('express').NextFunction,
-) {
-  const userId = req.user!.id;
-  // ตรวจ is_seller จาก DB เพื่อความปลอดภัย (ไม่เชื่อ JWT อย่างเดียว)
-  db.query(`SELECT is_seller FROM users WHERE id = $1`, [userId])
-    .then((result) => {
-      if (result.rowCount === 0 || !result.rows[0].is_seller) {
-        throw new AppError(403, 'NOT_SELLER', 'You must enable seller mode first');
-      }
-      next();
-    })
-    .catch(next);
-}
-
 // ─── 1. POST /api/seller/enable ─────────────────────────────────────────────
-// เปิดโหมดคนขาย (is_seller = true และเปลี่ยน role user -> creator)
+// ปิดช่องทางเปิดโหมดคนขายทันที — ผู้ใช้ใหม่ต้องผ่านระบบสมัคร 2 ขั้นตอน (/api/seller/apply) ด้วย Invite Code หรือรออนุมัติจากแอดมิน
 sellerRouter.post('/enable', requireAuth, async (req, res) => {
   const userId = req.user!.id;
 
-  const result = await db.query(
-    `UPDATE users SET is_seller = TRUE,
-                      role = CASE WHEN role = 'user' THEN 'creator'::user_role ELSE role END
-     WHERE id = $1 AND (is_seller = FALSE OR role = 'user') AND role <> 'admin' AND suspended_at IS NULL
-     RETURNING id`,
+  const check = await db.query<{ is_seller: boolean; role: string; suspended_at: Date | string | null }>(
+    `SELECT is_seller, role, suspended_at FROM users WHERE id = $1`,
     [userId],
   );
+  if (check.rowCount === 0) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
 
-  if (result.rowCount === 0) {
-    // ไม่ได้อัปเดต: หาสาเหตุจาก DB (ไม่เชื่อ role ใน JWT)
-    const check = await db.query(`SELECT is_seller, role, suspended_at FROM users WHERE id = $1`, [userId]);
-    if (check.rowCount === 0) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
-    const row = check.rows[0];
-    if (row.role === 'admin') {
-      throw new AppError(403, 'ADMIN_CANNOT_SELL', 'Admin accounts cannot become sellers');
-    }
-    if (row.suspended_at !== null) {
-      throw new AppError(403, 'ACCOUNT_SUSPENDED', 'Your account has been suspended by an administrator');
-    }
-    if (row.is_seller) {
-      res.json({ message: 'Seller mode is already enabled' });
-      return;
-    }
-    throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
+  const row = check.rows[0];
+  if (row.role === 'admin') {
+    throw new AppError(403, 'ADMIN_CANNOT_SELL', 'Admin accounts cannot become sellers');
+  }
+  if (row.suspended_at !== null) {
+    throw new AppError(403, 'ACCOUNT_SUSPENDED', 'Your account has been suspended by an administrator');
+  }
+  if (row.is_seller) {
+    res.json({ message: 'Seller mode is already enabled' });
+    return;
   }
 
-  res.json({ message: 'Seller mode enabled successfully' });
+  throw new AppError(
+    403,
+    'CREATOR_APPLICATION_REQUIRED',
+    'Direct seller activation is disabled. Please apply at /creator with an invite code or submit an application for admin approval.',
+  );
 });
 
 // ─── 2. GET /api/seller/models ──────────────────────────────────────────────
 // โมเดลของฉัน (คนขาย)
-sellerRouter.get('/models', requireAuth, requireSeller, async (req, res) => {
+sellerRouter.get('/models', requireAuth, requireActiveSeller, async (req, res) => {
   const userId = req.user!.id;
 
   const result = await db.query(
@@ -105,26 +83,28 @@ sellerRouter.get('/models', requireAuth, requireSeller, async (req, res) => {
 });
 
 // ─── 3. GET /api/seller/sales ───────────────────────────────────────────────
-// ยอดขายของคนขาย — สรุปรายได้ทั้งหมดและรายการขายแต่ละรายการ
-sellerRouter.get('/sales', requireAuth, requireSeller, async (req, res) => {
+// ยอดขายของคนขาย — ใช้ราคาที่ล็อกไว้ตอนซื้อ (purchases.amount_cents) เพื่อให้ตรงกับประวัติจริงแม้แก้ราคาภายหลัง
+sellerRouter.get('/sales', requireAuth, requireActiveSeller, async (req, res) => {
   const userId = req.user!.id;
 
   // รายการขายทั้งหมด (เฉพาะ paid)
   const salesResult = await db.query(
-    `SELECT p.id AS purchase_id, p.model_id, p.created_at AS sold_at,
-            m.title, m.price_cents, m.currency,
+    `SELECT p.id AS purchase_id, p.model_id, COALESCE(p.paid_at, p.created_at) AS sold_at,
+            m.title,
+            COALESCE(NULLIF(p.amount_cents, 0), m.price_cents) AS price_cents,
+            COALESCE(NULLIF(p.currency, ''), m.currency) AS currency,
             u.display_name AS buyer_name
      FROM purchases p
      JOIN models m ON m.id = p.model_id
      JOIN users u ON u.id = p.user_id
      WHERE m.owner_id = $1 AND p.status = 'paid'
-     ORDER BY p.created_at DESC`,
+     ORDER BY COALESCE(p.paid_at, p.created_at) DESC`,
     [userId],
   );
 
-  // สรุปรายได้รวม
+  // สรุปรายได้รวม (ล็อกจากราคาตอนซื้อจริง)
   const summaryResult = await db.query(
-    `SELECT COALESCE(SUM(m.price_cents), 0) AS total_revenue,
+    `SELECT COALESCE(SUM(COALESCE(NULLIF(p.amount_cents, 0), m.price_cents)), 0) AS total_revenue,
             COUNT(*)::int AS total_sales
      FROM purchases p
      JOIN models m ON m.id = p.model_id
@@ -141,7 +121,7 @@ sellerRouter.get('/sales', requireAuth, requireSeller, async (req, res) => {
       purchaseId: r.purchase_id,
       modelId: r.model_id,
       title: r.title,
-      priceCents: r.price_cents,
+      priceCents: Number(r.price_cents),
       currency: r.currency,
       buyerName: r.buyer_name,
       soldAt: r.sold_at,
@@ -150,7 +130,7 @@ sellerRouter.get('/sales', requireAuth, requireSeller, async (req, res) => {
 });
 
 // ─── 4. GET /api/seller/status ──────────────────────────────────────────────
-// ตรวจสถานะคนขาย (ไม่ต้อง requireSeller — ใครก็เรียกได้)
+// ตรวจสถานะคนขาย (ไม่ต้อง requireActiveSeller — ใครก็เรียกได้)
 sellerRouter.get('/status', requireAuth, async (req, res) => {
   const userId = req.user!.id;
 
@@ -166,15 +146,17 @@ sellerRouter.get('/status', requireAuth, async (req, res) => {
   res.json({ isSeller: result.rows[0].is_seller });
 });
 
-async function getSellerAvailableGrossCents(sellerId: string): Promise<number> {
-  const earnedRes = await db.query(
+type Queryable = Pick<typeof db, 'query'>;
+
+async function getSellerAvailableGrossCents(sellerId: string, runner: Queryable = db): Promise<number> {
+  const earnedRes = await runner.query(
     `SELECT COALESCE(SUM(COALESCE(NULLIF(p.amount_cents, 0), m.price_cents)), 0) AS gross_earned
      FROM purchases p
      JOIN models m ON m.id = p.model_id
      WHERE m.owner_id = $1 AND p.status = 'paid'`,
     [sellerId],
   );
-  const withdrawnRes = await db.query(
+  const withdrawnRes = await runner.query(
     `SELECT COALESCE(SUM(gross_amount_cents), 0) AS gross_withdrawn
      FROM creator_withdrawals
      WHERE seller_id = $1 AND status IN ('pending', 'approved', 'paid')`,
@@ -187,7 +169,7 @@ async function getSellerAvailableGrossCents(sellerId: string): Promise<number> {
 
 // ─── 5. GET /api/seller/wallet ──────────────────────────────────────────────
 // ยอดเงินที่เว็บถือไว้ให้คนขาย + คำนวณส่วนต่างค่าธรรมเนียมแพลตฟอร์ม + ประวัติการถอน
-sellerRouter.get('/wallet', requireAuth, requireSeller, async (req, res) => {
+sellerRouter.get('/wallet', requireAuth, requireActiveSeller, async (req, res) => {
   const userId = req.user!.id;
 
   const earnedRes = await db.query(
@@ -244,8 +226,8 @@ sellerRouter.get('/wallet', requireAuth, requireSeller, async (req, res) => {
 });
 
 // ─── 6. POST /api/seller/withdraw ───────────────────────────────────────────
-// ขอถอนเงินจากยอดที่เว็บถือไว้ โดยหักส่วนต่างค่าธรรมเนียมแพลตฟอร์มก่อน
-sellerRouter.post('/withdraw', requireAuth, requireSeller, async (req, res) => {
+// ขอถอนเงินใน Transaction + Row Lock บน users เพื่อกัน Race Condition (TOCTOU double-spend)
+sellerRouter.post('/withdraw', requireAuth, requireActiveSeller, async (req, res) => {
   const userId = req.user!.id;
   const payoutMethod = String(req.body?.payoutMethod || 'promptpay').trim().toLowerCase();
   const payoutAccount = String(req.body?.payoutAccount || '').trim();
@@ -253,61 +235,90 @@ sellerRouter.post('/withdraw', requireAuth, requireSeller, async (req, res) => {
   if (!['promptpay', 'bank'].includes(payoutMethod)) {
     throw new AppError(400, 'INVALID_PAYOUT_METHOD', 'Payout method must be promptpay or bank');
   }
-  if (!payoutAccount || payoutAccount.length < 4) {
+  if (!payoutAccount || payoutAccount.length < 4 || payoutAccount.length > 255) {
     throw new AppError(400, 'INVALID_PAYOUT_ACCOUNT', 'Please enter a valid PromptPay ID or bank account');
   }
 
-  const availableGrossCents = await getSellerAvailableGrossCents(userId);
-  if (availableGrossCents <= 0) {
-    throw new AppError(400, 'INSUFFICIENT_BALANCE', 'No available balance to withdraw');
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Serialize all concurrent withdrawal attempts for this seller by locking their user row first.
+    const lockedUser = await client.query<{ is_seller: boolean; role: string; suspended_at: Date | string | null }>(
+      `SELECT is_seller, role, suspended_at FROM users WHERE id = $1 FOR UPDATE`,
+      [userId],
+    );
+    const u = lockedUser.rows[0];
+    if (!u) throw new AppError(401, 'UNAUTHORIZED', 'Account not found');
+    if (u.suspended_at !== null) {
+      throw new AppError(403, 'ACCOUNT_SUSPENDED', 'Your account has been suspended by an administrator');
+    }
+    if (u.role === 'admin') {
+      throw new AppError(403, 'ADMIN_CANNOT_SELL', 'Admin accounts cannot act as sellers');
+    }
+    if (!u.is_seller) {
+      throw new AppError(403, 'NOT_SELLER', 'You must be an approved creator to access seller tools');
+    }
+
+    const availableGrossCents = await getSellerAvailableGrossCents(userId, client);
+    if (availableGrossCents <= 0) {
+      throw new AppError(400, 'INSUFFICIENT_BALANCE', 'No available balance to withdraw');
+    }
+
+    const requestedCents =
+      req.body?.amountCents !== undefined && req.body?.amountCents !== null
+        ? Math.round(Number(req.body.amountCents))
+        : availableGrossCents;
+
+    if (!Number.isFinite(requestedCents) || requestedCents <= 0) {
+      throw new AppError(400, 'INVALID_AMOUNT', 'Withdrawal amount must be greater than 0');
+    }
+    if (requestedCents > availableGrossCents) {
+      throw new AppError(400, 'EXCEEDS_BALANCE', 'Withdrawal amount exceeds available platform balance');
+    }
+
+    const breakdown = calculateWithdrawalBreakdown(requestedCents);
+
+    const inserted = await client.query(
+      `INSERT INTO creator_withdrawals
+         (seller_id, gross_amount_cents, platform_fee_cents, net_amount_cents, fee_rate_bps, currency, payout_method, payout_account, status)
+       VALUES ($1, $2, $3, $4, $5, 'USD', $6, $7, 'pending')
+       RETURNING id, gross_amount_cents, platform_fee_cents, net_amount_cents, fee_rate_bps,
+                 currency, payout_method, payout_account, status, created_at`,
+      [
+        userId,
+        breakdown.grossAmountCents,
+        breakdown.platformFeeCents,
+        breakdown.netAmountCents,
+        breakdown.feeRateBps,
+        payoutMethod,
+        payoutAccount,
+      ],
+    );
+
+    await client.query('COMMIT');
+
+    const r = inserted.rows[0];
+    res.status(201).json({
+      withdrawal: {
+        id: r.id,
+        grossAmountCents: r.gross_amount_cents,
+        platformFeeCents: r.platform_fee_cents,
+        netAmountCents: r.net_amount_cents,
+        feeRateBps: r.fee_rate_bps,
+        currency: r.currency,
+        payoutMethod: r.payout_method,
+        payoutAccount: r.payout_account,
+        status: r.status,
+        createdAt: r.created_at,
+      },
+    });
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw err;
+  } finally {
+    client.release();
   }
-
-  const requestedCents =
-    req.body?.amountCents !== undefined && req.body?.amountCents !== null
-      ? Math.round(Number(req.body.amountCents))
-      : availableGrossCents;
-
-  if (!Number.isFinite(requestedCents) || requestedCents <= 0) {
-    throw new AppError(400, 'INVALID_AMOUNT', 'Withdrawal amount must be greater than 0');
-  }
-  if (requestedCents > availableGrossCents) {
-    throw new AppError(400, 'EXCEEDS_BALANCE', 'Withdrawal amount exceeds available platform balance');
-  }
-
-  const breakdown = calculateWithdrawalBreakdown(requestedCents);
-
-  const inserted = await db.query(
-    `INSERT INTO creator_withdrawals
-       (seller_id, gross_amount_cents, platform_fee_cents, net_amount_cents, fee_rate_bps, currency, payout_method, payout_account, status)
-     VALUES ($1, $2, $3, $4, $5, 'USD', $6, $7, 'pending')
-     RETURNING id, gross_amount_cents, platform_fee_cents, net_amount_cents, fee_rate_bps,
-               currency, payout_method, payout_account, status, created_at`,
-    [
-      userId,
-      breakdown.grossAmountCents,
-      breakdown.platformFeeCents,
-      breakdown.netAmountCents,
-      breakdown.feeRateBps,
-      payoutMethod,
-      payoutAccount,
-    ],
-  );
-
-  const r = inserted.rows[0];
-  res.status(201).json({
-    withdrawal: {
-      id: r.id,
-      grossAmountCents: r.gross_amount_cents,
-      platformFeeCents: r.platform_fee_cents,
-      netAmountCents: r.net_amount_cents,
-      feeRateBps: r.fee_rate_bps,
-      currency: r.currency,
-      payoutMethod: r.payout_method,
-      payoutAccount: r.payout_account,
-      status: r.status,
-      createdAt: r.created_at,
-    },
-  });
 });
 
 // ─── 7. GET /api/seller/application ─────────────────────────────────────────
@@ -340,7 +351,7 @@ sellerRouter.get('/application', requireAuth, async (req, res) => {
 });
 
 // ─── 8. POST /api/seller/apply ──────────────────────────────────────────────
-// ส่งคำขอเป็น Creator (หลังยอมรับกฎ) — ถ้ามี Creator Invite Code ที่ถูกต้องจะเป็น Creator ทันที ถ้าไม่มีจะส่งให้แอดมินอนุมัติ
+// ส่งคำขอเป็น Creator (หลังยอมรับกฎ) — ถ้ามี Creator Invite Code ที่ถูกต้องจะเป็น Creator ทันทีแบบ Atomic CTE ถ้าไม่มีจะส่งให้แอดมินอนุมัติ
 sellerRouter.post('/apply', requireAuth, async (req, res) => {
   const userId = req.user!.id;
   const note = typeof req.body?.note === 'string' ? req.body.note.trim().slice(0, 1000) : '';
@@ -369,39 +380,44 @@ sellerRouter.post('/apply', requireAuth, async (req, res) => {
     return;
   }
 
-  // กรณีมี Creator Invite Code → ตรวจสอบและอนุมัติทันที
+  // กรณีมี Creator Invite Code → ตัดสิทธิ์โค้ด + เปิดครีเอเตอร์ + บันทึกคำขอใน SQL CTE เดียว (Atomic)
   if (rawInviteCode) {
     const codeUpper = rawInviteCode.toUpperCase();
-    const codeRes = await db.query(
-      `UPDATE creator_invite_codes
-       SET used_count = used_count + 1
-       WHERE UPPER(code) = $1
-         AND used_count < max_uses
-         AND (expires_at IS NULL OR expires_at > NOW())
-       RETURNING id, code`,
-      [codeUpper],
+    const atomicRes = await db.query(
+      `WITH used_code AS (
+         UPDATE creator_invite_codes
+         SET used_count = used_count + 1
+         WHERE UPPER(code) = $1
+           AND used_count < max_uses
+           AND (expires_at IS NULL OR expires_at > NOW())
+         RETURNING id, code
+       ),
+       promote AS (
+         UPDATE users
+         SET is_seller = TRUE,
+             role = CASE WHEN role = 'user' THEN 'creator'::user_role ELSE role END
+         WHERE id = $2
+           AND role <> 'admin'
+           AND suspended_at IS NULL
+           AND EXISTS (SELECT 1 FROM used_code)
+         RETURNING id
+       ),
+       app_row AS (
+         INSERT INTO creator_applications (user_id, note, status, admin_note, reviewed_at)
+         SELECT $2, $3, 'approved', 'Approved via invite code: ' || uc.code, NOW()
+         FROM used_code uc
+         WHERE EXISTS (SELECT 1 FROM promote)
+         RETURNING id, note, status, admin_note, created_at, reviewed_at
+       )
+       SELECT id, note, status, admin_note, created_at, reviewed_at FROM app_row`,
+      [codeUpper, userId, note],
     );
 
-    if (codeRes.rowCount === 0) {
+    if (atomicRes.rowCount === 0) {
       throw new AppError(400, 'INVALID_INVITE_CODE', 'Invalid, expired, or fully used Creator Invite Code');
     }
 
-    await db.query(
-      `UPDATE users
-       SET is_seller = TRUE,
-           role = CASE WHEN role = 'user' THEN 'creator' ELSE role END
-       WHERE id = $1`,
-      [userId],
-    );
-
-    const insertedApproved = await db.query(
-      `INSERT INTO creator_applications (user_id, note, status, admin_note, reviewed_at)
-       VALUES ($1, $2, 'approved', $3, NOW())
-       RETURNING id, note, status, admin_note, created_at, reviewed_at`,
-      [userId, note, `Approved via invite code: ${codeRes.rows[0].code}`],
-    );
-
-    const r = insertedApproved.rows[0];
+    const r = atomicRes.rows[0];
     res.status(201).json({
       approved: true,
       application: {

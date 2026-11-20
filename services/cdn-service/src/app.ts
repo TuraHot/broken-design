@@ -5,7 +5,12 @@ import { allowedOrigins } from "./config/cors";
 import { supabase } from "./config/supabase";
 import { uploadRouter } from "./modules/upload/upload.routes";
 import { avatarRouter } from "./modules/upload/avatar.routes";
-import { cdnRouter, verifyWatermarkMiddleware, verifyWatermarkHandler } from "./modules/cdn/cdn.routes";
+import {
+  cdnRouter,
+  verifyWatermarkLimiter,
+  verifyWatermarkMiddleware,
+  verifyWatermarkHandler,
+} from "./modules/cdn/cdn.routes";
 import { errorHandler } from "./middlewares/error.middleware";
 import { testDbConnection } from "./config/db";
 import { cleanupStaleTmpUploads } from "./storage/cacheManager";
@@ -33,9 +38,9 @@ app.use("/api", apiCors, uploadRouter);
 app.use("/api", apiCors, avatarRouter);
 app.use("/cdn", publicCdnCors, cdnRouter);
 app.options("/verify-watermark", apiCors);
-app.post("/verify-watermark", apiCors, verifyWatermarkMiddleware, verifyWatermarkHandler);
+app.post("/verify-watermark", apiCors, verifyWatermarkLimiter, verifyWatermarkMiddleware, verifyWatermarkHandler);
 app.options("/api/verify-watermark", apiCors);
-app.post("/api/verify-watermark", apiCors, verifyWatermarkMiddleware, verifyWatermarkHandler);
+app.post("/api/verify-watermark", apiCors, verifyWatermarkLimiter, verifyWatermarkMiddleware, verifyWatermarkHandler);
 
 app.use(errorHandler);
 

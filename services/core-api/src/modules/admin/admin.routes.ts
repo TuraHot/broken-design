@@ -1,30 +1,14 @@
 // [เจี๊ยบ] โมดูลแอดมิน — overview, ผู้ใช้ (ระงับ/คืน), โมเดล (ซ่อน/คืน), รายการสั่งซื้อทั้งระบบ
-import { NextFunction, Request, Response, Router } from 'express';
+import crypto from 'crypto';
+import { Router } from 'express';
 import { z } from 'zod';
 import { db } from '../../config/db';
-import { requireAuth } from '../../middlewares/auth.middleware';
+import { requireActiveAdmin, requireAuth } from '../../middlewares/auth.middleware';
 import { AppError } from '../../middlewares/error.middleware';
 
 export const adminRouter = Router();
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-// ─── Middleware: ตรวจแอดมินจากฐานข้อมูลจริง (AGENT.md §3.2) ───────────────────
-// ไม่เชื่อ role ใน JWT: ต้องเป็น admin และยังไม่ถูกระงับ ณ ตอนเรียก
-function requireActiveAdmin(req: Request, _res: Response, next: NextFunction) {
-  db.query(`SELECT role, suspended_at FROM users WHERE id = $1`, [req.user!.id])
-    .then((result) => {
-      const row = result.rows[0];
-      if (!row || row.role !== 'admin') {
-        throw new AppError(403, 'FORBIDDEN', 'Admin access required');
-      }
-      if (row.suspended_at) {
-        throw new AppError(403, 'ACCOUNT_SUSPENDED', 'Your account has been suspended by an administrator');
-      }
-      next();
-    })
-    .catch(next);
-}
 
 adminRouter.use(requireAuth, requireActiveAdmin);
 
@@ -792,7 +776,9 @@ adminRouter.get('/creator-applications', async (req, res) => {
 });
 
 adminRouter.patch('/creator-applications/:id', async (req, res) => {
-  const id = req.params.id;
+  const id = String(req.params.id);
+  requireUuid(id);
+
   const status = req.body?.status;
   const adminNote = typeof req.body?.adminNote === 'string' ? req.body.adminNote.trim().slice(0, 500) : null;
 
@@ -800,49 +786,113 @@ adminRouter.patch('/creator-applications/:id', async (req, res) => {
     throw new AppError(400, 'BAD_REQUEST', 'Status must be approved or rejected');
   }
 
-  const existing = await db.query(
-    `SELECT id, user_id, status FROM creator_applications WHERE id = $1`,
-    [id],
-  );
-  if (existing.rowCount === 0) {
-    throw new AppError(404, 'APPLICATION_NOT_FOUND', 'Creator application not found');
-  }
-
-  const appRow = existing.rows[0];
-  const updated = await db.query(
-    `UPDATE creator_applications
-     SET status = $2,
-         admin_note = COALESCE($3, admin_note),
-         reviewed_by = $4,
-         reviewed_at = NOW()
-     WHERE id = $1
-     RETURNING id, user_id, status, admin_note, reviewed_at`,
+  // Atomic CTE: lock application & user, validate pending/role/suspension, update application, promote user, and notify applicant.
+  const result = await db.query<{
+    found: number;
+    prev_status: string | null;
+    user_role: string | null;
+    user_suspended_at: Date | string | null;
+    id: string | null;
+    user_id: string | null;
+    status: string | null;
+    admin_note: string | null;
+    reviewed_at: Date | string | null;
+  }>(
+    `WITH target AS (
+       SELECT ca.id, ca.user_id, ca.status, u.role AS user_role, u.suspended_at AS user_suspended_at
+       FROM creator_applications ca
+       JOIN users u ON u.id = ca.user_id
+       WHERE ca.id = $1
+       FOR UPDATE OF ca, u
+     ),
+     upd_app AS (
+       UPDATE creator_applications ca
+       SET status = $2::varchar,
+           admin_note = COALESCE($3::text, ca.admin_note),
+           reviewed_by = $4::uuid,
+           reviewed_at = NOW()
+       FROM target t
+       WHERE ca.id = t.id
+         AND t.status = 'pending'
+         AND ($2::varchar <> 'approved' OR (t.user_role <> 'admin' AND t.user_suspended_at IS NULL))
+       RETURNING ca.id, ca.user_id, ca.status, ca.admin_note, ca.reviewed_at
+     ),
+     promote AS (
+       UPDATE users u
+       SET is_seller = TRUE,
+           role = CASE WHEN u.role = 'user' THEN 'creator'::user_role ELSE u.role END
+       FROM upd_app a
+       WHERE u.id = a.user_id AND $2::varchar = 'approved'
+       RETURNING u.id
+     ),
+     note AS (
+       INSERT INTO notifications (user_id, kind, data)
+       SELECT a.user_id,
+              CASE WHEN $2::varchar = 'approved' THEN 'creator_application_approved' ELSE 'creator_application_rejected' END::varchar,
+              jsonb_build_object('adminNote', a.admin_note)
+       FROM upd_app a
+       RETURNING id
+     )
+     SELECT
+       (SELECT COUNT(*) FROM target)::int AS found,
+       (SELECT status FROM target) AS prev_status,
+       (SELECT user_role::text FROM target) AS user_role,
+       (SELECT user_suspended_at FROM target) AS user_suspended_at,
+       a.id,
+       a.user_id,
+       a.status,
+       a.admin_note,
+       a.reviewed_at
+     FROM (SELECT 1) _row
+     LEFT JOIN upd_app a ON TRUE`,
     [id, status, adminNote, req.user!.id],
   );
 
-  if (status === 'approved') {
-    await db.query(
-      `UPDATE users
-       SET is_seller = TRUE,
-           role = CASE WHEN role = 'user' THEN 'creator' ELSE role END
-       WHERE id = $1`,
-      [appRow.user_id],
-    );
+  const row = result.rows[0];
+  if (!row || row.found === 0) {
+    throw new AppError(404, 'APPLICATION_NOT_FOUND', 'Creator application not found');
+  }
+  if (row.prev_status !== 'pending') {
+    throw new AppError(409, 'ALREADY_REVIEWED', 'This creator application has already been reviewed');
+  }
+  if (status === 'approved' && row.user_role === 'admin') {
+    throw new AppError(403, 'ADMIN_CANNOT_SELL', 'Admin accounts cannot become creators');
+  }
+  if (status === 'approved' && row.user_suspended_at !== null) {
+    throw new AppError(403, 'ACCOUNT_SUSPENDED', 'Cannot approve a suspended account');
   }
 
-  const r = updated.rows[0];
   res.json({
     application: {
-      id: r.id,
-      userId: r.user_id,
-      status: r.status,
-      adminNote: r.admin_note ?? null,
-      reviewedAt: r.reviewed_at,
+      id: row.id,
+      userId: row.user_id,
+      status: row.status,
+      adminNote: row.admin_note ?? null,
+      reviewedAt: row.reviewed_at,
     },
   });
 });
 
 // ─── Creator Invite Codes (Admin) ───────────────────────────────────────────
+
+const inviteCodeBody = z.object({
+  code: z
+    .string()
+    .trim()
+    .transform((s) => s.toUpperCase())
+    .refine((s) => s === '' || /^[A-Z0-9_-]{4,64}$/.test(s), {
+      message: 'Code must be 4-64 characters using A-Z, 0-9, _ or -',
+    })
+    .optional(),
+  maxUses: z.coerce.number().int().min(1).max(1000).default(1),
+  expiresAt: z
+    .string()
+    .datetime({ offset: true })
+    .refine((v) => new Date(v).getTime() > Date.now(), {
+      message: 'expiresAt must be in the future',
+    })
+    .optional(),
+});
 
 adminRouter.get('/invite-codes', async (_req, res) => {
   const result = await db.query(
@@ -864,25 +914,40 @@ adminRouter.get('/invite-codes', async (_req, res) => {
 });
 
 adminRouter.post('/invite-codes', async (req, res) => {
-  const rawCode = typeof req.body?.code === 'string' ? req.body.code.trim().toUpperCase() : '';
-  const code = rawCode || `LIXYTE-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
-  const maxUses = Math.max(1, Math.min(1000, Math.round(Number(req.body?.maxUses) || 1)));
+  const parsed = inviteCodeBody.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    throw new AppError(
+      400,
+      'INVALID_BODY',
+      parsed.error.issues[0]?.message || 'Invalid invite code parameters',
+    );
+  }
 
-  const result = await db.query(
-    `INSERT INTO creator_invite_codes (code, max_uses, created_by)
-     VALUES ($1, $2, $3)
-     RETURNING id, code, max_uses, used_count, expires_at, created_at`,
-    [code, maxUses, req.user!.id],
-  );
-  const r = result.rows[0];
-  res.status(201).json({
-    code: {
-      id: r.id,
-      code: r.code,
-      maxUses: r.max_uses,
-      usedCount: r.used_count,
-      expiresAt: r.expires_at,
-      createdAt: r.created_at,
-    },
-  });
+  const code = parsed.data.code || `LIXYTE-${crypto.randomBytes(6).toString('hex').toUpperCase()}`;
+  const { maxUses, expiresAt } = parsed.data;
+
+  try {
+    const result = await db.query(
+      `INSERT INTO creator_invite_codes (code, max_uses, created_by, expires_at)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, code, max_uses, used_count, expires_at, created_at`,
+      [code, maxUses, req.user!.id, expiresAt ?? null],
+    );
+    const r = result.rows[0];
+    res.status(201).json({
+      code: {
+        id: r.id,
+        code: r.code,
+        maxUses: r.max_uses,
+        usedCount: r.used_count,
+        expiresAt: r.expires_at,
+        createdAt: r.created_at,
+      },
+    });
+  } catch (err: any) {
+    if (err?.code === '23505') {
+      throw new AppError(409, 'CODE_EXISTS', 'An invite code with this value already exists');
+    }
+    throw err;
+  }
 });

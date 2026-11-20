@@ -1000,3 +1000,132 @@ test('GET /api/admin/models/:id/history - 400 for a bad id, otherwise license an
   );
   assert.deepEqual(params, [MODEL_ID]);
 });
+
+// ─── creator applications (atomic CTE + notification + guards) & invite codes ───
+test('PATCH /api/admin/creator-applications/:id - validates UUID, approves atomically, and blocks non-pending/admin/suspended', async () => {
+  const APP_ID = '88888888-8888-4888-8888-888888888888';
+  let cteRow: Record<string, any> = {
+    found: 1,
+    prev_status: 'pending',
+    user_role: 'user',
+    user_suspended_at: null,
+    id: APP_ID,
+    user_id: TARGET_ID,
+    status: 'approved',
+    admin_note: 'Looks great',
+    reviewed_at: '2026-11-20T00:00:00.000Z',
+  };
+  let sawAtomicSql = false;
+
+  await withServer(
+    ACTIVE_ADMIN,
+    (sql) => {
+      if (sql.includes('WITH target AS') && sql.includes('creator_applications')) {
+        sawAtomicSql = sql.includes('FOR UPDATE OF ca, u') && sql.includes('INSERT INTO notifications');
+        return { rowCount: 1, rows: [cteRow] };
+      }
+      return undefined;
+    },
+    async (base) => {
+      // 1. Bad UUID -> 400
+      const badId = await fetch(`${base}/creator-applications/not-a-uuid`, {
+        method: 'PATCH',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'approved' }),
+      });
+      assert.equal(badId.status, 400);
+
+      // 2. Approve pending user -> 200 via atomic CTE
+      const ok = await fetch(`${base}/creator-applications/${APP_ID}`, {
+        method: 'PATCH',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'approved', adminNote: 'Looks great' }),
+      });
+      assert.equal(ok.status, 200);
+      assert.equal(sawAtomicSql, true);
+      const body = await ok.json();
+      assert.equal(body.application.status, 'approved');
+
+      // 3. Already reviewed -> 409
+      cteRow = { ...cteRow, prev_status: 'approved', id: null };
+      const dup = await fetch(`${base}/creator-applications/${APP_ID}`, {
+        method: 'PATCH',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'approved' }),
+      });
+      assert.equal(dup.status, 409);
+      assert.equal((await dup.json()).error.code, 'ALREADY_REVIEWED');
+
+      // 4. Cannot approve suspended applicant -> 403
+      cteRow = { ...cteRow, prev_status: 'pending', user_suspended_at: '2026-11-19T00:00:00.000Z', id: null };
+      const susp = await fetch(`${base}/creator-applications/${APP_ID}`, {
+        method: 'PATCH',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'approved' }),
+      });
+      assert.equal(susp.status, 403);
+      assert.equal((await susp.json()).error.code, 'ACCOUNT_SUSPENDED');
+    },
+  );
+});
+
+test('POST /api/admin/invite-codes - generates cryptographic code and returns 409 on duplicate', async () => {
+  let insertedCode = '';
+  let forceDuplicate = false;
+
+  await withServer(
+    ACTIVE_ADMIN,
+    (sql, params) => {
+      if (sql.includes('INSERT INTO creator_invite_codes')) {
+        if (forceDuplicate) {
+          const err: any = new Error('duplicate key');
+          err.code = '23505';
+          throw err;
+        }
+        insertedCode = params[0];
+        return {
+          rowCount: 1,
+          rows: [
+            {
+              id: 'code-1',
+              code: params[0],
+              max_uses: params[1],
+              used_count: 0,
+              expires_at: params[3],
+              created_at: '2026-11-20T00:00:00.000Z',
+            },
+          ],
+        };
+      }
+      return undefined;
+    },
+    async (base) => {
+      // 1. Default generated code has 12 uppercase hex chars (crypto.randomBytes(6))
+      const res = await fetch(`${base}/invite-codes`, {
+        method: 'POST',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ maxUses: 3 }),
+      });
+      assert.equal(res.status, 201);
+      assert.match(insertedCode, /^LIXYTE-[0-9A-F]{12}$/);
+
+      // 2. Invalid custom code rejected with 400
+      const bad = await fetch(`${base}/invite-codes`, {
+        method: 'POST',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: 'x' }),
+      });
+      assert.equal(bad.status, 400);
+
+      // 3. Duplicate code -> 409 CODE_EXISTS
+      forceDuplicate = true;
+      const dup = await fetch(`${base}/invite-codes`, {
+        method: 'POST',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: 'LIXYTE-VIP2026' }),
+      });
+      assert.equal(dup.status, 409);
+      assert.equal((await dup.json()).error.code, 'CODE_EXISTS');
+    },
+  );
+});

@@ -217,7 +217,7 @@ export interface PaidDownloadAccess {
   licenseType: string | null;
 }
 
-/** Paid-model download: owner or a buyer with a `paid` purchase; the downloader must not be suspended. */
+/** Paid-model download: requires a `paid` purchase and an unsuspended downloader (owners are blocked by OWN_MODEL). */
 export async function assertCanDownloadPaid(
   model: CdnModel,
   userId: string,
@@ -284,7 +284,7 @@ export async function assertCanDownloadPaid(
       "ACCOUNT_SUSPENDED",
       "Your account has been suspended",
     );
-  if (model.owner_id !== userId && !row.purchased) {
+  if (!row.purchased) {
     throw new AppError(
       403,
       "PURCHASE_REQUIRED",

@@ -59,7 +59,10 @@ interactionsRouter.post(
       }
 
       const modelCheck = await db.query<{ id: string; owner_id: string; title: string }>(
-        `SELECT id, owner_id, title FROM models WHERE id = $1 AND hidden_at IS NULL AND deleted_at IS NULL`,
+        `SELECT m.id, m.owner_id, m.title
+         FROM models m
+         JOIN users u ON u.id = m.owner_id
+         WHERE m.id = $1 AND m.hidden_at IS NULL AND m.deleted_at IS NULL AND u.suspended_at IS NULL`,
         [id],
       );
       if (modelCheck.rows.length === 0) {

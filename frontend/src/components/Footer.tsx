@@ -42,25 +42,25 @@ export default function Footer() {
   if (hidesPublicChrome(pathname)) return null;
 
   return (
-    <footer className="relative z-10 border-t border-white/10 bg-black">
+    <footer className="relative z-10 border-t border-line bg-canvas">
       <div className="mx-auto grid max-w-[1400px] gap-10 px-4 py-12 md:grid-cols-[1fr_auto] md:px-6">
         <div>
-          <p className="font-semibold tracking-wide text-white">Lixyte</p>
-          <p className="mt-3 max-w-[40ch] text-sm leading-relaxed text-white/65">{t('footer.tagline')}</p>
+          <p className="font-semibold tracking-wide text-ink">Lixyte</p>
+          <p className="mt-3 max-w-[40ch] text-sm leading-relaxed text-ink/65">{t('footer.tagline')}</p>
         </div>
         <nav aria-label={t('footer.nav')} className="grid grid-cols-2 gap-x-12 gap-y-8 sm:grid-cols-3 sm:gap-x-16">
           {GROUPS.map((g) => (
             <div key={g.title}>
-              <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70">{t(g.title)}</p>
+              <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-accent/70">{t(g.title)}</p>
               <ul className="mt-3 grid gap-2 text-sm">
                 {g.links.map((l) => (
                   <li key={l.label}>
                     {'report' in l ? (
-                      <button type="button" onClick={openReport} className="text-left text-white/65 transition-colors hover:text-white">
+                      <button type="button" onClick={openReport} className="text-left text-ink/65 transition-colors hover:text-ink">
                         {t(l.label)}
                       </button>
                     ) : (
-                      <Link href={l.href} className="text-white/65 transition-colors hover:text-white">
+                      <Link href={l.href} className="text-ink/65 transition-colors hover:text-ink">
                         {t(l.label)}
                       </Link>
                     )}
@@ -71,8 +71,8 @@ export default function Footer() {
           ))}
         </nav>
       </div>
-      <div className="border-t border-white/10">
-        <p className="mx-auto max-w-[1400px] px-4 py-5 font-mono text-[11px] tracking-[0.08em] text-white/40 md:px-6">
+      <div className="border-t border-line">
+        <p className="mx-auto max-w-[1400px] px-4 py-5 font-mono text-[11px] tracking-[0.08em] text-ink/40 md:px-6">
           © {new Date().getFullYear()} Lixyte
         </p>
       </div>

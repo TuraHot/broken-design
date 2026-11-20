@@ -81,7 +81,7 @@ export default function NotificationBell({
         aria-expanded={open}
         aria-haspopup="true"
         aria-label={label}
-        className="relative grid h-9 w-9 place-items-center rounded-full text-white/75 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-hud"
+        className="relative grid h-9 w-8 place-items-center sm:w-9 rounded-full text-ink/75 transition-colors hover:bg-ink/10 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
       >
         <Bell aria-hidden className="h-5 w-5" />
         {unread > 0 && (
@@ -95,14 +95,14 @@ export default function NotificationBell({
       </button>
 
       {open && (
-        <div className="fixed inset-x-3 top-16 z-30 rounded-lg border border-white/15 bg-black/95 backdrop-blur sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-[380px]">
-          <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
-            <h2 className="font-mono text-[11px] uppercase tracking-[0.16em] text-white/80">{t('notice.title')}</h2>
+        <div className="fixed inset-x-3 top-16 z-30 rounded-lg border border-ink/15 bg-canvas/95 backdrop-blur sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-[380px]">
+          <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
+            <h2 className="font-mono text-[11px] uppercase tracking-[0.16em] text-ink/80">{t('notice.title')}</h2>
             {unread > 0 && (
               <button
                 type="button"
                 onClick={() => run(() => markAllNoticesRead(token))}
-                className="text-xs text-white/65 underline underline-offset-4 hover:text-white"
+                className="text-xs text-ink/65 underline underline-offset-4 hover:text-ink"
               >
                 {t('notice.markAll')}
               </button>
@@ -110,22 +110,22 @@ export default function NotificationBell({
           </div>
 
           <div className="max-h-[min(70vh,28rem)] overflow-y-auto p-3">
-            {error && <p role="alert" className="mb-2 text-sm text-red-300">{error}</p>}
+            {error && <p role="alert" className="mb-2 text-sm text-danger">{error}</p>}
             {items && list.length === 0 && !error && (
-              <p className="px-1 py-6 text-center text-sm text-white/50">{t('notice.empty')}</p>
+              <p className="px-1 py-6 text-center text-sm text-ink/50">{t('notice.empty')}</p>
             )}
-            {!items && !error && <p className="px-1 py-6 text-center text-sm text-white/50">{t('bell.loading')}</p>}
+            {!items && !error && <p className="px-1 py-6 text-center text-sm text-ink/50">{t('bell.loading')}</p>}
             <ul className="grid gap-2.5">
               {list.map((n) => {
                 const isNew = !n.readAt;
                 return (
                   <li
                     key={n.id}
-                    className={`rounded-lg border p-3 ${isNew ? 'border-amber/50 bg-white/[0.04]' : 'border-white/10 opacity-75'}`}
+                    className={`rounded-lg border p-3 ${isNew ? 'border-warn/50 bg-ink/[0.04]' : 'border-line opacity-75'}`}
                   >
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-white/50">
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-ink/50">
                       {isNew && (
-                        <span className="rounded border border-amber/50 px-1.5 py-0.5 font-mono uppercase tracking-[0.12em] text-amber">
+                        <span className="rounded border border-warn/50 px-1.5 py-0.5 font-mono uppercase tracking-[0.12em] text-warn">
                           {t('notice.new')}
                         </span>
                       )}
@@ -136,7 +136,7 @@ export default function NotificationBell({
                       <button
                         type="button"
                         onClick={() => run(() => markNoticeRead(n.id, token))}
-                        className="mt-2.5 h-8 rounded-lg border border-white/15 px-3 text-sm text-white/80 hover:border-white/40 hover:text-white"
+                        className="mt-2.5 h-8 rounded-lg border border-ink/15 px-3 text-sm text-ink/80 hover:border-ink/40 hover:text-ink"
                       >
                         {t('notice.markRead')}
                       </button>
@@ -147,8 +147,8 @@ export default function NotificationBell({
             </ul>
           </div>
 
-          <div className="border-t border-white/10 px-4 py-2.5 text-right">
-            <Link href="/me" onClick={() => setOpen(false)} className="text-xs text-hud hover:underline">
+          <div className="border-t border-line px-4 py-2.5 text-right">
+            <Link href="/me" onClick={() => setOpen(false)} className="text-xs text-accent hover:underline">
               {t('bell.viewAll')}
             </Link>
           </div>

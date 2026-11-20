@@ -13,12 +13,14 @@ import { useT } from '@/lib/i18n/client';
 import type { MessageKey } from '@/lib/i18n/messages';
 import AccountMenu from './AccountMenu';
 import LanguageSwitch from './LanguageSwitch';
+import ThemeToggle from './ThemeToggle';
 
-// `desktopOnly` links are hidden below `sm` so the bar fits at 375px.
-const LINKS: { href: string; label: MessageKey; desktopOnly?: boolean }[] = [
+// `desktopOnly` links are hidden below `sm` so the bar fits at 375px; `hideBelow375` links also go on the narrowest phones
+// (360px), where the theme toggle, bell and account button no longer fit next to them.
+const LINKS: { href: string; label: MessageKey; desktopOnly?: boolean; hideBelow375?: boolean }[] = [
   { href: '/gallery', label: 'nav.gallery' },
   { href: '/docs', label: 'nav.docs', desktopOnly: true },
-  { href: '/creator', label: 'nav.creator' },
+  { href: '/creator', label: 'nav.creator', hideBelow375: true },
 ];
 
 export default function Navbar() {
@@ -80,10 +82,10 @@ export default function Navbar() {
       {isPending ? (
         <Loader2
           aria-hidden
-          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-hud motion-reduce:animate-none"
+          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-accent motion-reduce:animate-none"
         />
       ) : (
-        <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/50" />
+        <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink/50" />
       )}
       <input
         type="search"
@@ -91,48 +93,48 @@ export default function Navbar() {
         onChange={(e) => setQuery(e.target.value)}
         placeholder={t('nav.searchPlaceholder')}
         aria-label={t('nav.searchLabel')}
-        className="h-9 w-full rounded-lg border border-white/15 bg-white/5 pl-9 pr-3 text-sm text-white placeholder:text-white/40 focus:border-white/50 focus:outline-none"
+        className="h-9 w-full rounded-lg border border-ink/15 bg-ink/5 pl-9 pr-3 text-sm text-ink placeholder:text-ink/40 focus:border-ink/50 focus:outline-none"
       />
     </form>
   );
 
   return (
-    <header className="fixed inset-x-0 top-0 z-50 border-b border-white/10 bg-black/90 backdrop-blur">
+    <header className="fixed inset-x-0 top-0 z-50 border-b border-line bg-canvas/90 backdrop-blur">
       <nav aria-label="Main" className="mx-auto flex h-16 max-w-[1400px] items-center gap-2 px-4 sm:gap-5 md:px-6">
         <Link
           href="/"
           onClick={handleNavClick('/')}
           aria-busy={pendingHref === '/'}
-          className={`inline-flex items-center gap-1.5 whitespace-nowrap text-[15px] font-semibold tracking-wide text-white sm:text-base ${
+          className={`inline-flex items-center gap-1.5 whitespace-nowrap text-[15px] font-semibold tracking-wide text-ink sm:text-base ${
             pendingHref !== null ? 'pointer-events-none' : ''
           }`}
         >
           <span>Lixyte</span>
           {pendingHref === '/' && (
-            <Loader2 aria-hidden className="h-3.5 w-3.5 animate-spin text-hud motion-reduce:animate-none" />
+            <Loader2 aria-hidden className="h-3.5 w-3.5 animate-spin text-accent motion-reduce:animate-none" />
           )}
         </Link>
 
         <ul className={`flex items-center gap-3 text-sm sm:gap-5 sm:text-[15px] ${pendingHref !== null ? 'pointer-events-none' : ''}`}>
-          {LINKS.map(({ href: baseHref, label, desktopOnly }) => {
+          {LINKS.map(({ href: baseHref, label, desktopOnly, hideBelow375 }) => {
             const href = baseHref === '/creator' && creatorDashboardHref ? creatorDashboardHref : baseHref;
             const hrefPath = href.split('?')[0];
             const active = pathname === hrefPath || pathname.startsWith(`${hrefPath}/`);
             const loading = pendingHref === href;
             return (
-              <li key={href} className={desktopOnly ? 'hidden sm:block' : undefined}>
+              <li key={href} className={desktopOnly ? 'hidden sm:block' : hideBelow375 ? 'hidden min-[375px]:block' : undefined}>
                 <Link
                   href={href}
                   onClick={handleNavClick(hrefPath)}
                   aria-current={active ? 'page' : undefined}
                   aria-busy={loading}
                   className={`inline-flex items-center gap-1.5 whitespace-nowrap ${
-                    loading ? 'text-hud' : active ? 'text-white' : 'text-white/65 transition-colors hover:text-white'
+                    loading ? 'text-accent' : active ? 'text-ink' : 'text-ink/65 transition-colors hover:text-ink'
                   }`}
                 >
                   <span>{t(label)}</span>
                   {loading && (
-                    <Loader2 aria-hidden className="h-3.5 w-3.5 animate-spin text-hud motion-reduce:animate-none" />
+                    <Loader2 aria-hidden className="h-3.5 w-3.5 animate-spin text-accent motion-reduce:animate-none" />
                   )}
                 </Link>
               </li>
@@ -142,22 +144,23 @@ export default function Navbar() {
 
         <div className="hidden w-full max-w-xs md:block">{searchField}</div>
 
-        <div className="ml-auto flex items-center gap-2 text-[15px] sm:gap-3">
+        <div className="ml-auto flex items-center gap-1 text-[15px] sm:gap-3">
           <button
             type="button"
             onClick={() => setMobileSearch((v) => !v)}
             aria-label={mobileSearch ? t('nav.closeSearch') : t('nav.openSearch')}
             aria-expanded={mobileSearch}
-            className="grid h-9 w-8 place-items-center rounded-lg text-white/80 hover:text-white md:hidden"
+            className="grid h-9 w-8 place-items-center rounded-lg text-ink/80 hover:text-ink md:hidden"
           >
             {mobileSearch ? <X className="h-5 w-5" /> : <Search className="h-5 w-5" />}
           </button>
+          <ThemeToggle />
           <LanguageSwitch />
           <AccountMenu />
         </div>
       </nav>
 
-      {mobileSearch && <div className="border-t border-white/10 px-4 py-3 md:hidden">{searchField}</div>}
+      {mobileSearch && <div className="border-t border-line px-4 py-3 md:hidden">{searchField}</div>}
     </header>
   );
 }

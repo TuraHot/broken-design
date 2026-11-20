@@ -36,7 +36,7 @@ export default function UserAvatar({
 
   return (
     <span
-      className={`grid shrink-0 place-items-center overflow-hidden rounded-full border border-hud/50 bg-black ${SIZE_CLASSES[size]} ${className}`}
+      className={`grid shrink-0 place-items-center overflow-hidden rounded-full border border-accent/50 bg-canvas ${SIZE_CLASSES[size]} ${className}`}
     >
       {showImage ? (
         // eslint-disable-next-line @next/next/no-img-element
@@ -47,7 +47,7 @@ export default function UserAvatar({
           className="h-full w-full object-cover"
         />
       ) : (
-        <span aria-hidden className="font-mono text-hud">
+        <span aria-hidden className="font-mono text-accent">
           {label}
         </span>
       )}

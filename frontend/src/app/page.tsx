@@ -1,143 +1,112 @@
-// Landing — hero over the 3D lily (page background, bursts apart as you scroll), then popular models, categories, new arrivals and a closing call to action
+// Landing — hero (bold type on the left, the framed 3D lily on the right), then stacked bands numbered /02 to /07: how it
+// works, categories, popular models, for creators, licenses and FAQ. A scroll-down arrow and the rail on the right edge
+// jump between the sections.
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowUpRight, Scan } from "lucide-react";
+import Band from "@/components/landing/Band";
 import Categories from "@/components/landing/Categories";
-import PopularCarousel from "@/components/landing/PopularCarousel";
-import SectionHeading from "@/components/landing/SectionHeading";
-import ModelCard from "@/components/gallery/ModelCard";
+import Faq from "@/components/landing/Faq";
+import ForCreators from "@/components/landing/ForCreators";
+import HeroFrame from "@/components/landing/HeroFrame";
+import HowItWorks from "@/components/landing/HowItWorks";
+import LicenseCards from "@/components/landing/LicenseCards";
+import NumberedHeading from "@/components/landing/NumberedHeading";
+import PopularGrid from "@/components/landing/PopularGrid";
+import SectionDots, { ScrollCue } from "@/components/landing/SectionDots";
 import PixieCursor from "@/components/PixieCursor";
-import LilyViewer from "@/components/viewer/LilyViewer";
 import { fetchModels } from "@/lib/api";
 import { getT } from "@/lib/i18n/server";
 
-const HUD_CLIP =
-  "polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px))";
-
 export default async function HomePage() {
   const { t } = await getT();
-  // Popular = top of the popularity-sorted list. The API has no "recent" sort yet, so new arrivals take the
-  // next models in that list as a stand-in.
+  // Popular = top of the popularity-sorted list (top 15, one row that drifts sideways)
   const { items } = await fetchModels({ page: 1 });
-  const popular = items.slice(0, 8);
-  const arrivals = items.slice(8, 14);
+  const popular = items.slice(0, 15);
+  const sectionIds = ["hero", "how", "categories", ...(popular.length > 0 ? ["popular"] : []), "creators", "licenses", "faq"];
 
   return (
     <main>
-      <LilyViewer />
       <PixieCursor />
+      <SectionDots ids={sectionIds} />
 
-      <section className="relative z-10 h-dvh min-h-[600px]">
-        <div className="mx-auto max-w-[1400px] px-4 pt-24 md:px-6">
-          <div className="max-w-[850px]">
-            <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70">
-              {t('home.eyebrow')}
-            </p>
-            <h1 className="mt-4 font-display text-[clamp(20px,6.4vw,62px)] uppercase leading-[1.02] text-white">
-              {t('home.title1')}
-              <span className="block whitespace-nowrap bg-gradient-to-r from-hud via-violet to-amber bg-clip-text text-transparent">
-                {t('home.title2')}
+      <section id="hero" className="relative z-10 min-h-[864px]">
+        <div className="mx-auto grid min-h-[864px] w-full max-w-[2400px] grid-cols-1 pt-16 md:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+          <div className="relative flex flex-col justify-center py-10 pb-24 pl-12 pr-6 md:pl-16 md:pr-10 min-[1500px]:pl-[calc((100vw-1400px)/2+2rem)]">
+            <div className="absolute inset-y-0 left-0 flex w-8 items-center justify-center border-r border-line">
+              <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-accent [writing-mode:vertical-rl] rotate-180">
+                {t("home.hero.side")}
               </span>
-            </h1>
-            <p className="mt-5 max-w-[46ch] text-[15px] leading-relaxed text-white/65">
-              {t('home.lead')}
-            </p>
-          </div>
-        </div>
+            </div>
 
-        <div
-          aria-label={t('home.startRegion')}
-          role="region"
-          className="pointer-events-none absolute inset-x-0 bottom-0 pb-6"
-        >
-          <div className="mx-auto flex max-w-[1400px] justify-end px-4 md:px-6">
-            <div
-              className="pointer-events-auto w-full max-w-[340px] border border-hud/40 bg-[rgba(4,8,18,0.66)] p-5 backdrop-blur-sm"
-              style={{ clipPath: HUD_CLIP }}
-            >
-              <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70">
-                {t('home.startLabel')}
-              </p>
-              <h2 className="mt-3 font-display text-lg uppercase leading-snug text-white">
-                {t('home.startTitle1')}
-                <br />
-                {t('home.startTitle2')}
-              </h2>
-              <p className="mt-3 text-[15px] leading-relaxed text-white/65">
-                {t('home.startBody')}
-              </p>
-              <div className="mt-5 flex flex-wrap items-center gap-3">
-                <Link
-                  href="/login"
-                  className="inline-flex items-center gap-2 rounded-lg bg-white px-3.5 py-1.5 text-[15px] font-medium text-black transition-colors hover:bg-white/85"
-                >
-                  {t('home.getStarted')}
-                  <ArrowRight aria-hidden className="h-4 w-4" />
-                </Link>
-                <Link
-                  href="/gallery"
-                  className="border border-white px-3 py-2 font-mono text-[10.5px] uppercase tracking-[0.18em] text-white transition-colors hover:bg-white hover:text-black"
-                >
-                  {t('home.explore')}
-                </Link>
-              </div>
+            <p className="font-mono text-[11px] text-accent">/01</p>
+            <h1 className="mt-3 font-[family-name:var(--font-barlow)] text-[length:var(--hero-title-size)] uppercase leading-[0.92] text-ink">
+              <span className="block">{t("home.hero.line1")}</span>
+              <span className="block">{t("home.hero.line2")}</span>
+              <span className="hero-accent block">{t("home.hero.line3")}</span>
+            </h1>
+            <p className="mt-5 font-mono text-[12px] uppercase tracking-[0.06em] text-accent">
+              {t("home.hero.tagline")}
+            </p>
+            <p className="mt-4 max-w-[46ch] text-[15px] leading-relaxed text-ink-soft">
+              {t("home.lead")}
+            </p>
+            <div className="mt-8 flex flex-wrap items-center gap-x-8 gap-y-4">
+              <Link
+                href="/gallery"
+                className="inline-flex items-center gap-4 bg-ink px-5 py-3 font-mono text-[11px] uppercase tracking-[0.12em] text-canvas transition-opacity hover:opacity-85"
+              >
+                {t("home.explore")}
+                <ArrowUpRight aria-hidden className="h-4 w-4 text-accent" />
+              </Link>
+              <Link
+                href="/docs"
+                className="inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.12em] text-ink transition-colors hover:text-accent"
+              >
+                {t("home.viewDocs")}
+                <Scan aria-hidden className="h-4 w-4" />
+              </Link>
             </div>
           </div>
+
+          <HeroFrame />
         </div>
+        <ScrollCue target={sectionIds[1]} />
       </section>
 
-      <div className="relative z-10 mx-auto grid max-w-[1400px] grid-cols-[minmax(0,1fr)] gap-20 px-4 pb-20 pt-8 md:px-6">
-        {popular.length > 0 && (
-          <section aria-label={t('home.popularAria')}>
-            <SectionHeading label={t('home.trending')} title={t('home.popular')} href="/gallery" />
-            <PopularCarousel models={popular} />
-          </section>
-        )}
+      {/* Below the hero: bands with no gaps, numbered /02 to /07, tinted and plain in turn */}
+      <Band id="how" tint>
+        <HowItWorks />
+      </Band>
 
+      <Band id="categories">
         <section aria-label={t('home.categories')}>
-          <SectionHeading label={t('home.browse')} title={t('home.categories')} />
+          <NumberedHeading index="03" title={t('home.categories')} />
           <Categories />
         </section>
+      </Band>
 
-        {arrivals.length > 0 && (
-          <section aria-label={t('home.arrivals')}>
-            <SectionHeading label={t('home.fresh')} title={t('home.arrivals')} href="/gallery" />
-            <ul className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
-              {arrivals.map((m) => (
-                <li key={m.id}>
-                  <ModelCard model={m} />
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
-
-        <section
-          aria-label={t('home.joinAria')}
-          className="border border-hud/40 bg-[rgba(4,8,18,0.66)] p-6 backdrop-blur-sm md:p-10"
-          style={{ clipPath: HUD_CLIP }}
-        >
-          <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70">
-                {t('home.joinLabel')}
-              </p>
-              <h2 className="mt-3 font-display text-[clamp(20px,2.6vw,30px)] uppercase leading-snug text-white">
-                {t('home.joinTitle')}
-              </h2>
-              <p className="mt-3 max-w-[52ch] text-[15px] leading-relaxed text-white/65">
-                {t('home.joinBody')}
-              </p>
+      {popular.length > 0 && (
+        <Band id="popular" tint full>
+          <section aria-label={t('home.popularAria')}>
+            <div className="mx-auto max-w-[1400px] px-4 md:pl-6 md:pr-[76px] min-[1550px]:pr-6">
+              <NumberedHeading index="04" title={t('home.popular')} href="/gallery" />
             </div>
-            <Link
-              href="/login"
-              className="inline-flex shrink-0 items-center gap-2 self-start rounded-lg bg-white px-3.5 py-1.5 text-[15px] font-medium text-black transition-colors hover:bg-white/85 md:self-auto"
-            >
-              {t('home.getStarted')}
-              <ArrowRight aria-hidden className="h-4 w-4" />
-            </Link>
-          </div>
-        </section>
-      </div>
+            <PopularGrid models={popular} />
+          </section>
+        </Band>
+      )}
+
+      <Band id="creators">
+        <ForCreators />
+      </Band>
+
+      <Band id="licenses" tint>
+        <LicenseCards />
+      </Band>
+
+      <Band id="faq">
+        <Faq />
+      </Band>
     </main>
   );
 }

@@ -13,15 +13,15 @@ export default function NoticeContent({ n }: { n: NoticeItem }) {
   const reason = (text?: string | null) =>
     text ? (
       <>
-        <p className="mt-2 text-xs text-white/50">{t('notice.reason')}</p>
-        <p className="mt-1 whitespace-pre-wrap break-words text-sm text-white/80">{text}</p>
+        <p className="mt-2 text-xs text-ink/50">{t('notice.reason')}</p>
+        <p className="mt-1 whitespace-pre-wrap break-words text-sm text-ink/80">{text}</p>
       </>
     ) : null;
 
   if (n.kind === 'license_changed') {
     return (
       <>
-        <p className="mt-2 text-sm text-white">
+        <p className="mt-2 text-sm text-ink">
           {t('notice.licenseChanged', {
             model: n.data.modelTitle ?? '',
             from: n.data.oldLicense ?? '',
@@ -29,7 +29,7 @@ export default function NoticeContent({ n }: { n: NoticeItem }) {
           })}
         </p>
         {reason(n.data.reason ?? '')}
-        <p className="mt-2 text-xs text-white/50">{t('notice.buyers')}</p>
+        <p className="mt-2 text-xs text-ink/50">{t('notice.buyers')}</p>
       </>
     );
   }
@@ -37,7 +37,7 @@ export default function NoticeContent({ n }: { n: NoticeItem }) {
   if (n.kind === 'model_hidden' || n.kind === 'model_restored') {
     return (
       <>
-        <p className="mt-2 text-sm text-white">
+        <p className="mt-2 text-sm text-ink">
           {t(n.kind === 'model_hidden' ? 'notice.modelHidden' : 'notice.modelRestored', { model: n.data.modelTitle ?? '' })}
         </p>
         {reason(n.data.reason)}
@@ -48,7 +48,7 @@ export default function NoticeContent({ n }: { n: NoticeItem }) {
   if (n.kind === 'account_suspended' || n.kind === 'account_restored') {
     return (
       <>
-        <p className="mt-2 text-sm text-white">
+        <p className="mt-2 text-sm text-ink">
           {n.kind === 'account_suspended'
             ? n.data.until
               ? t('notice.suspendedUntil', { date: formatDate(n.data.until) })
@@ -62,5 +62,5 @@ export default function NoticeContent({ n }: { n: NoticeItem }) {
     );
   }
 
-  return <p className="mt-2 text-sm text-white">{t('notice.other')}</p>;
+  return <p className="mt-2 text-sm text-ink">{t('notice.other')}</p>;
 }

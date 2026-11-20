@@ -36,10 +36,10 @@ import {
   updateSellerModel,
 } from '@/lib/api';
 import { creatorHandle, type CreatorProfile } from '@/lib/creators';
-import type { AuthUser } from '@/lib/auth';
+import { updateProfile, type AuthUser } from '@/lib/auth';
 import { formatCount, formatMoney, formatPrice } from '@/lib/format';
 import { useLocale, useT } from '@/lib/i18n/client';
-import { readSession } from '@/lib/session';
+import { readSession, updateSessionUser } from '@/lib/session';
 import type {
   SellerModelItem,
   SellerSalesSummary,
@@ -81,6 +81,10 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
 
   const [editingModel, setEditingModel] = useState<SellerModelItem | null>(null);
   const [deletingModel, setDeletingModel] = useState<SellerModelItem | null>(null);
+  const [bio, setBio] = useState<string>(initialCreator?.bio || '');
+  const [isEditingBio, setIsEditingBio] = useState(false);
+  const [bioInput, setBioInput] = useState('');
+  const [savingBio, setSavingBio] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editPriceUsd, setEditPriceUsd] = useState('0');
   const [editLicense, setEditLicense] = useState('CC0');
@@ -185,6 +189,9 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
 
     const myHandle = creatorHandle(u.display_name?.trim() || u.email);
     const isMine = myHandle === handle;
+    if (isMine && u.bio && !initialCreator?.bio) {
+      setBio(u.bio);
+    }
     if (!isMine) return;
 
     (async () => {
@@ -253,7 +260,37 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
     ? initialCreator.totalDownloads
     : activeSellerModels.reduce((sum, m) => sum + Number(m.downloadCount || 0), 0);
   const totalLikes = initialCreator?.totalLikes ?? 0;
-  const bio = initialCreator?.bio || t('profile.bioFallback');
+  const currentBio = bio || (isOwnerCreator && user?.bio) || initialCreator?.bio || '';
+  const displayBio = currentBio.trim() ? currentBio : t('profile.bioFallback');
+
+  const handleStartEditBio = () => {
+    setBioInput(currentBio);
+    setIsEditingBio(true);
+  };
+
+  const handleSaveBio = async () => {
+    if (!token) return;
+    try {
+      setSavingBio(true);
+      setStatusMsg(null);
+      const updatedUser = await updateProfile({ bio: bioInput.trim() }, token);
+      const nextBio = updatedUser.bio ?? bioInput.trim();
+      setBio(nextBio);
+      updateSessionUser({ bio: nextBio });
+      setIsEditingBio(false);
+      setStatusMsg(t('profile.bioSaved'));
+      router.refresh();
+    } catch (err: any) {
+      setStatusMsg(err?.message || t('profile.bioSaveFail'));
+    } finally {
+      setSavingBio(false);
+    }
+  };
+
+  const handleCancelEditBio = () => {
+    setIsEditingBio(false);
+    setBioInput('');
+  };
 
   const showOwnerTabs = isOwnerCreator && !previewPublic;
   const currentTab: TabKey = showOwnerTabs ? activeTab : 'models';
@@ -341,11 +378,63 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
             <div className="mt-4 border-t border-line pt-4">
               <div className="flex items-center justify-between text-xs font-medium text-ink/80">
                 <span>{t('profile.aboutMe')}</span>
-                <span className="font-mono text-[11px] text-ink/45">
-                  {formatCount(totalLikes)} {t('creators.likes')}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-[11px] text-ink/45">
+                    {formatCount(totalLikes)} {t('creators.likes')}
+                  </span>
+                  {showOwnerTabs && !isEditingBio && (
+                    <button
+                      type="button"
+                      onClick={handleStartEditBio}
+                      className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[11px] text-accent transition-colors hover:bg-ink/10"
+                      title={t('profile.editBio')}
+                    >
+                      <Pencil className="h-3 w-3" />
+                      <span>{t('profile.editBioBtn')}</span>
+                    </button>
+                  )}
+                </div>
               </div>
-              <p className="mt-1.5 text-sm leading-relaxed text-ink/60">{bio}</p>
+
+              {isEditingBio ? (
+                <div className="mt-2.5">
+                  <textarea
+                    rows={4}
+                    maxLength={500}
+                    value={bioInput}
+                    onChange={(e) => setBioInput(e.target.value)}
+                    placeholder={t('profile.bioPlaceholder')}
+                    className="w-full resize-none rounded-lg border border-line bg-canvas/40 p-2.5 text-xs text-ink placeholder:text-ink/40 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                    disabled={savingBio}
+                    autoFocus
+                  />
+                  <div className="mt-1.5 flex items-center justify-between">
+                    <span className="font-mono text-[10px] text-ink/45">
+                      {bioInput.length}/500
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleCancelEditBio}
+                        disabled={savingBio}
+                        className="rounded-md border border-line px-2.5 py-1 text-xs text-ink/70 transition-colors hover:bg-ink/10 disabled:opacity-50"
+                      >
+                        {t('profile.cancelBio')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSaveBio}
+                        disabled={savingBio}
+                        className="inline-flex items-center gap-1 rounded-md bg-ink px-3 py-1 text-xs font-medium text-canvas transition-colors hover:bg-ink/85 disabled:opacity-50"
+                      >
+                        {savingBio ? t('profile.saving') : t('profile.saveBio')}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="mt-1.5 whitespace-pre-wrap break-words text-sm leading-relaxed text-ink/60">{displayBio}</p>
+              )}
               <Link
                 href="/creator"
                 className="mt-3 inline-block font-mono text-[11px] uppercase tracking-wider text-accent hover:text-accent"

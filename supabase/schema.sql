@@ -15,11 +15,13 @@ CREATE TABLE IF NOT EXISTS users (
     role user_role NOT NULL DEFAULT 'user',
     is_seller BOOLEAN NOT NULL DEFAULT FALSE,
     avatar_hash CHAR(64),
+    bio TEXT DEFAULT '',
     suspended_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_hash CHAR(64);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT DEFAULT '';
 -- Supabase exposes public tables via PostgREST: enabling RLS with no anon policy blocks direct client access
 -- while core-api/cdn-service (DATABASE_URL owner role or service_role/sb_secret_ key) continue working normally.
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;

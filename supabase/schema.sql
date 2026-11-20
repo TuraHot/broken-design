@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS users (
     role user_role NOT NULL DEFAULT 'user',
     is_seller BOOLEAN NOT NULL DEFAULT FALSE,
     avatar_hash CHAR(64),
+    bio TEXT DEFAULT '',
     suspended_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

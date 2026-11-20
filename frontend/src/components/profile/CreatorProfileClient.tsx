@@ -4,6 +4,7 @@
 // Full-width cover banner -> left sidebar (avatar, handle, stats, bio) + right underline tabs
 // (Models | Dashboard | Wallet & Withdraw for creator owner), with Donate at the bottom.
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
   AlertCircle,
@@ -59,6 +60,7 @@ interface Props {
 export default function CreatorProfileClient({ handle, initialCreator }: Props) {
   const t = useT();
   const locale = useLocale();
+  const router = useRouter();
   const dateFmt = (v: string) => new Date(v).toLocaleDateString(locale === 'th' ? 'th-TH' : 'en-US');
 
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -78,33 +80,12 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
   const [ready, setReady] = useState(false);
   const [deletedIds, setDeletedIds] = useState<Set<string>>(() => new Set());
 
-  const [currentBio, setCurrentBio] = useState<string>(() => initialCreator?.bio || '');
-  const [editingBio, setEditingBio] = useState(false);
-  const [bioInput, setBioInput] = useState('');
-  const [savingBio, setSavingBio] = useState(false);
-  const [bioStatus, setBioStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
-
-  const handleSaveBio = async () => {
-    if (!token) return;
-    try {
-      setSavingBio(true);
-      setBioStatus(null);
-      const res = await updateProfile({ bio: bioInput.trim() }, token);
-      const nextBio = res.bio ?? bioInput.trim();
-      setCurrentBio(nextBio);
-      updateSessionUser({ bio: nextBio });
-      setEditingBio(false);
-      setBioStatus({ type: 'success', message: 'Bio updated' });
-      setTimeout(() => setBioStatus(null), 3000);
-    } catch (err: any) {
-      setBioStatus({ type: 'error', message: err?.message || 'Failed to update bio' });
-    } finally {
-      setSavingBio(false);
-    }
-  };
-
   const [editingModel, setEditingModel] = useState<SellerModelItem | null>(null);
   const [deletingModel, setDeletingModel] = useState<SellerModelItem | null>(null);
+  const [bio, setBio] = useState<string>(initialCreator?.bio || '');
+  const [isEditingBio, setIsEditingBio] = useState(false);
+  const [bioInput, setBioInput] = useState('');
+  const [savingBio, setSavingBio] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editPriceUsd, setEditPriceUsd] = useState('0');
   const [editLicense, setEditLicense] = useState('CC0');
@@ -207,12 +188,11 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
     setUser(u);
     setToken(session.token);
 
-    if (!initialCreator?.bio && u.bio) {
-      setCurrentBio(u.bio);
-    }
-
     const myHandle = creatorHandle(u.display_name?.trim() || u.email);
     const isMine = myHandle === handle;
+    if (isMine && u.bio && !initialCreator?.bio) {
+      setBio(u.bio);
+    }
     if (!isMine) return;
 
     (async () => {
@@ -232,7 +212,9 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
       setStatusMsg(null);
       await deleteModel(modelId, token);
       setModels((prev) => prev.filter((m) => m.id !== modelId));
+      // Hide it from the server-rendered public list right away, then re-fetch so the cached RSC data catches up.
       setDeletedIds((prev) => new Set(prev).add(modelId));
+      router.refresh();
       setStatusMsg(t('profile.deletedMsg', { title }));
       setDeletingModel(null);
     } catch (err: any) {
@@ -273,13 +255,43 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
   const displayName = creatorName || handle;
   const avatarUrl = (isOwnerCreator ? user?.avatar_url : null) ?? initialCreator?.avatarUrl ?? null;
   const publicModels = (initialCreator?.models ?? []).filter((m) => !deletedIds.has(m.id));
-  const activeSellerModels = models.filter((m) => !m.isDeleted && !deletedIds.has(m.id));
+  const activeSellerModels = models;
   const modelCount = initialCreator ? publicModels.length : activeSellerModels.length;
   const totalDownloads = initialCreator
     ? initialCreator.totalDownloads
-    : models.reduce((sum, m) => sum + Number(m.downloadCount || 0), 0);
+    : activeSellerModels.reduce((sum, m) => sum + Number(m.downloadCount || 0), 0);
   const totalLikes = initialCreator?.totalLikes ?? 0;
-  const bio = currentBio || initialCreator?.bio || t('profile.bioFallback');
+  const currentBio = bio || (isOwnerCreator && user?.bio) || initialCreator?.bio || '';
+  const displayBio = currentBio.trim() ? currentBio : t('profile.bioFallback');
+
+  const handleStartEditBio = () => {
+    setBioInput(currentBio);
+    setIsEditingBio(true);
+  };
+
+  const handleSaveBio = async () => {
+    if (!token) return;
+    try {
+      setSavingBio(true);
+      setStatusMsg(null);
+      const updatedUser = await updateProfile({ bio: bioInput.trim() }, token);
+      const nextBio = updatedUser.bio ?? bioInput.trim();
+      setBio(nextBio);
+      updateSessionUser({ bio: nextBio });
+      setIsEditingBio(false);
+      setStatusMsg(t('profile.bioSaved'));
+      router.refresh();
+    } catch (err: any) {
+      setStatusMsg(err?.message || t('profile.bioSaveFail'));
+    } finally {
+      setSavingBio(false);
+    }
+  };
+
+  const handleCancelEditBio = () => {
+    setIsEditingBio(false);
+    setBioInput('');
+  };
 
   const showOwnerTabs = isOwnerCreator && !previewPublic;
   const currentTab: TabKey = showOwnerTabs ? activeTab : 'models';
@@ -366,92 +378,64 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
 
             <div className="mt-4 border-t border-line pt-4">
               <div className="flex items-center justify-between text-xs font-medium text-ink/80">
+                <span>{t('profile.aboutMe')}</span>
                 <div className="flex items-center gap-2">
-                  <span>{t('profile.aboutMe')}</span>
-                  {showOwnerTabs && !editingBio && (
+                  <span className="font-mono text-[11px] text-ink/45">
+                    {formatCount(totalLikes)} {t('creators.likes')}
+                  </span>
+                  {showOwnerTabs && !isEditingBio && (
                     <button
                       type="button"
-                      onClick={() => {
-                        setEditingBio(true);
-                        setBioInput(currentBio || initialCreator?.bio || '');
-                        setBioStatus(null);
-                      }}
-                      className="inline-flex items-center gap-1 rounded bg-ink/10 px-2 py-0.5 font-mono text-[11px] text-ink hover:bg-ink/15"
+                      onClick={handleStartEditBio}
+                      className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[11px] text-accent transition-colors hover:bg-ink/10"
+                      title={t('profile.editBio')}
                     >
                       <Pencil className="h-3 w-3" />
-                      <span>{t('admin.edit')}</span>
+                      <span>{t('profile.editBioBtn')}</span>
                     </button>
                   )}
                 </div>
-                <span className="font-mono text-[11px] text-ink/45">
-                  {formatCount(totalLikes)} {t('creators.likes')}
-                </span>
               </div>
 
-              {editingBio ? (
-                <div className="mt-2 space-y-2">
+              {isEditingBio ? (
+                <div className="mt-2.5">
                   <textarea
+                    rows={4}
+                    maxLength={1000}
                     value={bioInput}
                     onChange={(e) => setBioInput(e.target.value)}
-                    maxLength={1000}
-                    rows={3}
-                    placeholder={t('profile.bioFallback')}
-                    className="w-full rounded-lg border border-line bg-canvas p-2.5 text-xs text-ink placeholder:text-ink/40 focus:border-ink/50 focus:outline-none"
+                    placeholder={t('profile.bioPlaceholder')}
+                    className="w-full resize-none rounded-lg border border-line bg-canvas/40 p-2.5 text-xs text-ink placeholder:text-ink/40 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                    disabled={savingBio}
+                    autoFocus
                   />
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono text-[10px] text-ink/40">{bioInput.length}/1000</span>
-                    <div className="flex items-center gap-1.5">
+                  <div className="mt-1.5 flex items-center justify-between">
+                    <span className="font-mono text-[10px] text-ink/45">
+                      {bioInput.length}/1000
+                    </span>
+                    <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => {
-                          setEditingBio(false);
-                          setBioStatus(null);
-                        }}
+                        onClick={handleCancelEditBio}
                         disabled={savingBio}
-                        className="rounded-md border border-line px-2.5 py-1 text-xs text-ink-soft hover:bg-ink/5 disabled:opacity-50"
+                        className="rounded-md border border-line px-2.5 py-1 text-xs text-ink/70 transition-colors hover:bg-ink/10 disabled:opacity-50"
                       >
-                        {t('creator.apply.cancel')}
+                        {t('profile.cancelBio')}
                       </button>
                       <button
                         type="button"
                         onClick={handleSaveBio}
                         disabled={savingBio}
-                        className="inline-flex items-center gap-1 rounded-md bg-ink px-2.5 py-1 text-xs font-medium text-canvas hover:bg-ink/85 disabled:opacity-50"
+                        className="inline-flex items-center gap-1 rounded-md bg-ink px-3 py-1 text-xs font-medium text-canvas transition-colors hover:bg-ink/85 disabled:opacity-50"
                       >
-                        {savingBio && <Loader2 className="h-3 w-3 animate-spin" />}
-                        {savingBio ? t('profile.saving') : t('profile.saveChanges')}
+                        {savingBio ? t('profile.saving') : t('profile.saveBio')}
                       </button>
                     </div>
                   </div>
                 </div>
               ) : (
-                <p
-                  onClick={() => {
-                    if (showOwnerTabs) {
-                      setEditingBio(true);
-                      setBioInput(currentBio || initialCreator?.bio || '');
-                      setBioStatus(null);
-                    }
-                  }}
-                  className={`mt-1.5 text-sm leading-relaxed text-ink/60 whitespace-pre-line break-words ${
-                    showOwnerTabs ? 'cursor-pointer rounded p-1 hover:bg-ink/5 hover:text-ink transition-colors' : ''
-                  }`}
-                  title={showOwnerTabs ? 'คลิกเพื่อแก้ไข Bio' : undefined}
-                >
-                  {bio}
-                </p>
+                <p className="mt-1.5 whitespace-pre-wrap break-words text-sm leading-relaxed text-ink/60">{displayBio}</p>
               )}
-
-              {bioStatus && (
-                <p
-                  className={`mt-2 text-xs ${
-                    bioStatus.type === 'success' ? 'text-emerald-500' : 'text-red-400'
-                  }`}
-                >
-                  {bioStatus.message}
-                </p>
-              )}
-
               <Link
                 href="/creator"
                 className="mt-3 inline-block font-mono text-[11px] uppercase tracking-wider text-accent hover:text-accent"
@@ -564,9 +548,9 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
 
                 {/* My 3D Models Table */}
                 <div>
-                  <div className="flex items-center justify-between border-b border-white/10 pb-3">
-                    <h2 className="font-display text-base uppercase text-white">
-                      {t('seller.myModels')} <span className="ml-1 font-mono text-xs text-white/50">({activeSellerModels.length})</span>
+                  <div className="flex items-center justify-between border-b border-line pb-3">
+                    <h2 className="font-display text-base uppercase text-ink">
+                      {t('seller.myModels')} <span className="ml-1 font-mono text-xs text-ink-soft">({activeSellerModels.length})</span>
                     </h2>
                     <button
                       type="button"
@@ -593,16 +577,16 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                             <th className="px-4 py-3 text-right">{t('seller.thActions')}</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-white/5">
+                        <tbody className="divide-y divide-line">
                           {activeSellerModels.map((m) => (
-                            <tr key={m.id} className="hover:bg-white/[0.02]">
-                              <td className="px-4 py-3 font-medium text-white">
+                            <tr key={m.id} className="hover:bg-ink/[0.02]">
+                              <td className="px-4 py-3 font-medium text-ink">
                                 <Link
                                   href={`/models/${m.id}`}
-                                  className="group flex items-center gap-3 transition-colors hover:text-hud"
+                                  className="group flex items-center gap-3 transition-colors hover:text-accent"
                                 >
-                                  <div className="relative flex h-11 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10 bg-white/5 group-hover:border-hud/40">
-                                    <ImageIcon className="h-4 w-4 text-white/30" />
+                                  <div className="relative flex h-11 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md border border-line bg-ink/5 group-hover:border-accent/40">
+                                    <ImageIcon className="h-4 w-4 text-ink/30" />
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img
                                       src={m.posterUrl || `${CDN_SERVICE_URL}/cdn/models/${m.id}/poster.webp`}
@@ -627,9 +611,7 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                                 </span>
                               </td>
                               <td className="px-4 py-3 font-mono text-[11px] uppercase">
-                                {m.isDeleted ? (
-                                  <span className="text-danger">{t('seller.statusDeleted')}</span>
-                                ) : m.isHidden ? (
+                                {m.isHidden ? (
                                   <span className="text-warn">{t('seller.statusHidden')}</span>
                                 ) : (
                                   <span className="text-emerald-500">{t('seller.statusLive')}</span>
@@ -637,29 +619,25 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                               </td>
                               <td className="px-4 py-3 text-right">
                                 <div className="flex items-center justify-end gap-2">
-                                  {!m.isDeleted && (
-                                    <button
-                                      type="button"
-                                      onClick={() => openEditModal(m)}
-                                      className="rounded border border-line px-2 py-1 text-xs text-ink/75 hover:bg-ink/10 hover:text-ink"
-                                      title={t('profile.editBtn')}
-                                      aria-label={t('profile.editBtn')}
-                                    >
-                                      <Pencil className="inline h-3 w-3" />
-                                    </button>
-                                  )}
-                                  {!m.isDeleted && (
-                                    <button
-                                      type="button"
-                                      disabled={busyAction === `delete-${m.id}`}
-                                      onClick={() => setDeletingModel(m)}
-                                      className="rounded border border-danger/30 bg-danger/10 px-2 py-1 text-xs text-danger hover:bg-danger/20 disabled:opacity-50"
-                                      title={t('profile.deleteBtn')}
-                                      aria-label={t('profile.deleteBtn')}
-                                    >
-                                      <Trash2 className="inline h-3 w-3" />
-                                    </button>
-                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => openEditModal(m)}
+                                    className="rounded border border-line px-2 py-1 text-xs text-ink/75 hover:bg-ink/10 hover:text-ink"
+                                    title={t('profile.editBtn')}
+                                    aria-label={t('profile.editBtn')}
+                                  >
+                                    <Pencil className="inline h-3 w-3" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={busyAction === `delete-${m.id}`}
+                                    onClick={() => setDeletingModel(m)}
+                                    className="rounded border border-danger/30 bg-danger/10 px-2 py-1 text-xs text-danger hover:bg-danger/20 disabled:opacity-50"
+                                    title={t('profile.deleteBtn')}
+                                    aria-label={t('profile.deleteBtn')}
+                                  >
+                                    <Trash2 className="inline h-3 w-3" />
+                                  </button>
                                 </div>
                               </td>
                             </tr>

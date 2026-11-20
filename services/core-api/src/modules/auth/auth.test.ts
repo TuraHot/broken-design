@@ -115,11 +115,12 @@ test('PATCH /api/auth/profile - updates display_name and validates auth, input, 
   const avatarHash = 'a'.repeat(64);
 
   (db as any).query = async (sql: string, params: any[]) => {
-    if (sql.includes('SELECT id, suspended_at FROM users')) {
+    if (sql.includes('FROM users') && sql.includes('suspended_at') && !sql.includes('password_hash')) {
       return {
         rows: [
           {
             id: params[0],
+            display_name: 'Old Name',
             suspended_at: suspended ? new Date().toISOString() : null,
           },
         ],

@@ -24,27 +24,48 @@ creatorsRouter.get('/:handle', async (req, res) => {
     throw new AppError(404, 'CREATOR_NOT_FOUND', 'Creator not found');
   }
 
-  const candidatesRes = await db.query<{
-    id: string;
-    display_name: string | null;
-    email: string;
-    avatar_hash: string | null;
-    bio: string | null;
-  }>(
-    `SELECT u.id, u.display_name, u.email, u.avatar_hash, COALESCE(u.bio, '') AS bio
-     FROM users u
-     WHERE ${ownerActiveSql('u')}
-       AND u.role <> 'admin'
-       AND (
-         u.is_seller = TRUE
-         OR u.role = 'creator'
-         OR EXISTS (
-           SELECT 1 FROM models m
-           WHERE m.owner_id = u.id AND m.hidden_at IS NULL AND m.deleted_at IS NULL
+  let candidatesRes: {
+    rows: {
+      id: string;
+      display_name: string | null;
+      email: string;
+      avatar_hash: string | null;
+      bio?: string | null;
+    }[];
+  };
+  try {
+    candidatesRes = await db.query(
+      `SELECT u.id, u.display_name, u.email, u.avatar_hash, u.bio
+       FROM users u
+       WHERE ${ownerActiveSql('u')}
+         AND u.role <> 'admin'
+         AND (
+           u.is_seller = TRUE
+           OR u.role = 'creator'
+           OR EXISTS (
+             SELECT 1 FROM models m
+             WHERE m.owner_id = u.id AND m.hidden_at IS NULL AND m.deleted_at IS NULL
+           )
          )
-       )
-     ORDER BY u.created_at ASC, u.id ASC`,
-  );
+       ORDER BY u.created_at ASC, u.id ASC`,
+    );
+  } catch {
+    candidatesRes = await db.query(
+      `SELECT u.id, u.display_name, u.email, u.avatar_hash
+       FROM users u
+       WHERE ${ownerActiveSql('u')}
+         AND u.role <> 'admin'
+         AND (
+           u.is_seller = TRUE
+           OR u.role = 'creator'
+           OR EXISTS (
+             SELECT 1 FROM models m
+             WHERE m.owner_id = u.id AND m.hidden_at IS NULL AND m.deleted_at IS NULL
+           )
+         )
+       ORDER BY u.created_at ASC, u.id ASC`,
+    );
+  }
 
   const creator = candidatesRes.rows.find((u) => {
     const label = u.display_name?.trim() || u.email;

@@ -42,6 +42,7 @@ export interface AuthUser {
   role: 'user' | 'creator' | 'admin';
   is_seller: boolean;
   avatar_url?: string | null;
+  bio?: string | null;
 }
 
 export interface PurchaseItem {
@@ -126,7 +127,6 @@ export interface SellerModelItem {
   downloadCount: number;
   posterUrl?: string | null;
   isHidden: boolean;
-  isDeleted: boolean;
   createdAt: string;
 }
 

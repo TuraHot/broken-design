@@ -141,7 +141,7 @@ export default function SettingsPage() {
     avatarMode === 'file' ||
     avatarMode === 'preset' ||
     (avatarMode === 'remove' && Boolean(savedAvatarUrl));
-  const hasChanges = nameDirty || avatarDirty || bioDirty;
+  const hasChanges = nameDirty || bioDirty || avatarDirty;
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -214,9 +214,12 @@ export default function SettingsPage() {
           },
           session.token,
         );
-        updateSessionUser({ display_name: updatedUser.display_name, bio: updatedUser.bio });
+        updateSessionUser({
+          display_name: updatedUser.display_name,
+          bio: updatedUser.bio ?? draftBio.trim(),
+        });
         setDraftName(updatedUser.display_name);
-        setDraftBio(updatedUser.bio ?? '');
+        setDraftBio(updatedUser.bio ?? draftBio.trim());
       }
 
       if (avatarDirty) {
@@ -366,13 +369,13 @@ export default function SettingsPage() {
                 </div>
                 <div className="grid gap-1 py-3 sm:grid-cols-[160px_minmax(0,1fr)] sm:items-start sm:gap-4">
                   <dt className="pt-2 text-sm text-ink-soft">
-                    <label htmlFor="settings-bio">Bio</label>
+                    <label htmlFor="settings-bio">{t('profile.aboutMe')}</label>
                   </dt>
                   <dd className="min-w-0">
                     <textarea
                       id="settings-bio"
-                      maxLength={1000}
                       rows={3}
+                      maxLength={500}
                       disabled={saving}
                       value={draftBio}
                       onChange={(e) => {
@@ -380,10 +383,12 @@ export default function SettingsPage() {
                         setSaveError(null);
                         setSaveSuccess(false);
                       }}
-                      placeholder={t('profile.bioFallback')}
-                      className="w-full max-w-sm rounded-lg border border-line bg-canvas/40 p-2.5 text-sm text-ink placeholder:text-ink/40 focus:border-ink/50 focus:outline-none disabled:opacity-60"
+                      placeholder={t('profile.bioPlaceholder')}
+                      className="w-full max-w-sm resize-none rounded-lg border border-line bg-canvas/40 p-2.5 text-sm text-ink placeholder:text-ink/40 focus:border-ink/50 focus:outline-none disabled:opacity-60"
                     />
-                    <p className="mt-1 font-mono text-[11px] text-ink/40">{draftBio.length}/1000</p>
+                    <span className="mt-1 block font-mono text-[10px] text-ink/45">
+                      {draftBio.length}/500
+                    </span>
                   </dd>
                 </div>
                 <Row label={t('settings.email')}>{session.user.email}</Row>

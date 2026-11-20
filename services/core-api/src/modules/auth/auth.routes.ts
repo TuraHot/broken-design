@@ -86,6 +86,7 @@ const updateProfileSchema = z
       .optional(),
     bio: z
       .string()
+      .trim()
       .max(1000, 'Bio must not exceed 1000 characters')
       .optional(),
   })
@@ -264,12 +265,22 @@ authRouter.post('/login', loginLimiter, async (req, res) => {
 
 // GET /api/auth/me — return latest profile & avatar URL for the signed-in account
 authRouter.get('/me', requireAuth, async (req, res) => {
-  const result = await db.query(
-    `SELECT id, email, display_name, COALESCE(bio, '') AS bio, role, is_seller, avatar_hash, suspended_at
-     FROM users
-     WHERE id = $1`,
-    [req.user!.id],
-  );
+  let result;
+  try {
+    result = await db.query(
+      `SELECT id, email, display_name, bio, role, is_seller, avatar_hash, suspended_at
+       FROM users
+       WHERE id = $1`,
+      [req.user!.id],
+    );
+  } catch {
+    result = await db.query(
+      `SELECT id, email, display_name, role, is_seller, avatar_hash, suspended_at
+       FROM users
+       WHERE id = $1`,
+      [req.user!.id],
+    );
+  }
 
   const user = result.rows[0];
   if (!user) {
@@ -284,7 +295,7 @@ authRouter.get('/me', requireAuth, async (req, res) => {
       id: user.id,
       email: user.email,
       display_name: user.display_name,
-      bio: user.bio || '',
+      bio: (user as any).bio || '',
       role: user.role,
       is_seller: user.is_seller,
       avatar_url: buildAvatarUrl(user.id, user.avatar_hash),
@@ -305,7 +316,7 @@ authRouter.patch('/profile', requireAuth, async (req, res) => {
   }
 
   const existing = await db.query(
-    `SELECT id, suspended_at FROM users WHERE id = $1`,
+    `SELECT id, display_name, suspended_at FROM users WHERE id = $1`,
     [req.user!.id],
   );
   const currentUser = existing.rows[0];
@@ -316,28 +327,67 @@ authRouter.patch('/profile', requireAuth, async (req, res) => {
     throw new AppError(403, 'ACCOUNT_SUSPENDED', 'This account has been suspended');
   }
 
-  const updates: string[] = [];
-  const values: any[] = [];
-  let paramIdx = 1;
+  const nextDisplayName = parsed.data.displayName !== undefined ? parsed.data.displayName : currentUser.display_name;
+  const hasBio = parsed.data.bio !== undefined;
 
-  if (parsed.data.displayName !== undefined) {
-    updates.push(`display_name = $${paramIdx++}`);
-    values.push(parsed.data.displayName);
+  let user: any;
+  try {
+    if (hasBio && parsed.data.displayName !== undefined) {
+      const updated = await db.query(
+        `UPDATE users
+         SET display_name = $1,
+             bio = $2
+         WHERE id = $3
+         RETURNING id, email, display_name, bio, role, is_seller, avatar_hash`,
+        [nextDisplayName, parsed.data.bio, req.user!.id],
+      );
+      user = updated.rows[0];
+    } else if (hasBio) {
+      const updated = await db.query(
+        `UPDATE users
+         SET bio = $1
+         WHERE id = $2
+         RETURNING id, email, display_name, bio, role, is_seller, avatar_hash`,
+        [parsed.data.bio, req.user!.id],
+      );
+      user = updated.rows[0];
+    } else {
+      const updated = await db.query(
+        `UPDATE users
+         SET display_name = $1
+         WHERE id = $2
+         RETURNING id, email, display_name, role, is_seller, avatar_hash`,
+        [nextDisplayName, req.user!.id],
+      );
+      user = updated.rows[0];
+    }
+  } catch (err: any) {
+    if (err?.code === '42703') {
+      try {
+        await db.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT DEFAULT ''");
+        const updated = await db.query(
+          `UPDATE users
+           SET display_name = $1,
+               bio = $2
+           WHERE id = $3
+           RETURNING id, email, display_name, bio, role, is_seller, avatar_hash`,
+          [nextDisplayName, parsed.data.bio || '', req.user!.id],
+        );
+        user = updated.rows[0];
+      } catch {
+        const updated = await db.query(
+          `UPDATE users
+           SET display_name = $1
+           WHERE id = $2
+           RETURNING id, email, display_name, role, is_seller, avatar_hash`,
+          [nextDisplayName, req.user!.id],
+        );
+        user = { ...updated.rows[0], bio: parsed.data.bio || '' };
+      }
+    } else {
+      throw err;
+    }
   }
-  if (parsed.data.bio !== undefined) {
-    updates.push(`bio = $${paramIdx++}`);
-    values.push(parsed.data.bio.trim());
-  }
-  values.push(req.user!.id);
-
-  const updated = await db.query(
-    `UPDATE users
-     SET ${updates.join(', ')}
-     WHERE id = $${paramIdx}
-     RETURNING id, email, display_name, COALESCE(bio, '') AS bio, role, is_seller, avatar_hash`,
-    values,
-  );
-  const user = updated.rows[0];
 
   res.json({
     message: 'Profile updated',
@@ -345,7 +395,7 @@ authRouter.patch('/profile', requireAuth, async (req, res) => {
       id: user.id,
       email: user.email,
       display_name: user.display_name,
-      bio: user.bio || '',
+      bio: (user as any).bio || '',
       role: user.role,
       is_seller: user.is_seller,
       avatar_url: buildAvatarUrl(user.id, user.avatar_hash),

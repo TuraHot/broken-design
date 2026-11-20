@@ -9,7 +9,7 @@ export interface AuthUser {
   role: string;
   is_seller: boolean;
   avatar_url?: string | null;
-  bio?: string;
+  bio?: string | null;
 }
 
 // ผลลัพธ์เมื่อ Login หรือ Register สำเร็จ
@@ -150,22 +150,23 @@ async function accountRequest(url: string, init: RequestInit): Promise<any> {
   return data;
 }
 
-export interface UpdateProfileInput {
+export interface UpdateProfileParams {
   displayName?: string;
   bio?: string;
 }
+export type UpdateProfileInput = UpdateProfileParams;
 
-// อัปเดตชื่อที่แสดง และ/หรือ Bio ของบัญชีปัจจุบัน (PATCH /api/auth/profile)
+// อัปเดตข้อมูลโปรไฟล์ (ชื่อที่แสดง / bio) ของบัญชีปัจจุบัน (PATCH /api/auth/profile)
 export async function updateProfile(
-  payload: string | UpdateProfileInput,
+  params: string | UpdateProfileParams,
   token: string,
 ): Promise<AuthUser> {
   const body =
-    typeof payload === 'string'
-      ? { displayName: payload.trim() }
+    typeof params === 'string'
+      ? { displayName: params.trim() }
       : {
-          ...(payload.displayName !== undefined ? { displayName: payload.displayName.trim() } : {}),
-          ...(payload.bio !== undefined ? { bio: payload.bio.trim() } : {}),
+          ...(params.displayName !== undefined ? { displayName: params.displayName.trim() } : {}),
+          ...(params.bio !== undefined ? { bio: params.bio.trim() } : {}),
         };
 
   const data = await accountRequest(`${CORE_API_URL}/api/auth/profile`, {

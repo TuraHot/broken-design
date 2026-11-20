@@ -1,8 +1,8 @@
 'use client';
 
-// Quick jumps between the landing page sections: a rail on the right edge (wide screens) with up and down arrows around
-// the number of the current section, and a scroll-down arrow in the hero. Scrolling stays free; a click only scrolls
-// smoothly to the section (instantly under reduced motion). The numbers are the page numbers (the headings on page 02 are /02.1../02.3) on the page.
+// Quick jumps between the landing sections: a rail on the right edge (wide screens) with up and down arrows around the
+// number of the current section, and a scroll-down arrow in the hero. A click scrolls smoothly to the section (instantly
+// under reduced motion). The numbers are the same as the /01../07 headings on the page.
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useT } from '@/lib/i18n/client';
@@ -10,8 +10,12 @@ import type { MessageKey } from '@/lib/i18n/messages';
 
 export const LANDING_SECTIONS: { id: string; no: string; label: MessageKey }[] = [
   { id: 'hero', no: '01', label: 'home.nav.hero' },
-  { id: 'how', no: '02', label: 'home.browse' },
-  { id: 'join', no: '03', label: 'home.getStarted' },
+  { id: 'how', no: '02', label: 'home.how.title' },
+  { id: 'categories', no: '03', label: 'home.categories' },
+  { id: 'popular', no: '04', label: 'home.popular' },
+  { id: 'creators', no: '05', label: 'home.nav.creators' },
+  { id: 'licenses', no: '06', label: 'home.nav.licenses' },
+  { id: 'faq', no: '07', label: 'home.nav.faq' },
 ];
 
 // A section counts as the current one once its top is within this many pixels of the top of the screen (a little more

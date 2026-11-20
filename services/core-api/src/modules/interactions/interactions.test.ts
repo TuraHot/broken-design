@@ -48,7 +48,7 @@ test('POST /api/models/:id/like - toggles like, writes owner notification, and b
   let notified = false;
 
   (db as any).query = async (sql: string) => {
-    if (sql.includes('SELECT suspended_at FROM users WHERE id = $1')) {
+    if (sql.includes('SELECT suspended_at, suspended_until FROM users WHERE id = $1')) {
       return { rowCount: 1, rows: [{ suspended_at: suspended ? new Date() : null }] };
     }
     if (sql.includes('FROM models m') && sql.includes('u.suspended_at IS NULL')) {
@@ -116,7 +116,7 @@ test('POST /api/models/:id/like - a model whose owner an admin deleted is 404', 
   const originalQuery = db.query.bind(db);
   let modelSql = '';
   (db as any).query = async (sql: string) => {
-    if (sql.includes('SELECT suspended_at FROM users WHERE id = $1')) return { rowCount: 1, rows: [{ suspended_at: null }] };
+    if (sql.includes('SELECT suspended_at, suspended_until FROM users WHERE id = $1')) return { rowCount: 1, rows: [{ suspended_at: null }] };
     if (sql.includes('FROM models m')) {
       modelSql = sql;
       return { rowCount: 0, rows: [] }; // the predicate on the owner removes the model

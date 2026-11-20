@@ -12,6 +12,15 @@ export interface AuthUser {
   is_seller?: boolean;
 }
 
+/**
+ * Whether an account is suspended right now. A timed suspension whose end has passed no longer counts, even though
+ * `suspended_at` stays set until the sweeper or the next login clears it (login does the same check).
+ */
+export function isSuspended(row: { suspended_at?: unknown; suspended_until?: Date | string | null }): boolean {
+  if (!row.suspended_at) return false;
+  return !(row.suspended_until && new Date(row.suspended_until).getTime() <= Date.now());
+}
+
 const VALID_ROLES = new Set(['user', 'creator', 'admin']);
 
 declare global {
@@ -73,21 +82,21 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
 }
 
 /**
- * Use AFTER requireAuth on seller routes. Always verifies is_seller, role <> 'admin', and suspended_at from the DB.
+ * Use AFTER requireAuth on seller routes. Always verifies is_seller, role <> 'admin', and suspended_at (unless a timed suspension has ended) from the DB.
  */
 export async function requireActiveSeller(req: Request, _res: Response, next: NextFunction) {
   if (!req.user) {
     throw new AppError(401, 'UNAUTHORIZED', 'Authentication required');
   }
-  const result = await db.query<{ is_seller: boolean; role: string; suspended_at: Date | string | null }>(
-    `SELECT is_seller, role, suspended_at FROM users WHERE id = $1`,
+  const result = await db.query<{ is_seller: boolean; role: string; suspended_at: Date | string | null; suspended_until: Date | string | null }>(
+    `SELECT is_seller, role, suspended_at, suspended_until FROM users WHERE id = $1`,
     [req.user.id],
   );
   const row = result.rows[0];
   if (!row) {
     throw new AppError(401, 'UNAUTHORIZED', 'Account not found');
   }
-  if (row.suspended_at) {
+  if (isSuspended(row)) {
     throw new AppError(403, 'ACCOUNT_SUSPENDED', 'Your account has been suspended by an administrator');
   }
   if (row.role === 'admin') {
@@ -106,15 +115,15 @@ export async function requireActiveAdmin(req: Request, _res: Response, next: Nex
   if (!req.user) {
     throw new AppError(401, 'UNAUTHORIZED', 'Authentication required');
   }
-  const result = await db.query<{ role: string; suspended_at: Date | string | null }>(
-    `SELECT role, suspended_at FROM users WHERE id = $1`,
+  const result = await db.query<{ role: string; suspended_at: Date | string | null; suspended_until: Date | string | null }>(
+    `SELECT role, suspended_at, suspended_until FROM users WHERE id = $1`,
     [req.user.id],
   );
   const row = result.rows[0];
   if (!row || row.role !== 'admin') {
     throw new AppError(403, 'FORBIDDEN', 'Admin access required');
   }
-  if (row.suspended_at) {
+  if (isSuspended(row)) {
     throw new AppError(403, 'ACCOUNT_SUSPENDED', 'Your account has been suspended by an administrator');
   }
   next();
@@ -130,12 +139,12 @@ export async function requireNotSuspended(req: Request, _res: Response, next: Ne
   if (!req.user) {
     throw new AppError(401, 'UNAUTHORIZED', 'Authentication required');
   }
-  const result = await db.query(`SELECT suspended_at FROM users WHERE id = $1`, [req.user.id]);
+  const result = await db.query(`SELECT suspended_at, suspended_until FROM users WHERE id = $1`, [req.user.id]);
   const row = result.rows[0];
   if (!row) {
     throw new AppError(401, 'UNAUTHORIZED', 'Account not found');
   }
-  if (row.suspended_at) {
+  if (isSuspended(row)) {
     throw new AppError(403, 'ACCOUNT_SUSPENDED', 'Your account has been suspended by an administrator');
   }
   next();
@@ -151,12 +160,12 @@ export async function requireBuyer(req: Request, _res: Response, next: NextFunct
   if (!req.user) {
     throw new AppError(401, 'UNAUTHORIZED', 'Authentication required');
   }
-  const result = await db.query(`SELECT suspended_at, role FROM users WHERE id = $1`, [req.user.id]);
+  const result = await db.query(`SELECT suspended_at, suspended_until, role FROM users WHERE id = $1`, [req.user.id]);
   const row = result.rows[0];
   if (!row) {
     throw new AppError(401, 'UNAUTHORIZED', 'Account not found');
   }
-  if (row.suspended_at) {
+  if (isSuspended(row)) {
     throw new AppError(403, 'ACCOUNT_SUSPENDED', 'Your account has been suspended by an administrator');
   }
   if (row.role === 'admin') {

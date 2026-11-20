@@ -146,7 +146,7 @@ test('GET /api/seller/models - blocks non-seller, suspended, and admin users wit
   const originalQuery = db.query.bind(db);
   let dbUser = { is_seller: false, role: 'user', suspended_at: null as Date | null };
   (db as any).query = async (sql: string) => {
-    if (sql.includes('SELECT is_seller, role, suspended_at FROM users WHERE id = $1')) {
+    if (sql.includes('SELECT is_seller, role, suspended_at, suspended_until FROM users WHERE id = $1')) {
       return { rowCount: 1, rows: [dbUser] };
     }
     return { rowCount: 0, rows: [] };
@@ -183,7 +183,7 @@ test('GET /api/seller/models - blocks non-seller, suspended, and admin users wit
 test('GET /api/seller/models - returns creator models for active seller', async () => {
   const originalQuery = db.query.bind(db);
   (db as any).query = async (sql: string) => {
-    if (sql.includes('SELECT is_seller, role, suspended_at FROM users WHERE id = $1')) {
+    if (sql.includes('SELECT is_seller, role, suspended_at, suspended_until FROM users WHERE id = $1')) {
       return { rowCount: 1, rows: [{ is_seller: true, role: 'creator', suspended_at: null }] };
     }
     if (sql.includes('FROM models') && sql.includes('WHERE owner_id = $1')) {
@@ -229,7 +229,7 @@ test('GET /api/seller/sales - uses locked purchase amount_cents for revenue summ
   const originalQuery = db.query.bind(db);
   let sawLockedSummarySql = false;
   (db as any).query = async (sql: string) => {
-    if (sql.includes('SELECT is_seller, role, suspended_at FROM users WHERE id = $1')) {
+    if (sql.includes('SELECT is_seller, role, suspended_at, suspended_until FROM users WHERE id = $1')) {
       return { rowCount: 1, rows: [{ is_seller: true, role: 'creator', suspended_at: null }] };
     }
     if (sql.includes('COALESCE(SUM(COALESCE(NULLIF(p.amount_cents, 0), m.price_cents)), 0) AS total_revenue')) {
@@ -297,7 +297,7 @@ test('calculateWithdrawalBreakdown - deducts 7% platform fee correctly', () => {
 test('GET /api/seller/wallet - returns held balance and fee breakdown', async () => {
   const originalQuery = db.query.bind(db);
   (db as any).query = async (sql: string) => {
-    if (sql.includes('SELECT is_seller, role, suspended_at FROM users')) {
+    if (sql.includes('SELECT is_seller, role, suspended_at, suspended_until FROM users')) {
       return { rowCount: 1, rows: [{ is_seller: true, role: 'creator', suspended_at: null }] };
     }
     if (sql.includes('AS gross_earned')) {
@@ -338,7 +338,7 @@ test('POST /api/seller/withdraw - locks user row in a transaction, deducts fee, 
   let released = 0;
 
   (db as any).query = async (sql: string) => {
-    if (sql.includes('SELECT is_seller, role, suspended_at FROM users')) {
+    if (sql.includes('SELECT is_seller, role, suspended_at, suspended_until FROM users')) {
       return { rowCount: 1, rows: [{ is_seller: true, role: 'creator', suspended_at: null }] };
     }
     return { rowCount: 0, rows: [] };
@@ -440,7 +440,7 @@ test('POST /api/seller/apply - redeems invite code atomically via single CTE and
   let sawAtomicCte = false;
 
   (db as any).query = async (sql: string, params: any[]) => {
-    if (sql.includes('SELECT is_seller, role, suspended_at FROM users WHERE id = $1')) {
+    if (sql.includes('SELECT is_seller, role, suspended_at, suspended_until FROM users WHERE id = $1')) {
       return { rowCount: 1, rows: [{ is_seller: false, role: 'user', suspended_at: null }] };
     }
     if (sql.includes('WITH used_code AS')) {

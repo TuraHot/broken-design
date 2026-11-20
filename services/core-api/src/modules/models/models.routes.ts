@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { db } from '../../config/db';
-import { requireAuth } from '../../middlewares/auth.middleware';
+import { requireAuth, isSuspended } from '../../middlewares/auth.middleware';
 import { AppError } from '../../middlewares/error.middleware';
 import { formatModelResponse, type ModelPresenterRow } from './model.presenter';
 
@@ -211,15 +211,15 @@ modelsRouter.patch('/:id', requireAuth, async (req: Request, res: Response, next
     const userId = req.user!.id;
 
     // Verify caller role & suspension status from DB (never trust JWT role claims alone)
-    const userCheck = await db.query<{ role: string; suspended_at: Date | string | null }>(
-      `SELECT role, suspended_at FROM users WHERE id = $1`,
+    const userCheck = await db.query<{ role: string; suspended_at: Date | string | null; suspended_until: Date | string | null }>(
+      `SELECT role, suspended_at, suspended_until FROM users WHERE id = $1`,
       [userId],
     );
     const dbUser = userCheck.rows[0];
     if (!dbUser) {
       throw new AppError(401, 'UNAUTHORIZED', 'Account not found');
     }
-    if (dbUser.suspended_at !== null) {
+    if (isSuspended(dbUser)) {
       throw new AppError(403, 'ACCOUNT_SUSPENDED', 'Your account has been suspended by an administrator');
     }
 
@@ -323,15 +323,15 @@ modelsRouter.delete('/:id', requireAuth, async (req: Request, res: Response, nex
     const userId = req.user!.id;
 
     // 0. Verify caller role & suspension status from DB
-    const userCheck = await db.query<{ role: string; suspended_at: Date | string | null }>(
-      `SELECT role, suspended_at FROM users WHERE id = $1`,
+    const userCheck = await db.query<{ role: string; suspended_at: Date | string | null; suspended_until: Date | string | null }>(
+      `SELECT role, suspended_at, suspended_until FROM users WHERE id = $1`,
       [userId],
     );
     const dbUser = userCheck.rows[0];
     if (!dbUser) {
       throw new AppError(401, 'UNAUTHORIZED', 'Account not found');
     }
-    if (dbUser.suspended_at !== null) {
+    if (isSuspended(dbUser)) {
       throw new AppError(403, 'ACCOUNT_SUSPENDED', 'Your account has been suspended by an administrator');
     }
 

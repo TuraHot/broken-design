@@ -145,6 +145,46 @@ test('POST /api/models/:id/checkout - rejects models whose owner is suspended', 
   }
 });
 
+test('POST /api/models/:id/checkout - rejects models whose owner account was deleted', async () => {
+  const originalQuery = db.query.bind(db);
+  (db as any).query = async (sql: string) => {
+    if (sql.includes('suspended_at') && sql.includes('FROM users WHERE id = $1')) return { rowCount: 1, rows: [{ suspended_at: null, role: 'user' }] };
+    if (sql.includes('FROM models m')) {
+      return {
+        rowCount: 1,
+        rows: [
+          {
+            id: MODEL_PAID,
+            title: 'Deleted Owner Model',
+            price_cents: 1500,
+            currency: 'USD',
+            owner_id: 'creator-deleted',
+            deleted_at: null,
+            hidden_at: null,
+            owner_suspended_at: null,
+            owner_deleted_at: new Date().toISOString(),
+          },
+        ],
+      };
+    }
+    return { rowCount: 0, rows: [] };
+  };
+
+  const server = app.listen(0);
+  const port = (server.address() as any).port;
+  try {
+    const res = await fetch(`http://localhost:${port}/api/models/${MODEL_PAID}/checkout`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${makeToken()}` },
+    });
+    assert.equal(res.status, 400);
+    assert.equal((await res.json()).error?.code, 'MODEL_UNAVAILABLE');
+  } finally {
+    server.close();
+    db.query = originalQuery;
+  }
+});
+
 test('POST /api/models/:id/checkout - rejects purchasing own model', async () => {
   const originalQuery = db.query.bind(db);
   (db as any).query = async (sql: string) => {
@@ -322,7 +362,7 @@ test('POST /api/models/:id/checkout - prevents duplicate purchase if already pai
 test('GET /api/models/:id/purchase - returns purchased=true when user has paid purchase', async () => {
   const originalQuery = db.query.bind(db);
   (db as any).query = async (sql: string) => {
-    if (sql.includes("FROM purchases WHERE user_id = $1 AND model_id = $2 AND status = 'paid'")) {
+    if (sql.replace(/\s+/g, ' ').includes("FROM purchases WHERE user_id = $1 AND model_id = $2 AND status = 'paid'")) {
       return {
         rowCount: 1,
         rows: [{ id: PURCHASE_1, status: 'paid', embed_key: 'embed-key-123', paid_at: '2026-11-20T00:00:00.000Z' }],
@@ -619,4 +659,48 @@ test('payments - a normal user still passes the buyer check', async () => {
     assert.equal(res.status, 404);
     assert.equal((await res.json()).error.code, 'MODEL_NOT_FOUND');
   });
+});
+
+test('confirm-mock, pay-mock and qr - a pending purchase of a model whose owner account was deleted is refused with MODEL_UNAVAILABLE', async () => {
+  const originalQuery = db.query.bind(db);
+  (db as any).query = async (sql: string) => {
+    if (sql.includes('suspended_at') && sql.includes('FROM users WHERE id = $1')) return { rowCount: 1, rows: [{ suspended_at: null, role: 'user' }] };
+    if (sql.includes('UPDATE purchases')) return { rowCount: 0, rows: [] }; // the sellable-owner predicate did not match
+    if (sql.includes('FROM purchases p')) {
+      return {
+        rowCount: 1,
+        rows: [
+          {
+            id: PURCHASE_1,
+            model_id: MODEL_PAID,
+            status: 'pending',
+            amount_cents: 2900,
+            currency: 'USD',
+            title: 'Paid Model',
+            deleted_at: null,
+            hidden_at: null,
+            owner_suspended_at: null,
+            owner_deleted_at: '2026-11-20T00:00:00.000Z',
+          },
+        ],
+      };
+    }
+    return { rowCount: 0, rows: [] };
+  };
+
+  const server = app.listen(0);
+  const port = (server.address() as any).port;
+  try {
+    for (const path of [`/purchases/${PURCHASE_1}/confirm-mock`, `/models/${MODEL_PAID}/pay-mock`, `/purchases/${PURCHASE_1}/qr`]) {
+      const res = await fetch(`http://localhost:${port}/api${path}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${makeToken()}` },
+      });
+      assert.equal(res.status, 400, path);
+      assert.equal((await res.json()).error?.code, 'MODEL_UNAVAILABLE', path);
+    }
+  } finally {
+    server.close();
+    db.query = originalQuery;
+  }
 });

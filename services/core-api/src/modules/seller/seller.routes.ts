@@ -1,6 +1,6 @@
 // [ภีม] แดชบอร์ดคนขาย — โมเดลของฉัน, ยอดขาย, กระเป๋าเงิน, และระบบสมัครเป็นครีเอเตอร์
 import { Router } from 'express';
-import { requireActiveSeller, requireAuth } from '../../middlewares/auth.middleware';
+import { requireActiveSeller, requireAuth, isSuspended } from '../../middlewares/auth.middleware';
 import { db } from '../../config/db';
 import { env } from '../../config/env';
 import { AppError } from '../../middlewares/error.middleware';
@@ -25,8 +25,8 @@ export function calculateWithdrawalBreakdown(grossAmountCents: number, feeRateBp
 sellerRouter.post('/enable', requireAuth, async (req, res) => {
   const userId = req.user!.id;
 
-  const check = await db.query<{ is_seller: boolean; role: string; suspended_at: Date | string | null }>(
-    `SELECT is_seller, role, suspended_at FROM users WHERE id = $1`,
+  const check = await db.query<{ is_seller: boolean; role: string; suspended_at: Date | string | null; suspended_until: Date | string | null }>(
+    `SELECT is_seller, role, suspended_at, suspended_until FROM users WHERE id = $1`,
     [userId],
   );
   if (check.rowCount === 0) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
@@ -35,7 +35,7 @@ sellerRouter.post('/enable', requireAuth, async (req, res) => {
   if (row.role === 'admin') {
     throw new AppError(403, 'ADMIN_CANNOT_SELL', 'Admin accounts cannot become sellers');
   }
-  if (row.suspended_at !== null) {
+  if (isSuspended(row)) {
     throw new AppError(403, 'ACCOUNT_SUSPENDED', 'Your account has been suspended by an administrator');
   }
   if (row.is_seller) {
@@ -231,13 +231,13 @@ sellerRouter.post('/withdraw', requireAuth, requireActiveSeller, async (req, res
     await client.query('BEGIN');
 
     // Serialize all concurrent withdrawal attempts for this seller by locking their user row first.
-    const lockedUser = await client.query<{ is_seller: boolean; role: string; suspended_at: Date | string | null }>(
-      `SELECT is_seller, role, suspended_at FROM users WHERE id = $1 FOR UPDATE`,
+    const lockedUser = await client.query<{ is_seller: boolean; role: string; suspended_at: Date | string | null; suspended_until: Date | string | null }>(
+      `SELECT is_seller, role, suspended_at, suspended_until FROM users WHERE id = $1 FOR UPDATE`,
       [userId],
     );
     const u = lockedUser.rows[0];
     if (!u) throw new AppError(401, 'UNAUTHORIZED', 'Account not found');
-    if (u.suspended_at !== null) {
+    if (isSuspended(u)) {
       throw new AppError(403, 'ACCOUNT_SUSPENDED', 'Your account has been suspended by an administrator');
     }
     if (u.role === 'admin') {
@@ -345,7 +345,7 @@ sellerRouter.post('/apply', requireAuth, async (req, res) => {
   const rawInviteCode = typeof req.body?.inviteCode === 'string' ? req.body.inviteCode.trim() : '';
 
   const userRes = await db.query(
-    `SELECT is_seller, role, suspended_at FROM users WHERE id = $1`,
+    `SELECT is_seller, role, suspended_at, suspended_until FROM users WHERE id = $1`,
     [userId],
   );
   if (userRes.rowCount === 0) {
@@ -355,7 +355,7 @@ sellerRouter.post('/apply', requireAuth, async (req, res) => {
   if (u.role === 'admin') {
     throw new AppError(403, 'ADMIN_CANNOT_SELL', 'Admin accounts cannot become creators');
   }
-  if (u.suspended_at !== null) {
+  if (isSuspended(u)) {
     throw new AppError(403, 'ACCOUNT_SUSPENDED', 'Your account has been suspended by an administrator');
   }
   if (u.is_seller || u.role === 'creator') {

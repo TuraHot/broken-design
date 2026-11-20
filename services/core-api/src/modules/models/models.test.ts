@@ -31,7 +31,7 @@ test('PATCH /api/models/:id - enforces UUID, DB-backed admin check, and PREVIEW_
   };
 
   (db as any).query = async (sql: string, params: any[]) => {
-    if (sql.includes('SELECT role, suspended_at FROM users WHERE id = $1')) {
+    if (sql.includes('SELECT role, suspended_at, suspended_until FROM users WHERE id = $1')) {
       return { rowCount: 1, rows: [dbUser] };
     }
     if (sql.includes('FROM models WHERE id = $1')) {
@@ -115,7 +115,7 @@ test('PATCH /api/models/:id - enforces UUID, DB-backed admin check, and PREVIEW_
 test('DELETE /api/models/:id - checks DB role rather than JWT claim', async () => {
   const originalQuery = db.query.bind(db);
   (db as any).query = async (sql: string) => {
-    if (sql.includes('SELECT role, suspended_at FROM users WHERE id = $1')) {
+    if (sql.includes('SELECT role, suspended_at, suspended_until FROM users WHERE id = $1')) {
       return { rowCount: 1, rows: [{ role: 'user', suspended_at: null }] };
     }
     if (sql.includes('FROM models WHERE id = $1')) {

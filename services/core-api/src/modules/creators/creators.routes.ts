@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { db } from '../../config/db';
 import { AppError } from '../../middlewares/error.middleware';
+import { ownerActiveSql } from '../models/availability';
 import { buildAvatarUrl, formatModelResponse, type ModelPresenterRow } from '../models/model.presenter';
 
 export const creatorsRouter = Router();
@@ -31,7 +32,7 @@ creatorsRouter.get('/:handle', async (req, res) => {
   }>(
     `SELECT u.id, u.display_name, u.email, u.avatar_hash
      FROM users u
-     WHERE u.suspended_at IS NULL
+     WHERE ${ownerActiveSql('u')}
        AND u.role <> 'admin'
        AND (
          u.is_seller = TRUE

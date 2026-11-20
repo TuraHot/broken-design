@@ -25,7 +25,7 @@ async function withServer(
 ) {
   const originalQuery = db.query.bind(db);
   (db as any).query = async (sql: string, params: any[]) => {
-    if (sql.includes('SELECT role, suspended_at FROM users WHERE id = $1')) {
+    if (sql.includes('SELECT role, suspended_at, suspended_until FROM users WHERE id = $1')) {
       return adminRow ? { rowCount: 1, rows: [adminRow] } : { rowCount: 0, rows: [] };
     }
     return handler(sql, params) ?? { rowCount: 0, rows: [] };

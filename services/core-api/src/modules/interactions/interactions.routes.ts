@@ -1,6 +1,7 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
+import { ownerActiveSql } from '../models/availability';
 import { db } from '../../config/db';
-import { requireAuth } from '../../middlewares/auth.middleware';
+import { requireAuth, isSuspended } from '../../middlewares/auth.middleware';
 import { AppError } from '../../middlewares/error.middleware';
 import { notifyModelLike, notifyUser } from '../../config/socket';
 
@@ -69,11 +70,11 @@ interactionsRouter.post(
         throw new AppError(404, 'MODEL_NOT_FOUND', 'Model not found');
       }
 
-      const userCheck = await db.query<{ suspended_at: Date | null }>(
-        `SELECT suspended_at FROM users WHERE id = $1`,
+      const userCheck = await db.query<{ suspended_at: Date | null; suspended_until: Date | null }>(
+        `SELECT suspended_at, suspended_until FROM users WHERE id = $1`,
         [userId],
       );
-      if (userCheck.rows[0]?.suspended_at !== null && userCheck.rows[0]?.suspended_at !== undefined) {
+      if (userCheck.rows[0] && isSuspended(userCheck.rows[0])) {
         throw new AppError(403, 'ACCOUNT_SUSPENDED', 'Your account has been suspended by an administrator');
       }
 
@@ -81,7 +82,7 @@ interactionsRouter.post(
         `SELECT m.id, m.owner_id, m.title
          FROM models m
          JOIN users u ON u.id = m.owner_id
-         WHERE m.id = $1 AND m.hidden_at IS NULL AND m.deleted_at IS NULL AND u.suspended_at IS NULL`,
+         WHERE m.id = $1 AND m.hidden_at IS NULL AND m.deleted_at IS NULL AND ${ownerActiveSql('u')}`,
         [id],
       );
       if (modelCheck.rows.length === 0) {

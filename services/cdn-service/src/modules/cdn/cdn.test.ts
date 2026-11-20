@@ -65,6 +65,7 @@ function resetDb() {
     hidden_at: null,
     deleted_at: null,
     owner_suspended_at: null,
+    owner_deleted_at: null,
   };
   models = {
     [FREE_ID]: {
@@ -161,6 +162,7 @@ function resetDb() {
       hidden_at: null,
       deleted_at: null,
       owner_suspended_at: null,
+    owner_deleted_at: null,
     };
     models[inserted.id] = inserted;
     return { rows: [{ ...inserted }], rowCount: 1 };
@@ -456,6 +458,23 @@ test("soft-deleted model: public URLs 404, buyers keep streaming", async () => {
   await buyer.arrayBuffer();
 });
 
+test("model of an owner an admin deleted: free and preview URLs 404, buyers keep streaming", async () => {
+  models[PAID_ID].owner_deleted_at = new Date();
+  models[FREE_ID].owner_deleted_at = new Date();
+  for (const p of [
+    `/models/${PAID_ID}/preview.glb`,
+    `/models/${FREE_ID}/${FULL_HASH}.glb`,
+    `/models/${FREE_ID}/download`,
+  ]) {
+    const res = await get(p);
+    assert.equal(res.status, 404, p);
+    assert.equal(await errCode(res), "MODEL_NOT_FOUND");
+  }
+  const buyer = await get(`/models/${PAID_ID}/file.glb?key=${KEY}`);
+  assert.equal(buyer.status, 200);
+  await buyer.arrayBuffer();
+});
+
 test("unknown / malformed ids and hashes → 404", async () => {
   for (const p of [
     `/models/${MISSING_ID}/preview.glb`,
@@ -744,6 +763,7 @@ test("scoped storage layout: streams from <model_id>/ folder even without flat f
     hidden_at: null,
     deleted_at: null,
     owner_suspended_at: null,
+    owner_deleted_at: null,
   };
   purchases.push({ user_id: BUYER, model_id: SCOPED_ID, status: "paid", embed_key: "d".repeat(48) });
 
@@ -810,6 +830,13 @@ test("user avatar: avatarKey whitelist and GET /cdn/users/:id/avatar.webp stream
   const suspendedRes = await get(`/users/${OWNER}/avatar.webp`);
   assert.equal(suspendedRes.status, 404);
   await suspendedRes.arrayBuffer();
+  users[OWNER].suspended_at = null;
+
+  // User deleted by an admin -> 404
+  users[OWNER].deleted_at = new Date();
+  const deletedRes = await get(`/users/${OWNER}/avatar.webp`);
+  assert.equal(deletedRes.status, 404);
+  await deletedRes.arrayBuffer();
 
   // Invalid UUID -> 404
   const badIdRes = await get("/users/not-a-uuid/avatar.webp");

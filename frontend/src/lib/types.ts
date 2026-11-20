@@ -125,7 +125,6 @@ export interface SellerModelItem {
   downloadCount: number;
   posterUrl?: string | null;
   isHidden: boolean;
-  isDeleted: boolean;
   createdAt: string;
 }
 

@@ -12,7 +12,6 @@ import {
   KeyRound,
   Layers,
   RefreshCw,
-  ShieldCheck,
   Sparkles,
   User as UserIcon,
 } from 'lucide-react';
@@ -321,7 +320,6 @@ export default function MePage() {
           <div className="mt-6 grid grid-cols-1 gap-6">
             {purchases.map((item) => {
               const vmSnippet = `<vm-model model-id="${item.modelId}" cdn-base="${CDN_SERVICE_URL}" key="${item.embedKey}" auto-rotate camera-controls></vm-model>`;
-              const iframeSnippet = `<iframe src="http://localhost:3000/embed/${item.modelId}?key=${item.embedKey}" width="600" height="400" allow="fullscreen" style="border:0"></iframe>`;
 
               return (
                 <div key={item.id} className={`${CARD} min-w-0 space-y-4`}>

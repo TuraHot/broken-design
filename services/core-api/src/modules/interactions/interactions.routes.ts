@@ -8,6 +8,25 @@ export const interactionsRouter = Router();
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// GET /api/me/likes (Batch fetch all model IDs liked by the current user — avoids N+1 requests on /gallery)
+interactionsRouter.get(
+  '/me/likes',
+  requireAuth,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const result = await db.query<{ model_id: string }>(
+        `SELECT model_id FROM likes WHERE user_id = $1`,
+        [req.user!.id],
+      );
+      res.json({
+        modelIds: result.rows.map((r) => r.model_id),
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 // GET /api/models/:id/like (Current user's like state + total count)
 interactionsRouter.get(
   '/models/:id/like',

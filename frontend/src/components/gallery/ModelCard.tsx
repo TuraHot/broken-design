@@ -7,11 +7,10 @@ import { useEffect, useRef, useState } from 'react';
 import { Heart, Image as ImageIcon, Loader2, Rotate3D } from 'lucide-react';
 import UserAvatar from '@/components/ui/UserAvatar';
 import { CDN_SERVICE_URL } from '@/lib/api';
-import { formatPrice as price } from '@/lib/format';
+import { formatCount, formatPrice as price } from '@/lib/format';
 import { useT } from '@/lib/i18n/client';
+import { useModelLike } from '@/lib/likes-store';
 import type { Model } from '@/lib/types';
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Global dynamic loader for @google/model-viewer to load only once
 let modelViewerPromise: Promise<any> | null = null;
@@ -38,8 +37,8 @@ export default function ModelCard({ model }: { model: Model }) {
   const hoverTimerRef = useRef<NodeJS.Timeout | null>(null);
   const downCoordsRef = useRef<{ x: number; y: number } | null>(null);
 
+  const { liked, count, busy, isRealModel, toggleLike } = useModelLike(model.id, model.likeCount);
   const targetHref = `/models/${model.id}`;
-  const isRealModel = Boolean(model.id && UUID_RE.test(model.id));
   const preview3dUrl = isRealModel
     ? `${CDN_SERVICE_URL}/cdn/models/${encodeURIComponent(model.id)}/preview.glb`
     : null;
@@ -139,7 +138,7 @@ export default function ModelCard({ model }: { model: Model }) {
             {/* 3D Orbit Badge */}
             <div className="pointer-events-none absolute bottom-2 right-2 flex items-center gap-1 rounded bg-black/75 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-hud border border-white/10 backdrop-blur">
               <Rotate3D className="h-3 w-3 animate-pulse" />
-              <span>Drag to rotate</span>
+              <span>{t('card.dragRotate')}</span>
             </div>
           </div>
         ) : (
@@ -172,7 +171,7 @@ export default function ModelCard({ model }: { model: Model }) {
         {!show3D && isRealModel && isHovered && (
           <div className="pointer-events-none absolute bottom-2 right-2 flex items-center gap-1 rounded bg-black/80 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-white/80 border border-white/10 backdrop-blur">
             <Rotate3D className="h-3 w-3 text-hud" />
-            <span>3D Model</span>
+            <span>{t('card.badge3d')}</span>
           </div>
         )}
 
@@ -184,17 +183,21 @@ export default function ModelCard({ model }: { model: Model }) {
         )}
       </div>
 
-      {/* Model Metadata Section (Clickable Link) */}
-      <Link href={targetHref} onClick={onLinkClick} className="block p-3 cursor-pointer">
-        <h3 className="truncate text-sm font-medium text-ink group-hover:text-accent transition-colors">
-          {model.title}
-        </h3>
-        <div className="mt-1.5 flex items-center gap-1.5">
-          <UserAvatar name={model.creator} avatarUrl={model.creatorAvatarUrl} size="xs" />
-          <p className="min-w-0 truncate text-sm text-ink-soft">{model.creator}</p>
-        </div>
+      {/* Model Metadata Section */}
+      <div className="p-3">
+        <Link href={targetHref} onClick={onLinkClick} className="block cursor-pointer">
+          <h3 className="truncate text-sm font-medium text-ink group-hover:text-accent transition-colors">
+            {model.title}
+          </h3>
+          <div className="mt-1.5 flex items-center gap-1.5">
+            <UserAvatar name={model.creator} avatarUrl={model.creatorAvatarUrl} size="xs" />
+            <p className="min-w-0 truncate text-sm text-ink-soft">{model.creator}</p>
+          </div>
+        </Link>
         <div className="mt-3 flex items-center justify-between">
-          <span
+          <Link
+            href={targetHref}
+            onClick={onLinkClick}
             className={
               free
                 ? 'rounded border border-accent/40 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-accent'
@@ -202,14 +205,28 @@ export default function ModelCard({ model }: { model: Model }) {
             }
           >
             {free ? t('gallery.free') : price(model.priceCents)}
-          </span>
-          <span className="inline-flex items-center gap-1 font-mono text-[11px] text-ink-soft">
-            <Heart aria-hidden className="h-4 w-4" />
+          </Link>
+          <button
+            type="button"
+            onClick={() => void toggleLike()}
+            disabled={busy || !isRealModel}
+            aria-pressed={liked}
+            aria-label={liked ? t('model.unlike') : t('model.like')}
+            className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[11px] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-60 ${
+              liked ? 'text-red-500 hover:text-red-400' : 'text-ink-soft hover:text-ink'
+            }`}
+          >
+            <Heart
+              aria-hidden
+              className={`h-4 w-4 transition-transform ${
+                liked ? 'scale-110 fill-red-500 text-red-500' : 'fill-none'
+              }`}
+            />
             <span className="sr-only">{t('card.likes')}</span>
-            {model.likeCount}
-          </span>
+            <span>{formatCount(count)}</span>
+          </button>
         </div>
-      </Link>
+      </div>
     </div>
   );
 }

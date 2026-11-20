@@ -13,8 +13,6 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: t('creator.meta') };
 }
 
-const HUD_CLIP = 'polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px))';
-
 const FEATURES: { icon: LucideIcon; title: MessageKey; body: MessageKey }[] = [
   { icon: Upload, title: 'creator.f1.title', body: 'creator.f1.body' },
   { icon: Coins, title: 'creator.f2.title', body: 'creator.f2.body' },

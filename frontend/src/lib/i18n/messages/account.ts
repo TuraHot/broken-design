@@ -211,6 +211,17 @@ export const accountEn = {
   'avatar.upload': 'Upload user logo',
   'settings.preset': 'Preset {n}',
   'settings.errSave': 'Failed to save profile.',
+
+  // ── poster crop modal ──
+  'crop.title': 'Select Poster Area',
+  'crop.subtitle': 'Drag or resize the frame to choose the poster area for your 3D model.',
+  'crop.aspect': 'Aspect:',
+  'crop.free': 'Free',
+  'crop.fullFrame': 'Full Frame',
+  'crop.size': 'Size: {w}% × {h}%',
+  'crop.cancel': 'Cancel',
+  'crop.processing': 'Processing…',
+  'crop.confirm': 'Crop & Save Poster',
 } as const;
 
 export const accountTh: Record<keyof typeof accountEn, string> = {
@@ -418,4 +429,14 @@ export const accountTh: Record<keyof typeof accountEn, string> = {
   'avatar.upload': 'อัปโหลดโลโก้ผู้ใช้',
   'settings.preset': 'รูปตัวอย่าง {n}',
   'settings.errSave': 'บันทึกโปรไฟล์ไม่สำเร็จ',
+
+  'crop.title': 'ครอบตัดภาพโปสเตอร์',
+  'crop.subtitle': 'ลากหรือปรับกรอบเพื่อเลือกส่วนของโมเดลที่ต้องการใช้เป็นรูปโปสเตอร์',
+  'crop.aspect': 'สัดส่วน:',
+  'crop.free': 'อิสระ',
+  'crop.fullFrame': 'เต็มภาพ',
+  'crop.size': 'ขนาด: {w}% × {h}%',
+  'crop.cancel': 'ยกเลิก',
+  'crop.processing': 'กำลังประมวลผล…',
+  'crop.confirm': 'ครอบตัดและบันทึกโปสเตอร์',
 };

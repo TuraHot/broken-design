@@ -70,7 +70,7 @@ class VmModelElement extends HTMLElement {
 
         const banner = document.createElement('div');
         banner.setAttribute('role', 'status');
-        banner.textContent = 'ต้องซื้อเพื่อใช้งาน ·แสดงไฟล์ตัวอย่าง (Preview)';
+        banner.textContent = 'ต้องซื้อเพื่อใช้งาน · แสดงไฟล์ตัวอย่าง (Preview)';
         Object.assign(banner.style, {
           position: 'absolute',
           left: '12px',

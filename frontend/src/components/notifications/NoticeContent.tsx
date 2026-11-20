@@ -62,5 +62,28 @@ export default function NoticeContent({ n }: { n: NoticeItem }) {
     );
   }
 
+  if (n.kind === 'model_liked') {
+    const liker = n.data.liker_name;
+    const model = n.data.model_title ?? n.data.modelTitle;
+    return (
+      <p className="mt-2 text-sm text-ink">
+        {liker || model
+          ? t('notice.modelLiked', { liker: liker ?? '', model: model ?? '' })
+          : n.data.message || t('notice.other')}
+      </p>
+    );
+  }
+
+  if (n.kind === 'creator_application_approved' || n.kind === 'creator_application_rejected') {
+    return (
+      <>
+        <p className="mt-2 text-sm text-ink">
+          {t(n.kind === 'creator_application_approved' ? 'notice.creatorApproved' : 'notice.creatorRejected')}
+        </p>
+        {reason(n.data.adminNote ?? n.data.reason)}
+      </>
+    );
+  }
+
   return <p className="mt-2 text-sm text-ink">{t('notice.other')}</p>;
 }

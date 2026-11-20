@@ -6,6 +6,7 @@ import { allowedOrigins } from "./config/cors";
 import { testDbConnection } from "./config/db";
 import { initSocketServer } from "./config/socket";
 import { authRouter } from "./modules/auth/auth.routes";
+import { creatorsRouter } from "./modules/creators/creators.routes";
 import { modelsRouter } from "./modules/models/models.routes";
 import { paymentsRouter } from "./modules/payments/payments.routes";
 import { interactionsRouter } from "./modules/interactions/interactions.routes";
@@ -35,6 +36,7 @@ app.get("/health", async (_req, res) => {
 });
 
 app.use("/api/auth", authRouter);
+app.use("/api/creators", creatorsRouter);
 app.use("/api/models", modelsRouter);
 app.use("/api", paymentsRouter);
 app.use("/api/seller", sellerRouter);

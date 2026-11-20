@@ -68,6 +68,7 @@ modelsRouter.get('/', async (req, res, next) => {
     const tag = typeof req.query.tag === 'string' ? req.query.tag.trim().toLowerCase() : '';
     const license = typeof req.query.license === 'string' ? req.query.license.trim().toUpperCase() : '';
     const price = typeof req.query.price === 'string' ? req.query.price.trim().toLowerCase() : '';
+    const ownerId = typeof req.query.ownerId === 'string' ? req.query.ownerId.trim() : '';
 
     const rawPage = Number.parseInt(String(req.query.page ?? '1'), 10);
     const page = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
@@ -85,6 +86,15 @@ modelsRouter.get('/', async (req, res, next) => {
       'u.suspended_at IS NULL',
     ];
     const params: unknown[] = [];
+
+    if (ownerId) {
+      if (!UUID_RE.test(ownerId)) {
+        res.json({ items: [], page, pageSize, total: 0 });
+        return;
+      }
+      params.push(ownerId);
+      conditions.push(`m.owner_id = $${params.length}`);
+    }
 
     if (q) {
       params.push(`%${q}%`);
@@ -220,6 +230,10 @@ modelsRouter.get('/:id', async (req, res, next) => {
     const row = result.rows[0];
     if (!row) {
       throw new AppError(404, 'MODEL_NOT_FOUND', 'Model not found');
+    }
+
+    if (req.query.trackView === '1') {
+      void db.query(`UPDATE models SET view_count = view_count + 1 WHERE id = $1`, [id]).catch(() => undefined);
     }
 
     res.json(formatModelResponse(row));

@@ -14,7 +14,6 @@ import {
   Layers,
   DollarSign,
   Tag,
-  FileCode,
   ArrowRight,
   RefreshCw,
   Check,

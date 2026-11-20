@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { Heart, Bell, X } from 'lucide-react';
+import type { Socket } from 'socket.io-client';
 import { getSocket } from '@/lib/socket';
-import { readSession } from '@/lib/session';
+import { SESSION_UPDATED_EVENT } from '@/lib/session';
 
 interface RealtimeNotice {
   id: string;
@@ -18,39 +19,48 @@ export default function RealtimeNotificationToast() {
   const [notices, setNotices] = useState<RealtimeNotice[]>([]);
 
   useEffect(() => {
-    let socket: any = null;
+    let boundSocket: Socket | null = null;
 
-    try {
-      socket = getSocket();
-      if (!socket) return;
-
-      const handleNotification = (data: any) => {
-        if (!data || !data.title) return;
-        const newNotice: RealtimeNotice = {
-          id: `${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-          type: data.type || 'info',
-          title: data.title,
-          message: data.message || '',
-          modelId: data.modelId,
-          createdAt: data.createdAt || new Date().toISOString(),
-        };
-
-        setNotices((prev) => [newNotice, ...prev.slice(0, 4)]);
-
-        // Auto remove after 6 seconds
-        setTimeout(() => {
-          setNotices((prev) => prev.filter((n) => n.id !== newNotice.id));
-        }, 6000);
+    const handleNotification = (data: any) => {
+      if (!data || !data.title) return;
+      const newNotice: RealtimeNotice = {
+        id: `${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        type: data.type || 'info',
+        title: data.title,
+        message: data.message || '',
+        modelId: data.modelId,
+        createdAt: data.createdAt || new Date().toISOString(),
       };
 
-      socket.on('notification', handleNotification);
+      setNotices((prev) => [newNotice, ...prev.slice(0, 4)]);
 
-      return () => {
-        socket.off('notification', handleNotification);
-      };
-    } catch {
-      // Ignore if socket not available
-    }
+      // Auto remove after 6 seconds
+      setTimeout(() => {
+        setNotices((prev) => prev.filter((n) => n.id !== newNotice.id));
+      }, 6000);
+    };
+
+    const bind = () => {
+      try {
+        const socket = getSocket();
+        if (!socket || socket === boundSocket) return;
+        if (boundSocket) boundSocket.off('notification', handleNotification);
+        socket.on('notification', handleNotification);
+        boundSocket = socket;
+      } catch {
+        // Ignore if socket not available
+      }
+    };
+
+    bind();
+    window.addEventListener('storage', bind);
+    window.addEventListener(SESSION_UPDATED_EVENT, bind);
+
+    return () => {
+      window.removeEventListener('storage', bind);
+      window.removeEventListener(SESSION_UPDATED_EVENT, bind);
+      if (boundSocket) boundSocket.off('notification', handleNotification);
+    };
   }, []);
 
   const dismiss = (id: string) => {

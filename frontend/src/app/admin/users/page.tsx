@@ -5,110 +5,70 @@ import { useEffect, useState } from 'react';
 import AdminList, { type Column, type RowApi } from '@/components/admin/AdminList';
 import SuspendDialog from '@/components/admin/SuspendDialog';
 import { Badge } from '@/components/admin/ui';
-import type { AdminUser } from '@/lib/admin-api';
-import { CORE_API_URL } from '@/lib/api';
+import {
+  createInviteCode,
+  fetchCreatorApplications,
+  fetchInviteCodes,
+  reviewCreatorApplication,
+  type AdminCreatorApplication,
+  type AdminInviteCode,
+  type AdminUser,
+} from '@/lib/admin-api';
 import { formatDate } from '@/lib/format';
 import { useT } from '@/lib/i18n/client';
 import { readSession } from '@/lib/session';
 
-interface AdminCreatorApp {
-  id: string;
-  userId: string;
-  email: string;
-  displayName: string;
-  note: string;
-  status: 'pending' | 'approved' | 'rejected';
-  createdAt: string;
-}
-
-interface AdminInviteCode {
-  id: string;
-  code: string;
-  maxUses: number;
-  usedCount: number;
-  createdAt: string;
-}
-
-function CreatorApplicationsPanel() {
-  const [apps, setApps] = useState<AdminCreatorApp[]>([]);
+function CreatorApplicationsPanel({ onApproved }: { onApproved: () => void }) {
+  const t = useT();
+  const [apps, setApps] = useState<AdminCreatorApplication[]>([]);
   const [codes, setCodes] = useState<AdminInviteCode[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [creatingCode, setCreatingCode] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
   const loadData = async () => {
-    const token = readSession()?.token;
-    if (!token) return;
+    if (!readSession()) return;
     try {
-      const [appsRes, codesRes] = await Promise.all([
-        fetch(`${CORE_API_URL}/api/admin/creator-applications?status=pending`, {
-          headers: { Authorization: `Bearer ${token}` },
-          cache: 'no-store',
-        }),
-        fetch(`${CORE_API_URL}/api/admin/invite-codes`, {
-          headers: { Authorization: `Bearer ${token}` },
-          cache: 'no-store',
-        }),
+      const [appsData, codesData] = await Promise.all([
+        fetchCreatorApplications('pending'),
+        fetchInviteCodes(),
       ]);
-      if (appsRes.ok) {
-        const data = await appsRes.json();
-        setApps(Array.isArray(data.applications) ? data.applications : []);
-      }
-      if (codesRes.ok) {
-        const data = await codesRes.json();
-        setCodes(Array.isArray(data.codes) ? data.codes : []);
-      }
+      setApps(Array.isArray(appsData.applications) ? appsData.applications : []);
+      setCodes(Array.isArray(codesData.codes) ? codesData.codes : []);
     } catch {
-      // Ignore load error
+      // AdminShell / AdminList handle auth errors
     }
   };
 
   useEffect(() => {
-    loadData();
+    void loadData();
   }, []);
 
   const handleGenerateCode = async () => {
-    const token = readSession()?.token;
-    if (!token || creatingCode) return;
+    if (creatingCode) return;
     try {
       setCreatingCode(true);
-      const res = await fetch(`${CORE_API_URL}/api/admin/invite-codes`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ maxUses: 1 }),
-      });
-      if (!res.ok) throw new Error('Failed to generate invite code');
-      const data = await res.json();
+      setMsg(null);
+      const data = await createInviteCode({ maxUses: 1 });
       if (data.code) setCodes((prev) => [data.code, ...prev]);
     } catch (err: any) {
-      setMsg(err?.message || 'Unable to generate code.');
+      setMsg(err?.message || t('admin.apps.errGenerate'));
     } finally {
       setCreatingCode(false);
     }
   };
 
   const handleReview = async (id: string, status: 'approved' | 'rejected') => {
-    const token = readSession()?.token;
-    if (!token || busyId) return;
+    if (busyId) return;
     try {
       setBusyId(id);
       setMsg(null);
-      const res = await fetch(`${CORE_API_URL}/api/admin/creator-applications/${encodeURIComponent(id)}`, {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ status }),
-      });
-      if (!res.ok) throw new Error('Failed to update application');
+      await reviewCreatorApplication(id, status);
       setApps((prev) => prev.filter((a) => a.id !== id));
-      setMsg(`Application ${status}.`);
+      setMsg(status === 'approved' ? t('admin.apps.approvedMsg') : t('admin.apps.rejectedMsg'));
+      if (status === 'approved') onApproved();
     } catch (err: any) {
-      setMsg(err?.message || 'Action failed.');
+      setMsg(err?.message || t('admin.apps.errAction'));
     } finally {
       setBusyId(null);
     }
@@ -119,9 +79,9 @@ function CreatorApplicationsPanel() {
       <div className="rounded-xl border border-hud/30 bg-hud/5 p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud">[ Creator Approvals ]</p>
+            <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud">{t('admin.apps.eyebrow')}</p>
             <h2 className="mt-1 font-display text-lg uppercase text-white">
-              Pending Creator Applications ({apps.length})
+              {t('admin.apps.title', { n: apps.length })}
             </h2>
           </div>
           <button
@@ -130,7 +90,7 @@ function CreatorApplicationsPanel() {
             onClick={handleGenerateCode}
             className="h-9 rounded-lg border border-hud/40 bg-hud/10 px-3.5 font-mono text-xs uppercase tracking-wider text-hud transition-colors hover:bg-hud/20 disabled:opacity-50"
           >
-            {creatingCode ? 'Generating…' : '+ Generate Invite Code'}
+            {creatingCode ? t('admin.apps.generating') : t('admin.apps.generateCode')}
           </button>
         </div>
 
@@ -164,7 +124,9 @@ function CreatorApplicationsPanel() {
                     {app.displayName} <span className="font-mono text-xs text-white/55">({app.email})</span>
                   </p>
                   {app.note && <p className="mt-1 text-xs text-white/70">{app.note}</p>}
-                  <p className="mt-1 font-mono text-[11px] text-white/45">Applied: {formatDate(app.createdAt)}</p>
+                  <p className="mt-1 font-mono text-[11px] text-white/45">
+                    {t('admin.apps.applied', { date: formatDate(app.createdAt) })}
+                  </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   <button
@@ -173,7 +135,7 @@ function CreatorApplicationsPanel() {
                     onClick={() => handleReview(app.id, 'approved')}
                     className="h-8 rounded-lg bg-white px-3 text-xs font-semibold text-black transition-colors hover:bg-white/85 disabled:opacity-50"
                   >
-                    Approve
+                    {t('admin.apps.approve')}
                   </button>
                   <button
                     type="button"
@@ -181,7 +143,7 @@ function CreatorApplicationsPanel() {
                     onClick={() => handleReview(app.id, 'rejected')}
                     className="h-8 rounded-lg border border-red-500/40 bg-red-500/10 px-3 text-xs text-red-300 transition-colors hover:bg-red-500/20 disabled:opacity-50"
                   >
-                    Reject
+                    {t('admin.apps.reject')}
                   </button>
                 </div>
               </li>
@@ -266,12 +228,14 @@ function buildColumns(myId: string | null): Column<AdminUser>[] {
 
 export default function AdminUsersPage() {
   const [myId, setMyId] = useState<string | null>(null);
+  const [usersRefreshKey, setUsersRefreshKey] = useState(0);
   useEffect(() => setMyId(readSession()?.user.id ?? null), []);
 
   return (
     <>
-      <CreatorApplicationsPanel />
+      <CreatorApplicationsPanel onApproved={() => setUsersRefreshKey((k) => k + 1)} />
       <AdminList<AdminUser>
+        key={usersRefreshKey}
         path="/users"
         heading="admin.nav.users"
         searchLabel="admin.search.users"

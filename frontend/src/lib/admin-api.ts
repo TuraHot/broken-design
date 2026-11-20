@@ -204,3 +204,40 @@ export const updateComplaint = (id: string, status: ComplaintStatus, adminNote?:
     `/complaints/${encodeURIComponent(id)}`,
     { method: 'PATCH', body: JSON.stringify(adminNote === undefined ? { status } : { status, adminNote }) },
   );
+
+export interface AdminCreatorApplication {
+  id: string;
+  userId: string;
+  email: string;
+  displayName: string;
+  note: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+}
+
+export interface AdminInviteCode {
+  id: string;
+  code: string;
+  maxUses: number;
+  usedCount: number;
+  expiresAt?: string | null;
+  createdAt: string;
+}
+
+export const fetchCreatorApplications = (status: 'pending' | 'approved' | 'rejected' | 'all' = 'pending') =>
+  adminFetch<{ applications: AdminCreatorApplication[] }>(`/creator-applications?status=${encodeURIComponent(status)}`);
+
+export const reviewCreatorApplication = (id: string, status: 'approved' | 'rejected', adminNote?: string) =>
+  adminFetch<{ application: { id: string; userId: string; status: string; adminNote: string | null; reviewedAt: string } }>(
+    `/creator-applications/${encodeURIComponent(id)}`,
+    { method: 'PATCH', body: JSON.stringify(adminNote === undefined ? { status } : { status, adminNote }) },
+  );
+
+export const fetchInviteCodes = () =>
+  adminFetch<{ codes: AdminInviteCode[] }>('/invite-codes');
+
+export const createInviteCode = (body: { code?: string; maxUses?: number; expiresAt?: string } = { maxUses: 1 }) =>
+  adminFetch<{ code: AdminInviteCode }>('/invite-codes', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });

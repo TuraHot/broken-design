@@ -10,7 +10,7 @@ import ModelActions from '@/components/model/ModelActions';
 import ModelLikeButton from '@/components/model/ModelLikeButton';
 import ModelPreview from '@/components/model/ModelPreview';
 import UserAvatar from '@/components/ui/UserAvatar';
-import { fetchCoreApiModels, fetchModel, fetchMoreFromCreator } from '@/lib/api';
+import { fetchModel, fetchMoreFromCreator } from '@/lib/api';
 import { creatorHandle } from '@/lib/creators';
 import { formatCount, formatPrice } from '@/lib/format';
 import { getT } from '@/lib/i18n/server';
@@ -30,7 +30,7 @@ const LABEL = 'font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70';
 export default async function ModelDetailPage({ params }: Props) {
   const { t } = await getT();
   const { id } = await params;
-  const [model] = await Promise.all([fetchModel(id), fetchCoreApiModels()]);
+  const model = await fetchModel(id, true);
   if (!model) notFound();
 
   const more = await fetchMoreFromCreator(model);

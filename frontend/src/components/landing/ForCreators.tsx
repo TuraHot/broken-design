@@ -45,10 +45,10 @@ export default async function ForCreators() {
             ))}
           </ol>
           <Link
-            href="/seller"
+            href="/creator"
             className="mt-7 inline-flex items-center gap-4 bg-ink px-5 py-3 font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-canvas transition-opacity hover:opacity-85"
           >
-            {t('creator.seller')}
+            {t('creator.become')}
             <ArrowUpRight aria-hidden className="h-4 w-4 text-accent" />
           </Link>
         </div>

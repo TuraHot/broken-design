@@ -6,6 +6,7 @@ import { requireAuth, requireBuyer, requireNotSuspended } from '../../middleware
 import { db } from '../../config/db';
 import { env } from '../../config/env';
 import { AppError } from '../../middlewares/error.middleware';
+import { isModelUnavailable, MODEL_SELLABLE_SQL } from '../models/availability';
 
 export const paymentsRouter = Router();
 
@@ -93,7 +94,7 @@ paymentsRouter.post('/models/:id/checkout', requireAuth, requireBuyer, async (re
   // ดึงราคา ประเภท License และสถานะเจ้าของจากฐานข้อมูลจริง
   const modelRow = await db.query(
     `SELECT m.id, m.title, m.price_cents, m.currency, m.license, m.deleted_at, m.hidden_at, m.owner_id,
-            u.suspended_at AS owner_suspended_at
+            u.suspended_at AS owner_suspended_at, u.deleted_at AS owner_deleted_at
      FROM models m
      LEFT JOIN users u ON u.id = m.owner_id
      WHERE m.id = $1`,
@@ -104,7 +105,7 @@ paymentsRouter.post('/models/:id/checkout', requireAuth, requireBuyer, async (re
   }
   const model = modelRow.rows[0];
 
-  if (model.deleted_at || model.hidden_at || model.owner_suspended_at) {
+  if (isModelUnavailable(model)) {
     throw new AppError(400, 'MODEL_UNAVAILABLE', 'This model is no longer available');
   }
 
@@ -196,7 +197,7 @@ paymentsRouter.post('/purchases/:id/confirm-mock', requireAuth, requireMockProvi
      LEFT JOIN users o ON o.id = m.owner_id
      WHERE p.id = $1 AND p.user_id = $2 AND p.status = 'pending'
        AND m.id = p.model_id
-       AND m.deleted_at IS NULL AND m.hidden_at IS NULL AND o.suspended_at IS NULL
+       AND ${MODEL_SELLABLE_SQL}
      RETURNING p.id, p.model_id, p.embed_key, p.amount_cents, p.currency, p.license_type, p.paid_at`,
     [purchaseId, userId],
   );
@@ -204,7 +205,7 @@ paymentsRouter.post('/purchases/:id/confirm-mock', requireAuth, requireMockProvi
   if (result.rowCount === 0) {
     // อาจจ่ายไปแล้ว, โมเดลถูกซ่อน/ลบ/เจ้าของถูกระงับ, หรือไม่ใช่ของตัวเอง
     const check = await db.query(
-      `SELECT p.status, m.deleted_at, m.hidden_at, o.suspended_at AS owner_suspended_at
+      `SELECT p.status, m.deleted_at, m.hidden_at, o.suspended_at AS owner_suspended_at, o.deleted_at AS owner_deleted_at
        FROM purchases p
        LEFT JOIN models m ON m.id = p.model_id
        LEFT JOIN users o ON o.id = m.owner_id
@@ -216,7 +217,7 @@ paymentsRouter.post('/purchases/:id/confirm-mock', requireAuth, requireMockProvi
       if (row.status === 'paid') {
         throw new AppError(409, 'ALREADY_PAID', 'This purchase has already been paid');
       }
-      if (row.deleted_at || row.hidden_at || row.owner_suspended_at) {
+      if (isModelUnavailable(row)) {
         throw new AppError(400, 'MODEL_UNAVAILABLE', 'This model is no longer available');
       }
     }
@@ -249,7 +250,7 @@ paymentsRouter.post('/models/:id/pay-mock', requireAuth, requireMockProvider, re
      LEFT JOIN users o ON o.id = m.owner_id
      WHERE p.model_id = $1 AND p.user_id = $2 AND p.status = 'pending'
        AND m.id = p.model_id
-       AND m.deleted_at IS NULL AND m.hidden_at IS NULL AND o.suspended_at IS NULL
+       AND ${MODEL_SELLABLE_SQL}
      RETURNING p.id, p.model_id, p.embed_key, p.amount_cents, p.currency, p.license_type, p.paid_at`,
     [modelId, userId],
   );
@@ -257,7 +258,7 @@ paymentsRouter.post('/models/:id/pay-mock', requireAuth, requireMockProvider, re
   if (result.rowCount === 0) {
     const check = await db.query(
       `SELECT p.id, p.model_id, p.embed_key, p.status, p.paid_at,
-              m.deleted_at, m.hidden_at, o.suspended_at AS owner_suspended_at
+              m.deleted_at, m.hidden_at, o.suspended_at AS owner_suspended_at, o.deleted_at AS owner_deleted_at
        FROM purchases p
        LEFT JOIN models m ON m.id = p.model_id
        LEFT JOIN users o ON o.id = m.owner_id
@@ -276,7 +277,7 @@ paymentsRouter.post('/models/:id/pay-mock', requireAuth, requireMockProvider, re
         });
         return;
       }
-      if (row.deleted_at || row.hidden_at || row.owner_suspended_at) {
+      if (isModelUnavailable(row)) {
         throw new AppError(400, 'MODEL_UNAVAILABLE', 'This model is no longer available');
       }
     }
@@ -306,7 +307,7 @@ paymentsRouter.post('/purchases/:id/qr', requireAuth, requireBuyer, async (req, 
   const result = await db.query(
     `SELECT p.id, p.model_id, p.status, p.amount_cents, p.currency, p.provider_session_id,
             m.title, m.deleted_at, m.hidden_at,
-            o.suspended_at AS owner_suspended_at
+            o.suspended_at AS owner_suspended_at, o.deleted_at AS owner_deleted_at
      FROM purchases p
      JOIN models m ON m.id = p.model_id
      LEFT JOIN users o ON o.id = m.owner_id
@@ -322,7 +323,7 @@ paymentsRouter.post('/purchases/:id/qr', requireAuth, requireBuyer, async (req, 
   if (purchase.status === 'paid') {
     throw new AppError(409, 'ALREADY_PAID', 'This purchase has already been paid');
   }
-  if (purchase.deleted_at || purchase.hidden_at || purchase.owner_suspended_at) {
+  if (isModelUnavailable(purchase)) {
     throw new AppError(400, 'MODEL_UNAVAILABLE', 'This model is no longer available');
   }
 

@@ -111,3 +111,31 @@ test('POST /api/models/:id/like - toggles like, writes owner notification, and b
     db.query = originalQuery;
   }
 });
+
+test('POST /api/models/:id/like - a model whose owner an admin deleted is 404', async () => {
+  const originalQuery = db.query.bind(db);
+  let modelSql = '';
+  (db as any).query = async (sql: string) => {
+    if (sql.includes('SELECT suspended_at FROM users WHERE id = $1')) return { rowCount: 1, rows: [{ suspended_at: null }] };
+    if (sql.includes('FROM models m')) {
+      modelSql = sql;
+      return { rowCount: 0, rows: [] }; // the predicate on the owner removes the model
+    }
+    return { rowCount: 0, rows: [] };
+  };
+
+  const server = app.listen(0);
+  const port = (server.address() as any).port;
+  try {
+    const res = await fetch(`http://localhost:${port}/api/models/${MODEL_ID}/like`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token()}` },
+    });
+    assert.equal(res.status, 404);
+    assert.equal((await res.json()).error?.code, 'MODEL_NOT_FOUND');
+    assert.match(modelSql, /u.deleted_at IS NULL/);
+  } finally {
+    server.close();
+    db.query = originalQuery;
+  }
+});

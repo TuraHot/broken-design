@@ -1,4 +1,5 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
+import { ownerActiveSql } from '../models/availability';
 import { db } from '../../config/db';
 import { requireAuth } from '../../middlewares/auth.middleware';
 import { AppError } from '../../middlewares/error.middleware';
@@ -81,7 +82,7 @@ interactionsRouter.post(
         `SELECT m.id, m.owner_id, m.title
          FROM models m
          JOIN users u ON u.id = m.owner_id
-         WHERE m.id = $1 AND m.hidden_at IS NULL AND m.deleted_at IS NULL AND u.suspended_at IS NULL`,
+         WHERE m.id = $1 AND m.hidden_at IS NULL AND m.deleted_at IS NULL AND ${ownerActiveSql('u')}`,
         [id],
       );
       if (modelCheck.rows.length === 0) {

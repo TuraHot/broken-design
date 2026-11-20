@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { db } from '../../config/db';
 import { requireActiveAdmin, requireAuth } from '../../middlewares/auth.middleware';
 import { AppError } from '../../middlewares/error.middleware';
+import { disconnectUser } from '../../config/socket';
 
 export const adminRouter = Router();
 
@@ -359,6 +360,7 @@ adminRouter.delete('/users/:id', async (req, res) => {
     throw new AppError(403, 'CANNOT_DELETE_ADMIN', 'Admin accounts cannot be deleted');
   }
 
+  disconnectUser(targetId); // open sockets of the deleted account are closed now, not at their next reconnect
   res.json({ id: targetId, isDeleted: true });
 });
 

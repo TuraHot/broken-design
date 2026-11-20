@@ -135,3 +135,27 @@ test('GET /api/creators/:handle - returns visible models with totals and omits f
     db.query = originalQuery;
   }
 });
+
+test('GET /api/creators/:handle - the lookup skips accounts an admin deleted', async () => {
+  const originalQuery = db.query.bind(db);
+  let usersSql = '';
+  (db as any).query = async (sql: string) => {
+    if (sql.includes('FROM users u')) {
+      usersSql = sql;
+      return { rowCount: 0, rows: [] }; // the database drops the deleted creator because of the predicate
+    }
+    return { rowCount: 0, rows: [] };
+  };
+
+  const server = app.listen(0);
+  const port = (server.address() as any).port;
+  try {
+    const res = await fetch(`http://localhost:${port}/api/creators/deleted-creator`);
+    assert.equal(res.status, 404);
+    assert.equal((await res.json()).error?.code, 'CREATOR_NOT_FOUND');
+    assert.match(usersSql, /u.deleted_at IS NULL/);
+  } finally {
+    server.close();
+    db.query = originalQuery;
+  }
+});

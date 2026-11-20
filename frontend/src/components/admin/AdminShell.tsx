@@ -11,7 +11,7 @@ import { Box, Flag, LayoutDashboard, LogOut, Receipt, Users, Wallet, type Lucide
 import LanguageSwitch from '@/components/LanguageSwitch';
 import { useT } from '@/lib/i18n/client';
 import type { MessageKey } from '@/lib/i18n/messages';
-import { clearSession, readSession, type Session } from '@/lib/session';
+import { clearSession, readSession, SESSION_UPDATED_EVENT, type Session } from '@/lib/session';
 
 const TABS: { href: string; label: MessageKey; icon: LucideIcon }[] = [
   { href: '/admin', label: 'admin.nav.overview', icon: LayoutDashboard },
@@ -51,7 +51,11 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
     };
     sync();
     window.addEventListener('storage', sync);
-    return () => window.removeEventListener('storage', sync);
+    window.addEventListener(SESSION_UPDATED_EVENT, sync);
+    return () => {
+      window.removeEventListener('storage', sync);
+      window.removeEventListener(SESSION_UPDATED_EVENT, sync);
+    };
   }, []);
 
   if (!ready) {

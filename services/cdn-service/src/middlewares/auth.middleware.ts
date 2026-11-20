@@ -119,18 +119,3 @@ export async function requireSeller(req: Request, _res: Response, next: NextFunc
   next();
 }
 
-export async function requireAdmin(req: Request, _res: Response, next: NextFunction) {
-  if (!req.user) {
-    throw new AppError(401, 'UNAUTHORIZED', 'Authentication required');
-  }
-  const dbUser = await loadUserStatus(req.user.id);
-  if (!dbUser || dbUser.role !== 'admin') {
-    throw new AppError(403, 'FORBIDDEN', 'Admin access required');
-  }
-  if (dbUser.suspended_at !== null) {
-    throw new AppError(403, 'ACCOUNT_SUSPENDED', 'Your account has been suspended by an administrator');
-  }
-  req.user.role = dbUser.role;
-  next();
-}
-

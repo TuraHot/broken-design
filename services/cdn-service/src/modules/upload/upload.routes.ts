@@ -163,6 +163,10 @@ uploadRouter.post(
       if (title.trim().length > 255) {
         throw new AppError(400, 'BAD_REQUEST', 'Model title must not exceed 255 characters');
       }
+      const cleanDescription = typeof description === 'string' ? description.trim() : '';
+      if (cleanDescription.length > 5000) {
+        throw new AppError(400, 'BAD_REQUEST', 'Description must not exceed 5000 characters');
+      }
 
       // Validate License Enum against Postgres license_type enum ('CC0', 'CC-BY', 'CC-BY-NC', 'COMMERCIAL')
       const VALID_LICENSES = ['CC0', 'CC-BY', 'CC-BY-NC', 'COMMERCIAL'] as const;
@@ -175,7 +179,11 @@ uploadRouter.post(
         );
       }
 
-      const parsedPrice = Math.max(0, parseInt(String(price_cents), 10) || 0);
+      const rawPrice = Number(price_cents ?? 0);
+      const parsedPrice = Number.isFinite(rawPrice) ? Math.round(rawPrice) : NaN;
+      if (!Number.isFinite(parsedPrice) || parsedPrice < 0 || parsedPrice > 100_000_000) {
+        throw new AppError(400, 'BAD_REQUEST', 'Invalid price_cents (must be between 0 and 100000000)');
+      }
 
       // Business Rule (project.md Section 5): Paid models MUST have a preview GLB file for public rotation
       const previewFile = files?.['preview']?.[0];
@@ -282,7 +290,9 @@ uploadRouter.post(
           parsedTags = tags.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean);
         }
       }
-      parsedTags = Array.from(new Set(parsedTags));
+      parsedTags = Array.from(
+        new Set(parsedTags.filter((t) => t.length > 0 && t.length <= 50)),
+      ).slice(0, 20);
 
       const parsedCurrency = String(currency || 'USD').trim().toUpperCase().slice(0, 3);
 
@@ -300,7 +310,7 @@ uploadRouter.post(
             modelId,
             ownerId,
             title.trim(),
-            description.trim(),
+            cleanDescription,
             parsedTags,
             normalizedLicense,
             fileHash,
@@ -320,7 +330,7 @@ uploadRouter.post(
             id: modelId,
             owner_id: ownerId,
             title: title.trim(),
-            description: description.trim(),
+            description: cleanDescription,
             tags: parsedTags,
             license: normalizedLicense,
             file_hash: fileHash,
@@ -336,6 +346,7 @@ uploadRouter.post(
         insertedModel = data;
       }
 
+      await cleanupFiles(files);
       res.status(201).json({
         message: 'Model uploaded successfully',
         model: insertedModel,

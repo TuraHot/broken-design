@@ -7,7 +7,7 @@ import { Check, Copy, Lock } from 'lucide-react';
 import { CDN_SERVICE_URL } from '@/lib/api';
 import { useT } from '@/lib/i18n/client';
 import type { MessageKey } from '@/lib/i18n/messages';
-import { readSession } from '@/lib/session';
+import { readSession, SESSION_UPDATED_EVENT } from '@/lib/session';
 
 type Kind = 'component' | 'iframe';
 
@@ -33,7 +33,11 @@ export default function EmbedSnippets({ id, paid }: { id: string; paid: boolean 
     };
     syncSession();
     window.addEventListener('storage', syncSession);
-    return () => window.removeEventListener('storage', syncSession);
+    window.addEventListener(SESSION_UPDATED_EVENT, syncSession);
+    return () => {
+      window.removeEventListener('storage', syncSession);
+      window.removeEventListener(SESSION_UPDATED_EVENT, syncSession);
+    };
   }, []);
 
   const canUseEmbed = ready && signedIn;

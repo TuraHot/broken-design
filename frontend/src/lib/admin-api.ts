@@ -35,6 +35,8 @@ export interface AdminOverview {
   paidPurchases: number;
   pendingPurchases: number;
   openComplaints: number;
+  pendingApplications: number;
+  pendingWithdrawals: number;
   totalRevenueCents: number;
   revenue7dCents: number;
   licenseBreakdown: { license: string; count: number }[];

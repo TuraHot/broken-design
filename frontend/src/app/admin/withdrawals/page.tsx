@@ -3,7 +3,7 @@
 // /admin/withdrawals — review, approve, mark paid, or reject creator withdrawal requests
 import { useState } from 'react';
 import AdminList, { type Column, type RowApi } from '@/components/admin/AdminList';
-import { Badge } from '@/components/admin/ui';
+import { Badge, ConfirmAction } from '@/components/admin/ui';
 import {
   AdminApiError,
   updateWithdrawal,
@@ -53,27 +53,23 @@ function WithdrawalActions({ row, api }: { row: AdminWithdrawal; api: RowApi<Adm
           type="button"
           disabled={busy}
           onClick={() => void run('approved')}
-          className="h-7 whitespace-nowrap rounded-lg border border-hud/40 bg-hud/10 px-2.5 text-xs font-medium text-hud transition-colors hover:bg-hud/20 disabled:opacity-50"
+          className="h-8 whitespace-nowrap rounded-lg border border-hud/40 bg-hud/10 px-3 text-sm font-medium text-hud transition-colors hover:bg-hud/20 disabled:opacity-50"
         >
           {t('admin.wd.approve')}
         </button>
       )}
-      <button
-        type="button"
+      <ConfirmAction
+        label={t('admin.wd.markPaid')}
+        ariaLabel={t('admin.actionOn', { action: t('admin.wd.markPaid'), name: row.seller.displayName })}
         disabled={busy}
-        onClick={() => void run('paid')}
-        className="h-7 whitespace-nowrap rounded-lg bg-white px-2.5 text-xs font-semibold text-black transition-colors hover:bg-white/85 disabled:opacity-50"
-      >
-        {t('admin.wd.markPaid')}
-      </button>
-      <button
-        type="button"
+        onConfirm={() => run('paid')}
+      />
+      <ConfirmAction
+        label={t('admin.wd.reject')}
+        ariaLabel={t('admin.actionOn', { action: t('admin.wd.reject'), name: row.seller.displayName })}
         disabled={busy}
-        onClick={() => void run('rejected')}
-        className="h-7 whitespace-nowrap rounded-lg border border-red-500/40 bg-red-500/10 px-2.5 text-xs text-red-300 transition-colors hover:bg-red-500/20 disabled:opacity-50"
-      >
-        {t('admin.wd.reject')}
-      </button>
+        onConfirm={() => run('rejected')}
+      />
     </div>
   );
 }

@@ -1120,3 +1120,34 @@ test("security: assertProductionSecrets rejects default JWT_SECRET and WATERMARK
   );
   assert.doesNotThrow(() => assertProductionSecrets("development", "dev-secret", ""));
 });
+
+test("upload validation: rejects overflowing price_cents and overly long description with 400 BAD_REQUEST", async () => {
+  const glb = await createSampleGlbBuffer(72);
+  users[OWNER] = { role: "creator", is_seller: true, suspended_at: null };
+
+  // 1. Overflowing price_cents -> 400 BAD_REQUEST
+  const formBigPrice = new FormData();
+  formBigPrice.append("file", new Blob([new Uint8Array(glb)], { type: "model/gltf-binary" }), "big.glb");
+  formBigPrice.append("title", "Too Expensive");
+  formBigPrice.append("price_cents", "999999999999");
+  const priceRes = await fetch(`${apiBase}/models`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token(OWNER, "creator")}` },
+    body: formBigPrice,
+  });
+  assert.equal(priceRes.status, 400);
+  assert.equal(await errCode(priceRes), "BAD_REQUEST");
+
+  // 2. Description > 5000 chars -> 400 BAD_REQUEST
+  const formLongDesc = new FormData();
+  formLongDesc.append("file", new Blob([new Uint8Array(glb)], { type: "model/gltf-binary" }), "desc.glb");
+  formLongDesc.append("title", "Long Description");
+  formLongDesc.append("description", "a".repeat(5001));
+  const descRes = await fetch(`${apiBase}/models`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token(OWNER, "creator")}` },
+    body: formLongDesc,
+  });
+  assert.equal(descRes.status, 400);
+  assert.equal(await errCode(descRes), "BAD_REQUEST");
+});

@@ -6,9 +6,10 @@ import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { CheckCircle2, ExternalLink, Loader2, QrCode } from 'lucide-react';
 import { confirmMockPayment, createQrPayment, fetchPurchaseById } from '@/lib/api';
+import { updateProfile } from '@/lib/auth';
 import { initials } from '@/lib/creators';
 import { formatMoney } from '@/lib/format';
-import { readSession } from '@/lib/session';
+import { readSession, updateSessionUser } from '@/lib/session';
 import { useT } from '@/lib/i18n/client';
 import { fromErr, msgText, type Msg } from '@/lib/i18n/msg';
 import type { PurchaseDetail, QrPaymentResponse } from '@/lib/types';
@@ -82,6 +83,12 @@ export default function CheckoutPage() {
     try {
       setSubmitting(true);
       setErrorMsg(null);
+      const trimmedName = displayName.trim();
+      const savedName = readSession()?.user.display_name?.trim() ?? '';
+      if (trimmedName && trimmedName !== savedName) {
+        const updated = await updateProfile(trimmedName, token);
+        updateSessionUser({ display_name: updated.display_name });
+      }
       const res = await createQrPayment(purchase.id, token);
       setQrInfo(res);
     } catch (err: any) {
@@ -309,10 +316,12 @@ export default function CheckoutPage() {
                 <div className="mx-auto mt-3 grid h-40 w-40 place-items-center rounded-xl border border-dashed border-white/25 bg-white/5">
                   <QrCode className="h-24 w-24 text-white/80" />
                 </div>
-                <p className="mt-2 text-xs text-white/55">
-                  {t('pay.mockHelp1')} <code className="text-white/80">PAYMENT_PROVIDER=stripe</code> {t('pay.mockHelp2')}{' '}
-                  <code className="text-white/80">core-api/.env</code> {t('pay.mockHelp3')}
-                </p>
+                {process.env.NODE_ENV !== 'production' && (
+                  <p className="mt-2 text-xs text-white/55">
+                    {t('pay.mockHelp1')} <code className="text-white/80">PAYMENT_PROVIDER=stripe</code> {t('pay.mockHelp2')}{' '}
+                    <code className="text-white/80">core-api/.env</code> {t('pay.mockHelp3')}
+                  </p>
+                )}
                 <button
                   type="button"
                   disabled={submitting}

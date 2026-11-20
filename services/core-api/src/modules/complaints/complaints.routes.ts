@@ -7,7 +7,7 @@ import { AppError } from '../../middlewares/error.middleware';
 
 export const complaintsRouter = Router();
 
-export const COMPLAINT_CATEGORIES = ['model', 'account', 'purchase', 'other'] as const;
+const COMPLAINT_CATEGORIES = ['model', 'account', 'purchase', 'other'] as const;
 
 // กันสแปม: ผู้ใช้หนึ่งคนส่งได้ไม่เกินจำนวนนี้ต่อชั่วโมง
 const MAX_PER_HOUR = 5;

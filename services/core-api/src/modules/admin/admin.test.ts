@@ -88,6 +88,8 @@ test('GET /api/admin/overview - returns totals, breakdowns and recent lists', as
               paid_purchases: 5,
               pending_purchases: 1,
               open_complaints: 2,
+              pending_applications: 3,
+              pending_withdrawals: 4,
               total_revenue_cents: '12900',
               revenue_7d_cents: '2900',
             },
@@ -133,6 +135,8 @@ test('GET /api/admin/overview - returns totals, breakdowns and recent lists', as
       assert.equal(body.totalUsers, 10);
       assert.equal(body.hiddenModels, 2);
       assert.equal(body.paidPurchases, 5);
+      assert.equal(body.pendingApplications, 3);
+      assert.equal(body.pendingWithdrawals, 4);
       assert.equal(body.pendingPurchases, 1);
       assert.equal(body.openComplaints, 2);
       assert.equal(body.totalRevenueCents, 12900);

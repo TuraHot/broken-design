@@ -51,10 +51,6 @@ export function initSocketServer(httpServer: HTTPServer): SocketIOServer {
   return io;
 }
 
-export function getIO(): SocketIOServer | null {
-  return io;
-}
-
 /**
  * Broadcast live like count update to all clients viewing the model or in general
  */

@@ -26,7 +26,7 @@ import {
 import { creatorHandle } from '@/lib/creators';
 import { useT } from '@/lib/i18n/client';
 import type { MessageKey } from '@/lib/i18n/messages';
-import { readSession, updateSessionUser, type Session } from '@/lib/session';
+import { readSession, SESSION_UPDATED_EVENT, updateSessionUser, type Session } from '@/lib/session';
 
 const PRIMARY_BTN =
   'inline-flex items-center gap-2 rounded-lg bg-white px-3.5 py-1.5 text-[15px] font-medium text-black transition-colors hover:bg-white/85';
@@ -76,9 +76,13 @@ export default function CreatorActions() {
       });
     }
 
-    const onStorage = () => setSession(readSession());
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
+    const onSession = () => setSession(readSession());
+    window.addEventListener('storage', onSession);
+    window.addEventListener(SESSION_UPDATED_EVENT, onSession);
+    return () => {
+      window.removeEventListener('storage', onSession);
+      window.removeEventListener(SESSION_UPDATED_EVENT, onSession);
+    };
   }, []);
 
   const user = session?.user;
@@ -125,7 +129,7 @@ export default function CreatorActions() {
         const updated = updateSessionUser({ is_seller: true, role: nextRole });
         if (updated) setSession(updated);
         setModalOpen(false);
-        router.push(handle ? `/creators/${handle}?tab=dashboard` : '/me');
+        router.push(handle ? `/creators/${encodeURIComponent(handle)}?tab=dashboard` : '/me');
         return;
       }
 
@@ -142,7 +146,7 @@ export default function CreatorActions() {
     <>
       <div className="mt-7 flex flex-wrap items-center gap-3">
         {isCreator && handle ? (
-          <Link href={`/creators/${handle}?tab=dashboard`} className={PRIMARY_BTN}>
+          <Link href={`/creators/${encodeURIComponent(handle)}?tab=dashboard`} className={PRIMARY_BTN}>
             <User aria-hidden className="h-4 w-4" />
             {t('creator.profile')}
           </Link>

@@ -2,6 +2,7 @@ import { Router, type Request, type Response, type NextFunction } from 'express'
 import fs from 'fs';
 import fsp from 'fs/promises';
 import multer from 'multer';
+import rateLimit from 'express-rate-limit';
 import path from 'path';
 import sharp from 'sharp';
 import { db } from '../../config/db';
@@ -19,6 +20,28 @@ export const avatarRouter = Router();
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 const ALLOWED_MIME = new Set(['image/webp', 'image/png', 'image/jpeg']);
 const ALLOWED_EXT = new Set(['.webp', '.png', '.jpg', '.jpeg']);
+
+const avatarLimitNum = (() => {
+  const n = Number(process.env.CDN_AVATAR_LIMIT_PER_15MIN);
+  return Number.isFinite(n) && n > 0 ? n : 20;
+})();
+
+const avatarLimiter = rateLimit({
+  windowMs: 15 * 60_000,
+  limit: avatarLimitNum,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === 'test' && process.env.ENFORCE_AVATAR_RATE_LIMIT !== 'true',
+  handler: (_req: Request, res: Response) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.status(429).json({
+      error: {
+        code: 'RATE_LIMITED',
+        message: 'Too many avatar updates, please try again later.',
+      },
+    });
+  },
+});
 
 fs.mkdirSync(path.resolve(env.tmpUploadDir), { recursive: true });
 
@@ -75,6 +98,7 @@ async function saveUserAvatarHash(userId: string, avatarHash: string | null): Pr
 // POST /api/me/avatar — upload & center-crop user avatar/logo as 256x256 compressed WebP
 avatarRouter.post(
   '/me/avatar',
+  avatarLimiter,
   requireAuth,
   uploadAvatar,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -139,6 +163,7 @@ avatarRouter.post(
 // DELETE /api/me/avatar — remove current user's avatar/logo
 avatarRouter.delete(
   '/me/avatar',
+  avatarLimiter,
   requireAuth,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {

@@ -59,6 +59,8 @@ adminRouter.get('/overview', async (_req, res) => {
          (SELECT COUNT(*)::int FROM purchases WHERE status = 'paid') AS paid_purchases,
          (SELECT COUNT(*)::int FROM purchases WHERE status = 'pending') AS pending_purchases,
          (SELECT COUNT(*)::int FROM complaints WHERE status = 'open') AS open_complaints,
+         (SELECT COUNT(*)::int FROM creator_applications WHERE status = 'pending') AS pending_applications,
+         (SELECT COUNT(*)::int FROM creator_withdrawals WHERE status = 'pending') AS pending_withdrawals,
          (SELECT COALESCE(SUM(amount_cents), 0) FROM purchases WHERE status = 'paid') AS total_revenue_cents,
          (SELECT COALESCE(SUM(amount_cents), 0) FROM purchases
             WHERE status = 'paid' AND paid_at > NOW() - INTERVAL '7 days') AS revenue_7d_cents`,
@@ -107,6 +109,8 @@ adminRouter.get('/overview', async (_req, res) => {
     paidPurchases: r.paid_purchases,
     pendingPurchases: r.pending_purchases,
     openComplaints: r.open_complaints,
+    pendingApplications: Number(r.pending_applications ?? 0),
+    pendingWithdrawals: Number(r.pending_withdrawals ?? 0),
     totalRevenueCents: Number(r.total_revenue_cents),
     revenue7dCents: Number(r.revenue_7d_cents),
     licenseBreakdown: licenses.rows.map((l) => ({ license: l.license, count: l.count })),

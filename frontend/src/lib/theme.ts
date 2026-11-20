@@ -6,7 +6,7 @@ export type Theme = 'light' | 'dark';
 export const THEME_COOKIE = 'theme';
 
 /** Routes whose pages are converted to the colour tokens. Add a route here only after checking both themes. */
-export const THEME_READY_ROUTES: readonly string[] = [];
+export const THEME_READY_ROUTES: readonly string[] = ['/'];
 
 const normalize = (pathname: string) => {
   const path = pathname.split(/[?#]/)[0];

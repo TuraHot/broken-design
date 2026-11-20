@@ -33,8 +33,10 @@ test('a garbage cookie is treated as no cookie', () => {
   assert.equal(resolveTheme('/', '', false, routes), 'dark');
 });
 
-test('with the default (empty) route list nothing is light', () => {
-  assert.equal(resolveTheme('/', 'light', true), 'dark');
+test('with the default route list only the landing page can be light', () => {
+  assert.equal(resolveTheme('/', 'light', true), 'light');
+  assert.equal(resolveTheme('/gallery', 'light', true), 'dark');
+  assert.equal(resolveTheme('/login', null, true), 'dark');
 });
 
 test('readCookie finds the named cookie only', () => {

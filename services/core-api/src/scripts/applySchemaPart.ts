@@ -43,9 +43,9 @@ async function main() {
     const check = await client.query(
       `SELECT
          (SELECT COUNT(*)::int FROM information_schema.columns
-           WHERE table_name = 'users' AND column_name IN ('suspended_until', 'suspension_reason', 'deleted_at', 'deleted_by', 'deleted_reason', 'original_email')) AS user_columns,
+           WHERE table_schema = 'public' AND table_name = 'users' AND column_name IN ('suspended_until', 'suspension_reason', 'deleted_at', 'deleted_by', 'deleted_reason', 'original_email')) AS user_columns,
          (SELECT COUNT(*)::int FROM information_schema.tables
-           WHERE table_name IN ('model_license_changes', 'notifications', 'user_suspensions', 'model_visibility_changes')) AS new_tables,
+           WHERE table_schema = 'public' AND table_name IN ('model_license_changes', 'notifications', 'user_suspensions', 'model_visibility_changes')) AS new_tables,
          (SELECT COUNT(*)::int FROM pg_tables
            WHERE schemaname = 'public' AND rowsecurity
              AND tablename IN ('model_license_changes', 'notifications', 'user_suspensions', 'model_visibility_changes')) AS rls_tables`,

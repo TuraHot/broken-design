@@ -122,7 +122,9 @@ export default async function ModelDetailPage({ params }: Props) {
           <h2 id="description" className={LABEL}>
             {t('loader.description')}
           </h2>
-          <p className="mt-3 text-[15px] leading-relaxed text-ink/80">{model.description ?? t('model.noDescription')}</p>
+          <p className="mt-3 text-[15px] leading-relaxed text-ink/80 whitespace-pre-line break-words">
+            {model.description?.trim() ? model.description : t('model.noDescription')}
+          </p>
           {model.tags.length > 0 && (
             <ul className="mt-4 flex flex-wrap gap-2">
               {model.tags.map((tag) => (

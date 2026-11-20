@@ -362,7 +362,7 @@ test('POST /api/models/:id/checkout - prevents duplicate purchase if already pai
 test('GET /api/models/:id/purchase - returns purchased=true when user has paid purchase', async () => {
   const originalQuery = db.query.bind(db);
   (db as any).query = async (sql: string) => {
-    if (sql.includes("FROM purchases WHERE user_id = $1 AND model_id = $2 AND status = 'paid'")) {
+    if (sql.replace(/\s+/g, ' ').includes("FROM purchases WHERE user_id = $1 AND model_id = $2 AND status = 'paid'")) {
       return {
         rowCount: 1,
         rows: [{ id: PURCHASE_1, status: 'paid', embed_key: 'embed-key-123', paid_at: '2026-11-20T00:00:00.000Z' }],

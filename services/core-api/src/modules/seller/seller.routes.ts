@@ -58,9 +58,9 @@ sellerRouter.get('/models', requireAuth, requireActiveSeller, async (req, res) =
 
   const result = await db.query(
     `SELECT id, title, description, license, price_cents, currency, view_count, download_count,
-            poster_hash, hidden_at, deleted_at, created_at
+            poster_hash, hidden_at, created_at
      FROM models
-     WHERE owner_id = $1
+     WHERE owner_id = $1 AND deleted_at IS NULL
      ORDER BY created_at DESC`,
     [userId],
   );
@@ -77,7 +77,6 @@ sellerRouter.get('/models', requireAuth, requireActiveSeller, async (req, res) =
       downloadCount: r.download_count,
       posterUrl: r.poster_hash ? `${env.cdnServiceUrl}/cdn/models/${r.id}/poster.webp` : null,
       isHidden: r.hidden_at !== null,
-      isDeleted: r.deleted_at !== null,
       createdAt: r.created_at,
     })),
   });

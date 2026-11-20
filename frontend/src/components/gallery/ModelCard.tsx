@@ -132,11 +132,11 @@ export default function ModelCard({ model }: { model: Model }) {
               camera-controls
               auto-rotate
               shadow-intensity="1"
-              style={{ width: '100%', height: '100%', backgroundColor: '#050505' }}
+              style={{ width: '100%', height: '100%', backgroundColor: 'rgb(var(--c-canvas))' }}
               onError={() => setShow3D(false)}
             />
             {/* 3D Orbit Badge */}
-            <div className="pointer-events-none absolute bottom-2 right-2 flex items-center gap-1 rounded bg-black/75 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-hud border border-white/10 backdrop-blur">
+            <div className="pointer-events-none absolute bottom-2 right-2 flex items-center gap-1 rounded bg-canvas/75 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-accent border border-line backdrop-blur">
               <Rotate3D className="h-3 w-3 animate-pulse" />
               <span>{t('card.dragRotate')}</span>
             </div>
@@ -169,16 +169,16 @@ export default function ModelCard({ model }: { model: Model }) {
 
         {/* 3D Available Badge (shown on hover before 3D loads) */}
         {!show3D && isRealModel && isHovered && (
-          <div className="pointer-events-none absolute bottom-2 right-2 flex items-center gap-1 rounded bg-black/80 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-white/80 border border-white/10 backdrop-blur">
-            <Rotate3D className="h-3 w-3 text-hud" />
+          <div className="pointer-events-none absolute bottom-2 right-2 flex items-center gap-1 rounded bg-canvas/80 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-ink/80 border border-line backdrop-blur">
+            <Rotate3D className="h-3 w-3 text-accent" />
             <span>{t('card.badge3d')}</span>
           </div>
         )}
 
         {opening && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-[rgba(4,8,18,0.78)] backdrop-blur-[2px]">
-            <Loader2 aria-hidden className="h-6 w-6 animate-spin text-hud motion-reduce:animate-none" />
-            <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-hud">{t('card.opening')}</span>
+            <Loader2 aria-hidden className="h-6 w-6 animate-spin text-accent motion-reduce:animate-none" />
+            <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-accent">{t('card.opening')}</span>
           </div>
         )}
       </div>
@@ -213,7 +213,7 @@ export default function ModelCard({ model }: { model: Model }) {
             aria-pressed={liked}
             aria-label={liked ? t('model.unlike') : t('model.like')}
             className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[11px] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-60 ${
-              liked ? 'text-red-500 hover:text-red-400' : 'text-ink-soft hover:text-ink'
+              liked ? 'text-red-500 hover:text-danger' : 'text-ink-soft hover:text-ink'
             }`}
           >
             <Heart

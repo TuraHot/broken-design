@@ -34,15 +34,15 @@ export const CATEGORY_LABELS: Record<ComplaintCategory, MessageKey> = {
   other: 'admin.cat.other',
 };
 
-const BTN = 'h-9 whitespace-nowrap rounded-lg border border-white/15 px-3 text-sm text-white/80 transition-colors hover:border-white/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-40';
-const LABEL = 'font-mono text-[11px] uppercase tracking-[0.16em] text-white/65';
+const BTN = 'h-9 whitespace-nowrap rounded-lg border border-line px-3 text-sm text-ink/80 transition-colors hover:border-ink/40 hover:text-ink disabled:cursor-not-allowed disabled:opacity-40';
+const LABEL = 'font-mono text-[11px] uppercase tracking-[0.16em] text-ink-soft';
 
 export function ComplaintMessage({ row, api }: { row: AdminComplaint; api: RowApi<AdminComplaint> }) {
   const t = useT();
   const [open, setOpen] = useState(false);
   return (
     <div className="min-w-[220px] max-w-sm">
-      <p className="line-clamp-2 break-words text-white/80">{row.message}</p>
+      <p className="line-clamp-2 break-words text-ink/80">{row.message}</p>
       <button type="button" onClick={() => setOpen(true)} className={`${BTN} mt-2`}>
         {t('admin.readRespond')}
       </button>
@@ -95,7 +95,7 @@ function ReportedModelAction({ row, api, onError }: { row: AdminComplaint; api: 
         required={requiresReason}
         rows={3}
       />
-      {!model.isHidden && <p className="text-xs text-white/50">{t('admin.edit.hideWarning')}</p>}
+      {!model.isHidden && <p className="text-xs text-ink/50">{t('admin.edit.hideWarning')}</p>}
       <div>
         <button type="submit" disabled={!valid || busy} className={BTN}>
           {busy ? t('admin.license.saving') : t(model.isHidden ? 'admin.edit.restoreSubmit' : 'admin.edit.hideSubmit')}
@@ -148,12 +148,12 @@ function ComplaintDetails({ row, api }: { row: AdminComplaint; api: RowApi<Admin
           <dt className={LABEL}>{t('admin.col.from')}</dt>
           <dd className="mt-1">
             <span className="block font-medium">{row.reporter.displayName}</span>
-            <span className="block break-all text-white/65">{row.reporter.email}</span>
+            <span className="block break-all text-ink-soft">{row.reporter.email}</span>
           </dd>
         </div>
         <div>
           <dt className={LABEL}>{t('admin.sent')}</dt>
-          <dd className="mt-1 font-mono text-[13px] text-white/80">{formatDate(row.createdAt)}</dd>
+          <dd className="mt-1 font-mono text-[13px] text-ink/80">{formatDate(row.createdAt)}</dd>
         </div>
         <div>
           <dt className={LABEL}>{t('admin.type')}</dt>
@@ -166,8 +166,8 @@ function ComplaintDetails({ row, api }: { row: AdminComplaint; api: RowApi<Admin
           <div>
             <dt className={LABEL}>{t('admin.reportedModel')}</dt>
             <dd className="mt-1">
-              <span className="block text-white">{row.model.title}</span>
-              {row.owner && <span className="block text-white/65">{t('admin.by', { name: row.owner.displayName })}</span>}
+              <span className="block text-ink">{row.model.title}</span>
+              {row.owner && <span className="block text-ink-soft">{t('admin.by', { name: row.owner.displayName })}</span>}
               <span className="mt-1 flex flex-wrap gap-2">
                 {row.model.isHidden && <Badge tone="warn">{t('admin.hidden')}</Badge>}
                 {row.owner?.isSuspended && <Badge tone="danger">{t('admin.ownerSuspended')}</Badge>}
@@ -179,31 +179,31 @@ function ComplaintDetails({ row, api }: { row: AdminComplaint; api: RowApi<Admin
 
       <section aria-labelledby={`msg-${row.id}`}>
         <h3 id={`msg-${row.id}`} className={LABEL}>{t('admin.col.message')}</h3>
-        <p className="mt-2 max-h-[40dvh] overflow-y-auto whitespace-pre-wrap break-words rounded-lg border border-white/10 bg-white/5 p-4 text-[15px] leading-relaxed text-white/90">
+        <p className="mt-2 max-h-[40dvh] overflow-y-auto whitespace-pre-wrap break-words rounded-lg border border-line bg-ink/5 p-4 text-[15px] leading-relaxed text-ink/90">
           {row.message}
         </p>
       </section>
 
-      <section aria-labelledby={`resp-${row.id}`} className="grid gap-4 border-t border-white/10 pt-5">
+      <section aria-labelledby={`resp-${row.id}`} className="grid gap-4 border-t border-line pt-5">
         <h3 id={`resp-${row.id}`} className={LABEL}>{t('admin.yourResponse')}</h3>
 
         <div className="grid gap-1.5">
-          <label htmlFor={`status-${row.id}`} className="text-sm text-white/65">{t('admin.statusLabel')}</label>
+          <label htmlFor={`status-${row.id}`} className="text-sm text-ink-soft">{t('admin.statusLabel')}</label>
           <select
             id={`status-${row.id}`}
             value={row.status}
             disabled={busy}
             onChange={(e) => changeStatus(e.target.value as ComplaintStatus)}
-            className="h-10 rounded-lg border border-white/15 bg-black px-3 text-sm text-white focus:border-white/50 focus:outline-none disabled:opacity-40"
+            className="h-10 rounded-lg border border-line bg-canvas px-3 text-sm text-ink focus:border-ink/50 focus:outline-none disabled:opacity-40"
           >
             {(Object.keys(STATUS_LABELS) as ComplaintStatus[]).map((s) => (
               <option key={s} value={s}>{t(STATUS_LABELS[s])}</option>
             ))}
           </select>
-          <p className="text-sm text-white/65">{t('admin.closeHint')}</p>
-          {notified && <p className="text-sm text-hud">{t('admin.reporterNotified', { name: row.reporter.displayName })}</p>}
+          <p className="text-sm text-ink-soft">{t('admin.closeHint')}</p>
+          {notified && <p className="text-sm text-accent">{t('admin.reporterNotified', { name: row.reporter.displayName })}</p>}
           {row.handledAt && (
-            <p className="text-sm text-white/65">
+            <p className="text-sm text-ink-soft">
               {row.handledByName
                 ? t('admin.lastHandledBy', { date: formatDate(row.handledAt), name: row.handledByName })
                 : t('admin.lastHandled', { date: formatDate(row.handledAt) })}
@@ -212,7 +212,7 @@ function ComplaintDetails({ row, api }: { row: AdminComplaint; api: RowApi<Admin
         </div>
 
         <div className="grid gap-1.5">
-          <label htmlFor={`note-${row.id}`} className="text-sm text-white/65">{t('admin.noteLabel')}</label>
+          <label htmlFor={`note-${row.id}`} className="text-sm text-ink-soft">{t('admin.noteLabel')}</label>
           <textarea
             id={`note-${row.id}`}
             value={note}
@@ -220,7 +220,7 @@ function ComplaintDetails({ row, api }: { row: AdminComplaint; api: RowApi<Admin
             rows={3}
             onChange={(e) => setNote(e.target.value)}
             placeholder={t('admin.notePlaceholder')}
-            className="w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/40 focus:border-white/50 focus:outline-none"
+            className="w-full rounded-lg border border-line bg-ink/5 px-3 py-2 text-sm text-ink placeholder:text-ink/40 focus:border-ink/50 focus:outline-none"
           />
           <div>
             <button type="button" disabled={busy || !noteChanged} onClick={saveNote} className={BTN}>
@@ -231,14 +231,14 @@ function ComplaintDetails({ row, api }: { row: AdminComplaint; api: RowApi<Admin
 
         {row.model && (
           <div className="grid gap-1.5">
-            <span className="text-sm text-white/65">{t('admin.reportedModel')}</span>
+            <span className="text-sm text-ink-soft">{t('admin.reportedModel')}</span>
             <div>
               <ReportedModelAction row={row} api={api} onError={setError} />
             </div>
           </div>
         )}
 
-        <p role="status" className="min-h-5 text-sm text-amber">{error}</p>
+        <p role="status" className="min-h-5 text-sm text-warn">{error}</p>
       </section>
     </div>
   );

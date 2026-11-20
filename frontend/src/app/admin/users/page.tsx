@@ -22,7 +22,7 @@ function SuspendAction({ user, api }: { user: AdminUser; api: RowApi<AdminUser> 
         type="button"
         onClick={() => setOpen(true)}
         aria-label={t('admin.actionOn', { action, name: user.displayName })}
-        className="h-8 whitespace-nowrap rounded-lg border border-white/15 px-3 text-sm text-white/80 transition-colors hover:border-white/40 hover:text-white"
+        className="h-8 whitespace-nowrap rounded-lg border border-line px-3 text-sm text-ink/80 transition-colors hover:border-ink/40 hover:text-ink"
       >
         {action}
       </button>
@@ -47,7 +47,7 @@ function DeleteAction({ user, api }: { user: AdminUser; api: RowApi<AdminUser> }
         type="button"
         onClick={() => setOpen(true)}
         aria-label={t('admin.actionOn', { action: t('admin.delete'), name: user.displayName })}
-        className="h-8 whitespace-nowrap rounded-lg border border-red-400/50 px-3 text-sm text-red-300 transition-colors hover:border-red-400 hover:bg-red-400/10"
+        className="h-8 whitespace-nowrap rounded-lg border border-danger/50 px-3 text-sm text-danger transition-colors hover:border-danger hover:bg-danger/10"
       >
         {t('admin.delete')}
       </button>
@@ -71,21 +71,21 @@ function buildColumns(myId: string | null): Column<AdminUser>[] {
       cell: (u) => (
         <span className="block">
           <span className="block font-medium">{u.displayName}</span>
-          <span className="block text-white/65">{u.email}</span>
+          <span className="block text-ink-soft">{u.email}</span>
         </span>
       ),
     },
     { header: 'admin.col.role', cell: (u) => <Badge>{u.role}</Badge> },
-    { header: 'admin.col.seller', cell: (u, _api, t) => <span className="text-white/65">{u.isSeller ? t('admin.yesWord') : t('admin.noWord')}</span> },
+    { header: 'admin.col.seller', cell: (u, _api, t) => <span className="text-ink-soft">{u.isSeller ? t('admin.yesWord') : t('admin.noWord')}</span> },
     {
       header: 'admin.col.status',
       cell: (u, _api, t) =>
         u.deletedAt ? (
           <span className="flex flex-col items-start gap-1">
             <Badge tone="danger">{t('admin.deleted')}</Badge>
-            <span className="text-xs text-white/65">{t('admin.deletedOn', { date: formatDate(u.deletedAt) })}</span>
+            <span className="text-xs text-ink-soft">{t('admin.deletedOn', { date: formatDate(u.deletedAt) })}</span>
             {u.deletedReason && (
-              <span title={u.deletedReason} className="line-clamp-2 max-w-[28ch] break-words text-xs text-white/50">
+              <span title={u.deletedReason} className="line-clamp-2 max-w-[28ch] break-words text-xs text-ink/50">
                 {u.deletedReason}
               </span>
             )}
@@ -93,11 +93,11 @@ function buildColumns(myId: string | null): Column<AdminUser>[] {
         ) : u.suspendedAt ? (
           <span className="flex flex-col items-start gap-1">
             <Badge tone="danger">{t('admin.suspended')}</Badge>
-            <span className="text-xs text-white/65">
+            <span className="text-xs text-ink-soft">
               {u.suspendedUntil ? t('admin.suspendedUntil', { date: formatDate(u.suspendedUntil) }) : t('admin.suspendedNoEnd')}
             </span>
             {u.suspensionReason && (
-              <span title={u.suspensionReason} className="line-clamp-2 max-w-[28ch] break-words text-xs text-white/50">
+              <span title={u.suspensionReason} className="line-clamp-2 max-w-[28ch] break-words text-xs text-ink/50">
                 {u.suspensionReason}
               </span>
             )}
@@ -106,14 +106,14 @@ function buildColumns(myId: string | null): Column<AdminUser>[] {
           <Badge>{t('admin.active')}</Badge>
         ),
     },
-    { header: 'admin.col.joined', cell: (u) => <span className="font-mono text-[13px] text-white/65">{formatDate(u.createdAt)}</span> },
+    { header: 'admin.col.joined', cell: (u) => <span className="font-mono text-[13px] text-ink-soft">{formatDate(u.createdAt)}</span> },
     {
       header: 'admin.col.action',
       cell: (u, api, t) => {
-        if (u.deletedAt) return <span className="text-sm text-white/40">—</span>; // a deleted account has no actions
-        if (u.id === myId) return <span className="text-sm text-white/65">{t('admin.you')}</span>;
+        if (u.deletedAt) return <span className="text-sm text-ink/40">—</span>; // a deleted account has no actions
+        if (u.id === myId) return <span className="text-sm text-ink-soft">{t('admin.you')}</span>;
         // An admin account cannot be suspended or deleted (the server refuses too); one suspended earlier can still be restored.
-        if (u.role === 'admin' && u.suspendedAt === null) return <span title={t('admin.noAdminSuspend')} className="text-sm text-white/40">—</span>;
+        if (u.role === 'admin' && u.suspendedAt === null) return <span title={t('admin.noAdminSuspend')} className="text-sm text-ink/40">—</span>;
         return (
           <span className="flex flex-wrap items-center gap-2">
             <SuspendAction user={u} api={api} />

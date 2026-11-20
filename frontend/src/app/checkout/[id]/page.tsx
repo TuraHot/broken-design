@@ -114,8 +114,8 @@ export default function CheckoutPage() {
   if (!ready || loading) {
     return (
       <main className="flex min-h-[calc(100dvh-4rem)] items-center justify-center px-4 pt-20 pb-12">
-        <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-6 py-5 text-white/70">
-          <Loader2 className="h-5 w-5 animate-spin text-hud" />
+        <div className="flex items-center gap-3 rounded-2xl border border-line bg-ink/5 px-6 py-5 text-ink/70">
+          <Loader2 className="h-5 w-5 animate-spin text-accent" />
           <span className="font-mono text-xs uppercase tracking-wider">{t('pay.loadingCheckout')}</span>
         </div>
       </main>
@@ -125,12 +125,12 @@ export default function CheckoutPage() {
   if (!token) {
     return (
       <main className="flex min-h-[calc(100dvh-4rem)] items-center justify-center px-4 pt-20 pb-12">
-        <div className="w-full max-w-[460px] rounded-2xl border border-white/10 bg-[#0b0d12] p-6 text-center shadow-2xl">
-          <h1 className="font-display text-xl uppercase text-white">{t('pay.signInTitle')}</h1>
-          <p className="mt-2 text-sm text-white/65">{t('pay.signInQr')}</p>
+        <div className="w-full max-w-[460px] rounded-2xl border border-line bg-card p-6 text-center shadow-2xl">
+          <h1 className="font-display text-xl uppercase text-ink">{t('pay.signInTitle')}</h1>
+          <p className="mt-2 text-sm text-ink-soft">{t('pay.signInQr')}</p>
           <Link
             href="/login"
-            className="mt-5 inline-flex h-11 w-full items-center justify-center rounded-full bg-white text-sm font-medium text-black transition-colors hover:bg-white/85"
+            className="mt-5 inline-flex h-11 w-full items-center justify-center rounded-full bg-ink text-sm font-medium text-canvas transition-colors hover:bg-ink/85"
           >
             {t('pay.login')}
           </Link>
@@ -142,12 +142,12 @@ export default function CheckoutPage() {
   if (!purchase) {
     return (
       <main className="flex min-h-[calc(100dvh-4rem)] items-center justify-center px-4 pt-20 pb-12">
-        <div className="w-full max-w-[460px] rounded-2xl border border-white/10 bg-[#0b0d12] p-6 text-center shadow-2xl">
-          <h1 className="font-display text-xl uppercase text-white">{t('pay.orderNotFound')}</h1>
-          <p className="mt-2 text-sm text-amber">{errorMsg ? msgText(errorMsg, t) : t('pay.errOrderMissing')}</p>
+        <div className="w-full max-w-[460px] rounded-2xl border border-line bg-card p-6 text-center shadow-2xl">
+          <h1 className="font-display text-xl uppercase text-ink">{t('pay.orderNotFound')}</h1>
+          <p className="mt-2 text-sm text-warn">{errorMsg ? msgText(errorMsg, t) : t('pay.errOrderMissing')}</p>
           <Link
             href="/gallery"
-            className="mt-5 inline-flex h-10 items-center justify-center rounded-full border border-white/20 px-5 text-sm text-white/80 hover:bg-white/10"
+            className="mt-5 inline-flex h-10 items-center justify-center rounded-full border border-line px-5 text-sm text-ink/80 hover:bg-ink/10"
           >
             {t('pay.backGallery')}
           </Link>
@@ -162,14 +162,14 @@ export default function CheckoutPage() {
   if (purchase.status === 'paid') {
     return (
       <main className="flex min-h-[calc(100dvh-4rem)] items-center justify-center px-4 pt-20 pb-12">
-        <div className="w-full max-w-[460px] rounded-2xl border border-white/10 bg-[#0b0d12] p-6 text-center shadow-2xl">
-          <CheckCircle2 className="mx-auto h-10 w-10 text-hud" />
-          <h1 className="mt-3 font-display text-xl uppercase text-white">{t('pay.paidTitle')}</h1>
-          <p className="mt-1.5 text-sm text-white/65">{purchase.title}</p>
-          <p className="mt-2 text-sm font-medium text-hud">{t('pay.alreadyOwned')}</p>
+        <div className="w-full max-w-[460px] rounded-2xl border border-line bg-card p-6 text-center shadow-2xl">
+          <CheckCircle2 className="mx-auto h-10 w-10 text-accent" />
+          <h1 className="mt-3 font-display text-xl uppercase text-ink">{t('pay.paidTitle')}</h1>
+          <p className="mt-1.5 text-sm text-ink-soft">{purchase.title}</p>
+          <p className="mt-2 text-sm font-medium text-accent">{t('pay.alreadyOwned')}</p>
           <Link
             href={`/checkout/success?purchaseId=${encodeURIComponent(purchase.id)}`}
-            className="mt-6 inline-flex h-11 w-full items-center justify-center rounded-full bg-white text-sm font-medium text-black transition-colors hover:bg-white/85"
+            className="mt-6 inline-flex h-11 w-full items-center justify-center rounded-full bg-ink text-sm font-medium text-canvas transition-colors hover:bg-ink/85"
           >
             {t('pay.viewKey')}
           </Link>
@@ -180,40 +180,40 @@ export default function CheckoutPage() {
 
   return (
     <main className="flex min-h-[calc(100dvh-4rem)] items-center justify-center px-4 pt-20 pb-12">
-      <div className="w-full max-w-[460px] rounded-2xl border border-white/10 bg-[#0b0d12] p-6 shadow-2xl sm:p-7">
+      <div className="w-full max-w-[460px] rounded-2xl border border-line bg-card p-6 shadow-2xl sm:p-7">
         {/* Seller header (Ko-fi prototype style) */}
         <div className="flex items-center justify-center gap-2.5">
-          <span className="grid h-7 w-7 place-items-center rounded-full border border-hud/40 bg-hud/10 font-mono text-[11px] text-hud">
+          <span className="grid h-7 w-7 place-items-center rounded-full border border-accent/40 bg-accent/10 font-mono text-[11px] text-accent">
             {initials(sellerName)}
           </span>
-          <p className="text-sm font-medium text-white">
-            {sellerName} <span className="font-normal text-white/50">({t('pay.seller')})</span>
+          <p className="text-sm font-medium text-ink">
+            {sellerName} <span className="font-normal text-ink-soft">({t('pay.seller')})</span>
           </p>
         </div>
 
-        <p className="mt-3 text-center text-xs text-white/55">
+        <p className="mt-3 text-center text-xs text-ink-soft">
           {t('pay.signedInAs', { email })}
         </p>
 
         {/* Item card */}
-        <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-white/15 bg-white/[0.03] px-4 py-3.5">
+        <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-line bg-ink/[0.03] px-4 py-3.5">
           <div className="min-w-0">
-            <p className="truncate text-sm font-medium text-white">{purchase.title}</p>
-            <p className="mt-0.5 font-mono text-[11px] uppercase tracking-wider text-white/50">
+            <p className="truncate text-sm font-medium text-ink">{purchase.title}</p>
+            <p className="mt-0.5 font-mono text-[11px] uppercase tracking-wider text-ink-soft">
               {purchase.licenseType}
             </p>
           </div>
-          <span className="shrink-0 font-mono text-sm font-semibold text-white">{priceText}</span>
+          <span className="shrink-0 font-mono text-sm font-semibold text-ink">{priceText}</span>
         </div>
 
         {/* Highlighted Total bar */}
-        <div className="mt-3 flex items-center justify-between rounded-xl border border-hud/25 bg-hud/10 px-4 py-3">
-          <span className="text-sm font-medium text-white">{t('pay.total')}</span>
-          <span className="font-mono text-sm font-semibold text-hud">{priceText}</span>
+        <div className="mt-3 flex items-center justify-between rounded-xl border border-accent/25 bg-accent/10 px-4 py-3">
+          <span className="text-sm font-medium text-ink">{t('pay.total')}</span>
+          <span className="font-mono text-sm font-semibold text-accent">{priceText}</span>
         </div>
 
         <div className="mt-2.5 text-right">
-          <Link href={`/models/${purchase.modelId}`} className="text-xs text-hud hover:underline">
+          <Link href={`/models/${purchase.modelId}`} className="text-xs text-accent hover:underline">
             {t('pay.continue')}
           </Link>
         </div>
@@ -221,7 +221,7 @@ export default function CheckoutPage() {
         {/* Buyer Info */}
         <div className="mt-4 space-y-3">
           <div>
-            <label htmlFor="checkout-email" className="block text-xs font-medium text-white/85">
+            <label htmlFor="checkout-email" className="block text-xs font-medium text-ink/85">
               {t('pay.email')}
             </label>
             <input
@@ -229,15 +229,15 @@ export default function CheckoutPage() {
               type="email"
               value={email}
               readOnly
-              className="mt-1.5 h-10 w-full rounded-lg border border-white/15 bg-white/5 px-3 text-sm text-white/75 focus:outline-none"
+              className="mt-1.5 h-10 w-full rounded-lg border border-line bg-ink/5 px-3 text-sm text-ink/75 focus:outline-none"
             />
           </div>
 
           <div>
-            <label htmlFor="checkout-name" className="block text-xs font-medium text-white/85">
+            <label htmlFor="checkout-name" className="block text-xs font-medium text-ink/85">
               {t('pay.displayName')}
             </label>
-            <p className="mt-0.5 text-[11px] text-white/45">
+            <p className="mt-0.5 text-[11px] text-ink/45">
               {t('pay.displayNameHint')}
             </p>
             <input
@@ -245,24 +245,24 @@ export default function CheckoutPage() {
               type="text"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
-              className="mt-1.5 h-10 w-full rounded-lg border border-white/15 bg-white/5 px-3 text-sm text-white focus:border-hud/60 focus:outline-none"
+              className="mt-1.5 h-10 w-full rounded-lg border border-line bg-ink/5 px-3 text-sm text-ink focus:border-accent/60 focus:outline-none"
             />
           </div>
         </div>
 
         {/* Payment Method: QR Only */}
-        <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] px-3.5 py-2.5">
+        <div className="mt-4 rounded-xl border border-line bg-ink/[0.03] px-3.5 py-2.5">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-xs font-medium text-white">
-              <QrCode className="h-4 w-4 text-hud" />
+            <div className="flex items-center gap-2 text-xs font-medium text-ink">
+              <QrCode className="h-4 w-4 text-accent" />
               {t('pay.method')}
             </div>
-            <span className="font-mono text-[10px] uppercase tracking-wider text-hud/80">{t('pay.qrOnly')}</span>
+            <span className="font-mono text-[10px] uppercase tracking-wider text-accent">{t('pay.qrOnly')}</span>
           </div>
         </div>
 
         {errorMsg && (
-          <p role="alert" className="mt-3 rounded-lg border border-amber/40 bg-amber/10 px-3 py-2 text-xs text-amber">
+          <p role="alert" className="mt-3 rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-xs text-warn">
             {msgText(errorMsg, t)}
           </p>
         )}
@@ -273,19 +273,19 @@ export default function CheckoutPage() {
             type="button"
             disabled={submitting}
             onClick={handleCheckoutNow}
-            className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-white text-sm font-semibold text-black transition-colors hover:bg-white/85 disabled:opacity-60"
+            className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-ink text-sm font-semibold text-canvas transition-colors hover:bg-ink/85 disabled:opacity-60"
           >
             {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
             {submitting ? t('pay.generating') : t('pay.checkoutNow')}
           </button>
         ) : (
-          <div className="mt-5 rounded-xl border border-hud/35 bg-black/70 p-4 text-center">
+          <div className="mt-5 rounded-xl border border-accent/35 bg-canvas/70 p-4 text-center">
             {qrInfo.provider === 'stripe' && qrInfo.qrImageUrl ? (
               <>
-                <p className="font-mono text-xs uppercase tracking-wider text-hud">
+                <p className="font-mono text-xs uppercase tracking-wider text-accent">
                   {t('pay.scanQr', { amount: formatMoney(qrInfo.amountSatang, 'THB') })}
                 </p>
-                <div className="mx-auto mt-3 inline-block rounded-xl bg-white p-3">
+                <div className="mx-auto mt-3 inline-block rounded-xl bg-ink p-3">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={qrInfo.qrImageUrl}
@@ -293,8 +293,8 @@ export default function CheckoutPage() {
                     className="h-48 w-48 object-contain"
                   />
                 </div>
-                <p className="mt-3 flex items-center justify-center gap-2 font-mono text-[11px] text-white/60">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin text-hud" />
+                <p className="mt-3 flex items-center justify-center gap-2 font-mono text-[11px] text-ink/60">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-accent" />
                   {t('pay.waiting')}
                 </p>
                 {qrInfo.hostedUrl && (
@@ -302,7 +302,7 @@ export default function CheckoutPage() {
                     href={qrInfo.hostedUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="mt-2 inline-flex items-center gap-1 text-xs text-hud hover:underline"
+                    className="mt-2 inline-flex items-center gap-1 text-xs text-accent hover:underline"
                   >
                     {t('pay.stripeHelp')}
                     <ExternalLink className="h-3 w-3" />
@@ -311,23 +311,23 @@ export default function CheckoutPage() {
               </>
             ) : (
               <>
-                <p className="font-mono text-xs uppercase tracking-wider text-amber">
+                <p className="font-mono text-xs uppercase tracking-wider text-warn">
                   {t('pay.mockQr', { amount: formatMoney(qrInfo.amountSatang, 'THB') })}
                 </p>
-                <div className="mx-auto mt-3 grid h-40 w-40 place-items-center rounded-xl border border-dashed border-white/25 bg-white/5">
-                  <QrCode className="h-24 w-24 text-white/80" />
+                <div className="mx-auto mt-3 grid h-40 w-40 place-items-center rounded-xl border border-dashed border-ink/25 bg-ink/5">
+                  <QrCode className="h-24 w-24 text-ink/80" />
                 </div>
                 {process.env.NODE_ENV !== 'production' && (
-                  <p className="mt-2 text-xs text-white/55">
-                    {t('pay.mockHelp1')} <code className="text-white/80">PAYMENT_PROVIDER=stripe</code> {t('pay.mockHelp2')}{' '}
-                    <code className="text-white/80">core-api/.env</code> {t('pay.mockHelp3')}
+                  <p className="mt-2 text-xs text-ink-soft">
+                    {t('pay.mockHelp1')} <code className="text-ink/80">PAYMENT_PROVIDER=stripe</code> {t('pay.mockHelp2')}{' '}
+                    <code className="text-ink/80">core-api/.env</code> {t('pay.mockHelp3')}
                   </p>
                 )}
                 <button
                   type="button"
                   disabled={submitting}
                   onClick={handleMockConfirm}
-                  className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-full bg-white text-xs font-semibold text-black transition-colors hover:bg-white/85 disabled:opacity-60"
+                  className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-full bg-ink text-xs font-semibold text-canvas transition-colors hover:bg-ink/85 disabled:opacity-60"
                 >
                   {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
                   {t('pay.confirmMock')}
@@ -337,7 +337,7 @@ export default function CheckoutPage() {
           </div>
         )}
 
-        <p className="mt-4 text-center text-[11px] text-white/45">
+        <p className="mt-4 text-center text-[11px] text-ink/45">
           {t('pay.contactSeller', { name: sellerName })}
         </p>
       </div>

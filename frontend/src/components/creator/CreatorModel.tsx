@@ -56,18 +56,18 @@ export default function CreatorModel() {
 
   return (
     <div className="relative mx-auto aspect-square w-full max-w-[600px] lg:mx-0 lg:justify-self-end">
-      {/* screen blend: the black canvas turns see-through, so the page's wave shows behind the butterfly's light */}
-      <div className="absolute inset-0 z-[6] mix-blend-screen">
+      {/* screen blend: the black canvas turns see-through, so the page's wave shows behind the butterfly's light. Light theme: invert + multiply turns it into dark ink on the off-white page */}
+      <div className="absolute inset-0 z-[6] mix-blend-screen [html[data-theme='light']_&]:mix-blend-multiply [html[data-theme='light']_&]:[filter:invert(1)_hue-rotate(180deg)]">
         <CreatorViewer onProject={wide ? onProject : undefined} />
       </div>
       <div aria-hidden className={`pointer-events-none absolute inset-0 z-[7] hidden ${SHOW_CALLOUTS ? 'md:block' : ''}`}>
         <svg className="absolute inset-0 h-full w-full">
           {CALLOUTS.map((c) => (
             <g key={c.id}>
-              <line ref={(el) => { lines.current[c.id] = el; }} stroke="rgba(143,211,255,0.55)" strokeWidth="1" />
+              <line ref={(el) => { lines.current[c.id] = el; }} stroke="rgb(var(--c-accent) / 0.55)" strokeWidth="1" />
               <g ref={(el) => { dots.current[c.id] = el; }}>
-                <circle r="6" fill="none" stroke="rgba(143,211,255,0.5)" strokeWidth="1" />
-                <circle r="2.5" fill="#8fd3ff" />
+                <circle r="6" fill="none" stroke="rgb(var(--c-accent) / 0.5)" strokeWidth="1" />
+                <circle r="2.5" fill="rgb(var(--c-accent))" />
               </g>
             </g>
           ))}
@@ -76,13 +76,13 @@ export default function CreatorModel() {
           <div
             key={c.id}
             ref={(el) => { cards.current[c.id] = el; }}
-            className={`absolute ${c.pos} w-[112px] border border-hud/40 bg-[rgba(4,8,18,0.66)] p-2.5 xl:w-[140px]`}
+            className={`absolute ${c.pos} w-[112px] border border-accent/40 bg-canvas/70 p-2.5 xl:w-[140px]`}
             style={{ clipPath: CLIP }}
           >
-            <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-hud/70">[ {t(c.tag)} ]</p>
-            <p className="mt-1.5 font-display text-[11px] uppercase text-white">{t(c.title)}</p>
+            <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-accent">[ {t(c.tag)} ]</p>
+            <p className="mt-1.5 font-display text-[11px] uppercase text-ink">{t(c.title)}</p>
             {c.lines.map((l) => (
-              <p key={l} className="mt-1 font-mono text-[10.5px] leading-snug text-white/65">
+              <p key={l} className="mt-1 font-mono text-[10.5px] leading-snug text-ink-soft">
                 {t(l)}
               </p>
             ))}

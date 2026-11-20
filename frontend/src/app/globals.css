@@ -25,9 +25,9 @@ html[data-theme='light'] {
   --c-ink-soft: 59 59 59;
   --c-line: 207 207 207;
   --c-card: 255 255 255;
-  --c-accent: 123 79 224;
+  --c-accent: 112 70 214;
   --c-highlight: 201 242 61;
-  --c-warn: 168 90 0;
+  --c-warn: 156 82 0;
   --c-danger: 185 28 28;
 }
 
@@ -82,4 +82,35 @@ select option {
 html[data-theme='light'] select option {
   background-color: rgb(var(--c-card));
   color: rgb(var(--c-ink));
+}
+
+/*
+ * Light theme text contrast. Faint text is written as `text-ink/30..55` (and `placeholder:text-ink/..`), which is fine
+ * on the black canvas but drops under 4.5:1 on the off-white one (ink/50 is about 3.6:1). Raise those alphas to 0.62
+ * (about 5:1 on canvas, card and ink/5 panels) in the light theme only; dark values are untouched. Success green is
+ * emerald-500 in dark (kept as it was) and emerald-700 in light.
+ */
+html[data-theme='light'] .text-ink\/30,
+html[data-theme='light'] .text-ink\/35,
+html[data-theme='light'] .text-ink\/40,
+html[data-theme='light'] .text-ink\/45,
+html[data-theme='light'] .text-ink\/50,
+html[data-theme='light'] .text-ink\/55 {
+  color: rgb(var(--c-ink) / 0.62);
+}
+
+html[data-theme='light'] [class*='placeholder:text-ink/']::placeholder {
+  color: rgb(var(--c-ink) / 0.62);
+}
+
+html[data-theme='light'] .text-emerald-400,
+html[data-theme='light'] .text-emerald-500 {
+  color: rgb(4 120 87);
+}
+
+/* Faint accent labels (`text-accent/70`, written for the dark theme) would be about 2.9:1 on the light canvas. */
+html[data-theme='light'] .text-accent\/60,
+html[data-theme='light'] .text-accent\/70,
+html[data-theme='light'] .text-accent\/80 {
+  color: rgb(var(--c-accent));
 }

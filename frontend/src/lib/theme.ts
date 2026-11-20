@@ -6,16 +6,24 @@ export type Theme = 'light' | 'dark';
 export const THEME_COOKIE = 'theme';
 
 /** Routes whose pages are converted to the colour tokens. Add a route here only after checking both themes. */
-export const THEME_READY_ROUTES: readonly string[] = ['/'];
+export const THEME_READY_ROUTES: readonly string[] = ['/', '/gallery', '/models/[id]', '/creator', '/creators/[handle]', '/login', '/register', '/forgot-password', '/reset-password', '/docs', '/terms', '/privacy', '/seller-terms', '/refunds', '/dmca', '/licenses', '/contact', '/me', '/seller', '/settings', '/upload', '/checkout/[id]', '/checkout/success', '/admin', '/admin/models', '/admin/users', '/admin/purchases', '/admin/complaints', '/admin/notifications', '/admin/creator-approvals', '/admin/withdrawals', '/403'];
 
 const normalize = (pathname: string) => {
   const path = pathname.split(/[?#]/)[0];
   return path.length > 1 ? path.replace(/\/+$/, '') : path || '/';
 };
 
-/** Exact match on the path (no query, hash or trailing slash): `/` matches only `/`. */
+/** A route segment like `[id]` matches any one non-empty path segment; every other segment must match exactly. */
+const routeMatches = (route: string, path: string) => {
+  const a = route.split('/');
+  const b = path.split('/');
+  return a.length === b.length && a.every((seg, i) => (/^\[[^\]/]+\]$/.test(seg) ? b[i] !== '' : seg === b[i]));
+};
+
+/** Match on the path (no query, hash or trailing slash): `/` matches only `/`, `/models/[id]` any `/models/<x>`. */
 export function isThemeReady(pathname: string, routes: readonly string[] = THEME_READY_ROUTES): boolean {
-  return routes.includes(normalize(pathname));
+  const path = normalize(pathname);
+  return routes.some((route) => routeMatches(route, path));
 }
 
 /**
@@ -53,7 +61,10 @@ export function themeBootstrapScript(routes: readonly string[]): string {
     'var r=' + JSON.stringify(routes) + ';' +
     'var p=location.pathname.split(/[?#]/)[0];while(p.length>1&&p.charAt(p.length-1)==="/"){p=p.slice(0,-1)}if(!p){p="/"}' +
     'var t="dark";' +
-    'if(r.indexOf(p)>-1){var s=null,c=document.cookie.split(";");' +
+    'var m=false;for(var j=0;j<r.length&&!m;j++){var a=r[j].split("/"),b=p.split("/");' +
+    'if(a.length===b.length){m=true;for(var k=0;k<a.length;k++){' +
+    'if(/^\\[[^\\]\\/]+\\]$/.test(a[k])){if(b[k]===""){m=false;break}}else if(a[k]!==b[k]){m=false;break}}}}' +
+    'if(m){var s=null,c=document.cookie.split(";");' +
     'for(var i=0;i<c.length;i++){var e=c[i].indexOf("=");' +
     'if(e>-1&&c[i].slice(0,e).trim()==="' + THEME_COOKIE + '"){s=c[i].slice(e+1).trim()}}' +
     'if(s==="light"||s==="dark"){t=s}' +

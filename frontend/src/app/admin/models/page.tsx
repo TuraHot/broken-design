@@ -19,7 +19,7 @@ function EditAction({ model, api }: { model: AdminModel; api: RowApi<AdminModel>
         type="button"
         onClick={() => setOpen(true)}
         aria-label={t('admin.actionOn', { action: t('admin.edit'), name: model.title })}
-        className="h-8 whitespace-nowrap rounded-lg border border-white/15 px-3 text-sm text-white/80 transition-colors hover:border-white/40 hover:text-white"
+        className="h-8 whitespace-nowrap rounded-lg border border-line px-3 text-sm text-ink/80 transition-colors hover:border-ink/40 hover:text-ink"
       >
         {t('admin.edit')}
       </button>
@@ -38,21 +38,21 @@ function EditAction({ model, api }: { model: AdminModel; api: RowApi<AdminModel>
 const COLUMNS: Column<AdminModel>[] = [
   {
     header: 'admin.col.model',
-    cell: (m) => <span className="font-medium text-white">{m.title}</span>,
+    cell: (m) => <span className="font-medium text-ink">{m.title}</span>,
   },
   {
     header: 'admin.col.owner',
     cell: (m, _api, t) => (
       <span className="flex flex-wrap items-center gap-2">
-        <span className="text-white/80">{m.owner.displayName}</span>
+        <span className="text-ink/80">{m.owner.displayName}</span>
         {m.owner.isSuspended && <Badge tone="danger">{t('admin.suspended')}</Badge>}
       </span>
     ),
   },
-  { header: 'admin.col.license', cell: (m) => <span className="text-white/65">{m.license}</span> },
+  { header: 'admin.col.license', cell: (m) => <span className="text-ink-soft">{m.license}</span> },
   {
     header: 'admin.col.price',
-    cell: (m, _api, t) => <span className="text-white/65">{m.priceCents === 0 ? t('admin.free') : formatMoney(m.priceCents, m.currency)}</span>,
+    cell: (m, _api, t) => <span className="text-ink-soft">{m.priceCents === 0 ? t('admin.free') : formatMoney(m.priceCents, m.currency)}</span>,
   },
   {
     header: 'admin.col.status',
@@ -63,10 +63,10 @@ const COLUMNS: Column<AdminModel>[] = [
       </span>
     ),
   },
-  { header: 'admin.col.created', cell: (m) => <span className="font-mono text-[13px] text-white/65">{formatDate(m.createdAt)}</span> },
+  { header: 'admin.col.created', cell: (m) => <span className="font-mono text-[13px] text-ink-soft">{formatDate(m.createdAt)}</span> },
   {
     header: 'admin.col.action',
-    cell: (m, api) => (m.isDeleted ? <span className="text-white/40">—</span> : <EditAction model={m} api={api} />),
+    cell: (m, api) => (m.isDeleted ? <span className="text-ink/40">—</span> : <EditAction model={m} api={api} />),
   },
 ];
 

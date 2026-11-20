@@ -11,7 +11,7 @@ import { useT } from '@/lib/i18n/client';
 import { EMAIL_RE, FIELD, Field } from './Field';
 
 const PRIMARY =
-  'mt-2 h-10 w-full rounded-lg bg-white text-[15px] font-medium text-black transition-colors hover:bg-white/85 disabled:opacity-60';
+  'mt-2 h-10 w-full rounded-lg bg-ink text-[15px] font-medium text-canvas transition-colors hover:bg-ink/85 disabled:opacity-60';
 
 export default function RegisterForm() {
   const router = useRouter();
@@ -92,23 +92,23 @@ export default function RegisterForm() {
   };
 
   const fieldClass = (key: keyof typeof values) =>
-    `${FIELD} ${errors[key] ? 'border-red-400/70 focus:border-red-300' : 'border-white/15 focus:border-white/50'}`;
+    `${FIELD} ${errors[key] ? 'border-danger/70 focus:border-danger' : 'border-line focus:border-ink/50'}`;
 
   return (
     <div className="w-full max-w-[420px]">
-      <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70">{t('auth.label')}</p>
-      <h1 className="mt-4 whitespace-nowrap font-display text-[clamp(18px,2.5vw,24px)] uppercase leading-[1.05] text-white">
+      <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-accent">{t('auth.label')}</p>
+      <h1 className="mt-4 whitespace-nowrap font-display text-[clamp(18px,2.5vw,24px)] uppercase leading-[1.05] text-ink">
         {t('auth.register.title')}
       </h1>
-      <p className="mt-3 text-[15px] leading-relaxed text-white/65">{t('auth.register.lead')}</p>
+      <p className="mt-3 text-[15px] leading-relaxed text-ink-soft">{t('auth.register.lead')}</p>
 
       {fromLogin && (
-        <p role="status" className="mt-6 rounded-lg border border-hud/40 bg-hud/10 px-3 py-2 text-sm text-hud">
+        <p role="status" className="mt-6 rounded-lg border border-accent/40 bg-accent/10 px-3 py-2 text-sm text-accent">
           {t('auth.register.noAccountNotice')}
         </p>
       )}
 
-      <div className="mt-8 rounded-lg border border-white/10 bg-white/5 p-5 sm:p-6">
+      <div className="mt-8 rounded-lg border border-line bg-ink/5 p-5 sm:p-6">
         <form onSubmit={onSubmit} noValidate className="grid gap-4">
           {/* Username Field */}
           <Field id="username" label={t('auth.username')} error={errors.username}>
@@ -156,7 +156,7 @@ export default function RegisterForm() {
                 type="button"
                 onClick={() => setShowPassword((prev) => !prev)}
                 aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
-                className="absolute right-1 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-md text-white/65 transition-colors hover:text-white"
+                className="absolute right-1 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-md text-ink-soft transition-colors hover:text-ink"
               >
                 {showPassword ? <EyeOff aria-hidden className="h-4 w-4" /> : <Eye aria-hidden className="h-4 w-4" />}
               </button>
@@ -165,7 +165,7 @@ export default function RegisterForm() {
 
           {/* API Error Message */}
           {errors.api && (
-            <div role="status" className="rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-300">
+            <div role="status" className="rounded-lg border border-danger/20 bg-danger/10 p-3 text-sm text-danger">
               <p className="flex items-start gap-1.5">
                 <AlertCircle aria-hidden className="mt-0.5 h-4 w-4 shrink-0" />
                 <span>{errors.api}</span>
@@ -178,12 +178,12 @@ export default function RegisterForm() {
           </button>
         </form>
 
-        <div className="mt-5 border-t border-white/10 pt-4 text-center">
-          <p className="text-sm text-white/65">
+        <div className="mt-5 border-t border-line pt-4 text-center">
+          <p className="text-sm text-ink-soft">
             {t('auth.haveAccount')}{' '}
             <Link
               href="/login"
-              className="text-white underline-offset-4 transition-colors hover:underline hover:text-hud"
+              className="text-ink underline-offset-4 transition-colors hover:underline hover:text-accent"
             >
               {t('auth.loginLink')}
             </Link>

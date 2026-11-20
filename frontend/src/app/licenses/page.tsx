@@ -28,7 +28,7 @@ const TOC = [
 function Mark({ value }: { value: Cell }) {
   if (value === 'yes') {
     return (
-      <span className="inline-flex items-center gap-1.5 text-white/80">
+      <span className="inline-flex items-center gap-1.5 text-ink/80">
         <Check aria-hidden className="h-4 w-4 text-emerald-400" />
         Yes
       </span>
@@ -36,7 +36,7 @@ function Mark({ value }: { value: Cell }) {
   }
   if (value === 'credit') {
     return (
-      <span className="inline-flex items-center gap-1.5 text-white/80">
+      <span className="inline-flex items-center gap-1.5 text-ink/80">
         <Check aria-hidden className="h-4 w-4 text-emerald-400" />
         Yes, with credit
       </span>
@@ -44,13 +44,13 @@ function Mark({ value }: { value: Cell }) {
   }
   if (value === 'no') {
     return (
-      <span className="inline-flex items-center gap-1.5 text-white/80">
-        <X aria-hidden className="h-4 w-4 text-red-300" />
+      <span className="inline-flex items-center gap-1.5 text-ink/80">
+        <X aria-hidden className="h-4 w-4 text-danger" />
         No
       </span>
     );
   }
-  return <span className="text-white/65">Not defined yet*</span>;
+  return <span className="text-ink-soft">Not defined yet*</span>;
 }
 
 export default async function LicensesPage() {
@@ -68,7 +68,7 @@ function LicensesEn() {
           <>
             Every model on Lixyte has one license. It is shown as a badge on the model card and explained on the model page. This page says the same thing
             in plain words, in one place. These are summaries, not legal text: the{' '}
-            <Link href="/terms" className="text-white underline underline-offset-4">terms of service</Link> and the license of each model are what count.
+            <Link href="/terms" className="text-ink underline underline-offset-4">terms of service</Link> and the license of each model are what count.
           </>
         }
       />
@@ -79,17 +79,17 @@ function LicensesEn() {
             {LICENSES.map((lic) => {
               const info = LICENSE_INFO[lic];
               return (
-                <article key={lic} className="rounded-lg border border-white/10 bg-white/5 p-5">
-                  <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud">{lic}</p>
-                  <h3 className="mt-2 text-[15px] font-medium text-white">{info.name}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-white/65">{info.summary}</p>
+                <article key={lic} className="rounded-lg border border-line bg-ink/5 p-5">
+                  <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-accent">{lic}</p>
+                  <h3 className="mt-2 text-[15px] font-medium text-ink">{info.name}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-ink-soft">{info.summary}</p>
                   <ul className="mt-4 grid gap-2 text-sm">
                     {info.rules.map((r) => (
-                      <li key={r.text} className="flex items-start gap-2 text-white/80">
+                      <li key={r.text} className="flex items-start gap-2 text-ink/80">
                         {r.ok ? (
                           <Check aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
                         ) : (
-                          <X aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-red-300" />
+                          <X aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-danger" />
                         )}
                         <span>
                           <span className="sr-only">{r.ok ? 'Allowed: ' : 'Not allowed: '}</span>
@@ -112,7 +112,7 @@ function LicensesEn() {
               LICENSE_INFO[lic].name,
               <Mark key="c" value={MATRIX[lic].commercial} />,
               <Mark key="m" value={MATRIX[lic].modify} />,
-              MATRIX[lic].credit === 'credit' ? <span key="cr" className="text-white/80">Required</span> : <span key="cr">Not needed</span>,
+              MATRIX[lic].credit === 'credit' ? <span key="cr" className="text-ink/80">Required</span> : <span key="cr">Not needed</span>,
               <Mark key="s" value={MATRIX[lic].resell} />,
             ])}
           />
@@ -122,7 +122,7 @@ function LicensesEn() {
           </UL>
           <Callout title="Free to use is not the same as free to upload">
             You can use a CC0 model in your own work, but you cannot upload it to Lixyte as if it were yours. Uploading a model you did not make or
-            have no right to share breaks the <Link href="/seller-terms" className="text-white underline underline-offset-4">seller terms</Link>.
+            have no right to share breaks the <Link href="/seller-terms" className="text-ink underline underline-offset-4">seller terms</Link>.
           </Callout>
         </Section>
 
@@ -142,9 +142,9 @@ function LicensesEn() {
         <Section id="buying" title="When you buy a model">
           <UL>
             <li>The price, the currency and the license are fixed at the moment you buy. If the creator changes them later, your purchase stays as it was.</li>
-            <li>You get an embed key to show the model on your own website, and you can download the file. See the <Link href="/docs" className="text-white underline underline-offset-4">docs</Link>.</li>
+            <li>You get an embed key to show the model on your own website, and you can download the file. See the <Link href="/docs" className="text-ink underline underline-offset-4">docs</Link>.</li>
             <li>The file you download carries a hidden mark with your purchase and license. It lets us trace a leaked copy back to its purchase. Removing the mark, or sharing the file, breaks the license.</li>
-            <li>If an admin hides a model or suspends its owner, the model stops working for everyone, including people who bought it. See the <Link href="/refunds" className="text-white underline underline-offset-4">refund policy</Link> for what you can do then.</li>
+            <li>If an admin hides a model or suspends its owner, the model stops working for everyone, including people who bought it. See the <Link href="/refunds" className="text-ink underline underline-offset-4">refund policy</Link> for what you can do then.</li>
           </UL>
         </Section>
 
@@ -155,7 +155,7 @@ function LicensesEn() {
             <li>Do you want credit for your work? Choose <C>CC BY</C>.</li>
             <li>Do you want it free for hobby and school projects but paid for business? Choose <C>CC BY-NC</C>.</li>
           </OL>
-          <P>Only upload models you made or have the right to share. See the <Link href="/seller-terms" className="text-white underline underline-offset-4">seller terms</Link> and the <Link href="/dmca" className="text-white underline underline-offset-4">copyright policy</Link>.</P>
+          <P>Only upload models you made or have the right to share. See the <Link href="/seller-terms" className="text-ink underline underline-offset-4">seller terms</Link> and the <Link href="/dmca" className="text-ink underline underline-offset-4">copyright policy</Link>.</P>
         </Section>
       </DocLayout>
     </main>

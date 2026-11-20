@@ -81,7 +81,7 @@ export default function ModelPreview({
 
   return (
     <div className="space-y-3">
-      <div className="relative aspect-[4/3] w-full overflow-hidden rounded-lg border border-white/10 bg-white/[0.06]">
+      <div className="relative aspect-[4/3] w-full overflow-hidden rounded-lg border border-line bg-ink/[0.06]">
         {isRealModel && viewerReady && !loadFailed ? (
           <>
             <model-viewer
@@ -105,13 +105,13 @@ export default function ModelPreview({
               <div
                 role="status"
                 aria-live="polite"
-                className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/45 backdrop-blur-[2px]"
+                className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 bg-canvas/45 backdrop-blur-[2px]"
               >
                 <Loader2
                   aria-hidden
-                  className="h-5 w-5 animate-spin text-hud motion-reduce:animate-none"
+                  className="h-5 w-5 animate-spin text-accent motion-reduce:animate-none"
                 />
-                <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud">
+                <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-accent">
                   {t('model.streaming3d')}
                 </span>
               </div>
@@ -122,8 +122,8 @@ export default function ModelPreview({
                 onClick={() => setAutoRotate((v) => !v)}
                 className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 font-mono text-[11px] backdrop-blur transition-colors ${
                   autoRotate
-                    ? "border-hud/50 bg-black/70 text-hud"
-                    : "border-white/20 bg-black/70 text-white/70 hover:text-white"
+                    ? "border-accent/50 bg-canvas/70 text-accent"
+                    : "border-line bg-canvas/70 text-ink/70 hover:text-ink"
                 }`}
               >
                 <RotateCw className="h-3.5 w-3.5" />
@@ -134,7 +134,7 @@ export default function ModelPreview({
         ) : (
           <div
             aria-hidden
-            className="flex h-full w-full flex-col items-center justify-center gap-2 text-white/40"
+            className="flex h-full w-full flex-col items-center justify-center gap-2 text-ink/40"
           >
             <Box className="h-8 w-8" />
             <span className="text-sm">{t('model.preview3d')}</span>
@@ -143,15 +143,15 @@ export default function ModelPreview({
       </div>
 
       {paid && isRealModel && !loadFailed && (
-        <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+        <div className="rounded-lg border border-line bg-ink/5 p-3">
           <div className="flex flex-wrap items-center gap-2">
-            <KeyRound className="h-4 w-4 text-hud/80" />
+            <KeyRound className="h-4 w-4 text-accent" />
             <input
               type="text"
               value={embedKey}
               onChange={(e) => setEmbedKey(e.target.value)}
               placeholder={t('model.keyPlaceholder')}
-              className="min-w-0 flex-1 rounded border border-white/15 bg-black/60 px-2.5 py-1 font-mono text-xs text-white placeholder:text-white/40 focus:border-hud/60 focus:outline-none"
+              className="min-w-0 flex-1 rounded border border-line bg-canvas/60 px-2.5 py-1 font-mono text-xs text-ink placeholder:text-ink/40 focus:border-accent/60 focus:outline-none"
             />
             <button
               type="button"
@@ -163,24 +163,24 @@ export default function ModelPreview({
                 if (nextKey === appliedKey) return;
                 setAppliedKey(nextKey);
               }}
-              className="inline-flex items-center gap-1.5 rounded border border-white/20 bg-white/10 px-3 py-1 font-mono text-xs text-white transition-colors hover:bg-white/20 disabled:cursor-wait disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded border border-line bg-ink/10 px-3 py-1 font-mono text-xs text-ink transition-colors hover:bg-ink/20 disabled:cursor-wait disabled:opacity-50"
             >
               {modelLoading && (
                 <Loader2
                   aria-hidden
-                  className="h-3.5 w-3.5 animate-spin text-hud motion-reduce:animate-none"
+                  className="h-3.5 w-3.5 animate-spin text-accent motion-reduce:animate-none"
                 />
               )}
               {appliedKey ? t('model.keyUpdate') : t('model.keyStream')}
             </button>
           </div>
           {keyInvalid && (
-            <p className="mt-1.5 font-mono text-xs text-amber-400">
+            <p className="mt-1.5 font-mono text-xs text-warn">
               {t('model.keyInvalid')}
             </p>
           )}
           {appliedKey && !keyInvalid && (
-            <p className="mt-1.5 font-mono text-xs text-hud">
+            <p className="mt-1.5 font-mono text-xs text-accent">
               {t('model.keyActive', { id })}
             </p>
           )}

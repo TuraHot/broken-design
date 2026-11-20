@@ -3,8 +3,8 @@ import Link from 'next/link';
 import LegalPage from '@/components/content/LegalPage';
 import { C, P, UL } from '@/components/content/prose';
 
-const link = 'text-white underline underline-offset-4';
-const strong = 'font-medium text-white/80';
+const link = 'text-ink underline underline-offset-4';
+const strong = 'font-medium text-ink/80';
 
 export default function TermsTh() {
   return (

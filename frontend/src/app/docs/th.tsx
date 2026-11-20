@@ -17,8 +17,8 @@ const TOC = [
   { id: 'help', title: 'ยังแก้ไม่ได้?' },
 ];
 
-const A = 'text-white underline underline-offset-4';
-const B = 'font-medium text-white/80';
+const A = 'text-ink underline underline-offset-4';
+const B = 'font-medium text-ink/80';
 
 export default function DocsTh() {
   return (

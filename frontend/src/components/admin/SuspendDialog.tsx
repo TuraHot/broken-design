@@ -14,7 +14,7 @@ import type { MessageKey } from '@/lib/i18n/messages';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MAX_DAYS = 365;
-const FIELD = 'mt-1.5 w-full rounded-lg border border-white/15 bg-black px-3 text-sm text-white focus:border-white/50 focus:outline-none';
+const FIELD = 'mt-1.5 w-full rounded-lg border border-line bg-canvas px-3 text-sm text-ink focus:border-ink/50 focus:outline-none';
 
 const DURATIONS: { value: string; label: MessageKey }[] = [
   { value: '1', label: 'admin.suspend.d1' },
@@ -120,7 +120,7 @@ export default function SuspendDialog({
       <form onSubmit={submit} noValidate className="grid gap-5">
         {!restoring && (
           <div>
-            <label htmlFor="suspend-duration" className="text-sm text-white/65">{t('admin.suspend.duration')}</label>
+            <label htmlFor="suspend-duration" className="text-sm text-ink-soft">{t('admin.suspend.duration')}</label>
             <select id="suspend-duration" value={duration} onChange={(e) => setDuration(e.target.value)} className={`${FIELD} h-10`}>
               {DURATIONS.map((d) => (
                 <option key={d.value} value={d.value}>{t(d.label)}</option>
@@ -128,7 +128,7 @@ export default function SuspendDialog({
             </select>
             {duration === 'custom' && (
               <div className="mt-3">
-                <label htmlFor="suspend-until" className="text-sm text-white/65">{t('admin.suspend.until')}</label>
+                <label htmlFor="suspend-until" className="text-sm text-ink-soft">{t('admin.suspend.until')}</label>
                 <input
                   id="suspend-until"
                   type="date"
@@ -139,7 +139,7 @@ export default function SuspendDialog({
                   className={`${FIELD} h-10`}
                 />
                 {customDate !== '' && until === undefined && (
-                  <p className="mt-1.5 text-xs text-amber">{t('admin.suspend.errDate')}</p>
+                  <p className="mt-1.5 text-xs text-warn">{t('admin.suspend.errDate')}</p>
                 )}
               </div>
             )}
@@ -155,23 +155,23 @@ export default function SuspendDialog({
         />
 
         {!restoring && (
-          <p className="rounded-lg border border-amber/40 bg-amber/10 px-3 py-2 text-sm text-amber">{t('admin.suspend.warning')}</p>
+          <p className="rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-warn">{t('admin.suspend.warning')}</p>
         )}
 
-        {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
+        {error && <p role="alert" className="text-sm text-danger">{error}</p>}
 
         <div className="flex flex-wrap justify-end gap-2">
           <button
             type="button"
             onClick={onClose}
-            className="h-10 rounded-lg border border-white/15 px-4 text-sm text-white/80 hover:border-white/40 hover:text-white"
+            className="h-10 rounded-lg border border-line px-4 text-sm text-ink/80 hover:border-ink/40 hover:text-ink"
           >
             {t('admin.license.cancel')}
           </button>
           <button
             type="submit"
             disabled={!valid || busy}
-            className="h-10 rounded-lg bg-white px-4 text-sm font-medium text-black transition-colors hover:bg-white/85 disabled:cursor-not-allowed disabled:opacity-50"
+            className="h-10 rounded-lg bg-ink px-4 text-sm font-medium text-canvas transition-colors hover:bg-ink/85 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {busy ? t('admin.license.saving') : t(restoring ? 'admin.restore.submit' : 'admin.suspend.submit')}
           </button>

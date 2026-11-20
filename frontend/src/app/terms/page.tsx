@@ -11,7 +11,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: locale === 'th' ? 'ข้อกำหนดการใช้งาน · Lixyte' : 'Terms of Service · Lixyte' };
 }
 
-const link = 'text-white underline underline-offset-4';
+const link = 'text-ink underline underline-offset-4';
 
 export default async function TermsPage() {
   const { locale } = await getT();
@@ -114,7 +114,7 @@ function TermsPageEn() {
                 <li>A suspended account cannot log in. Its models stop working in the same way.</li>
                 <li>Both can be undone if the problem is solved.</li>
               </UL>
-              <P>To report a problem, use <strong className="font-medium text-white/80">Report a problem</strong> in the account menu or the footer. For copyright, see the <Link href="/dmca" className={link}>copyright policy</Link>.</P>
+              <P>To report a problem, use <strong className="font-medium text-ink">Report a problem</strong> in the account menu or the footer. For copyright, see the <Link href="/dmca" className={link}>copyright policy</Link>.</P>
             </>
           ),
         },

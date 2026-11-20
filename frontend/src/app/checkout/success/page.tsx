@@ -28,8 +28,8 @@ import {
 } from '@/lib/model-assets';
 import type { PurchaseItem } from '@/lib/types';
 
-const CARD = 'rounded-lg border border-white/10 bg-white/5 p-5 sm:p-6';
-const LABEL = 'font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70';
+const CARD = 'rounded-lg border border-line bg-ink/5 p-5 sm:p-6';
+const LABEL = 'font-mono text-[11px] uppercase tracking-[0.16em] text-accent';
 
 function CheckoutSuccessContent() {
   const t = useT();
@@ -123,8 +123,8 @@ function CheckoutSuccessContent() {
 
   if (!ready || loading) {
     return (
-      <div className={`${CARD} flex items-center gap-3 text-white/70`}>
-        <Loader2 className="h-5 w-5 animate-spin text-hud" />
+      <div className={`${CARD} flex items-center gap-3 text-ink/70`}>
+        <Loader2 className="h-5 w-5 animate-spin text-accent" />
         <span className="font-mono text-xs uppercase tracking-wider">{t('pay.loadingConfirm')}</span>
       </div>
     );
@@ -134,11 +134,11 @@ function CheckoutSuccessContent() {
     return (
       <div className={CARD}>
         <p className={LABEL}>{t('pay.crumb')}</p>
-        <h1 className="mt-2 font-display text-2xl uppercase text-white">{t('pay.signInTitle')}</h1>
-        <p className="mt-2 text-sm text-white/65">{t('pay.signInView')}</p>
+        <h1 className="mt-2 font-display text-2xl uppercase text-ink">{t('pay.signInTitle')}</h1>
+        <p className="mt-2 text-sm text-ink-soft">{t('pay.signInView')}</p>
         <Link
           href="/login"
-          className="mt-6 inline-block rounded-lg bg-white px-4 py-2 text-sm font-medium text-black transition-colors hover:bg-white/85"
+          className="mt-6 inline-block rounded-lg bg-ink px-4 py-2 text-sm font-medium text-canvas transition-colors hover:bg-ink/85"
         >
           {t('pay.login')}
         </Link>
@@ -150,18 +150,18 @@ function CheckoutSuccessContent() {
     return (
       <div className={CARD}>
         <p className={LABEL}>{t('pay.crumb')}</p>
-        <h1 className="mt-2 font-display text-2xl uppercase text-white">{t('pay.success.notFound')}</h1>
-        <p className="mt-2 text-sm text-amber">{errorMsg ? msgText(errorMsg, t) : t('pay.success.notFoundBody')}</p>
+        <h1 className="mt-2 font-display text-2xl uppercase text-ink">{t('pay.success.notFound')}</h1>
+        <p className="mt-2 text-sm text-warn">{errorMsg ? msgText(errorMsg, t) : t('pay.success.notFoundBody')}</p>
         <div className="mt-6 flex flex-wrap gap-3">
           <Link
             href="/me"
-            className="rounded-lg bg-white px-4 py-2 text-sm font-medium text-black transition-colors hover:bg-white/85"
+            className="rounded-lg bg-ink px-4 py-2 text-sm font-medium text-canvas transition-colors hover:bg-ink/85"
           >
             {t('pay.goLibrary')}
           </Link>
           <Link
             href="/gallery"
-            className="rounded-lg border border-white/20 px-4 py-2 text-sm text-white/80 transition-colors hover:bg-white/10"
+            className="rounded-lg border border-line px-4 py-2 text-sm text-ink/80 transition-colors hover:bg-ink/10"
           >
             {t('pay.browseGallery')}
           </Link>
@@ -185,12 +185,12 @@ function CheckoutSuccessContent() {
   return (
     <div className="space-y-6">
       <section className={CARD}>
-        <div className="flex items-center gap-2 text-hud">
+        <div className="flex items-center gap-2 text-accent">
           <CheckCircle2 className="h-5 w-5" />
           <span className="font-mono text-xs uppercase tracking-wider">{t('pay.paidTitle')}</span>
         </div>
-        <h1 className="mt-3 font-display text-2xl uppercase text-white sm:text-3xl">{purchase.title}</h1>
-        <p className="mt-2 text-sm text-white/65">
+        <h1 className="mt-3 font-display text-2xl uppercase text-ink sm:text-3xl">{purchase.title}</h1>
+        <p className="mt-2 text-sm text-ink-soft">
           {t('pay.success.paid', {
             amount: formatMoney(purchase.amountCents, purchase.currency || 'USD'),
             license: purchase.licenseType,
@@ -199,28 +199,28 @@ function CheckoutSuccessContent() {
         </p>
 
         {/* Embed Key Box */}
-        <div className="mt-6 rounded-lg border border-hud/40 bg-black/70 p-4">
+        <div className="mt-6 rounded-lg border border-accent/40 bg-canvas/70 p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-wider text-hud">
+            <span className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-wider text-accent">
               <KeyRound className="h-3.5 w-3.5" />
               {t('pay.success.key')}
             </span>
             <button
               type="button"
               onClick={() => handleCopy('key', purchase.embedKey)}
-              className="inline-flex items-center gap-1.5 rounded border border-white/20 px-2.5 py-1 font-mono text-[11px] text-white/80 transition-colors hover:bg-white/10"
+              className="inline-flex items-center gap-1.5 rounded border border-line px-2.5 py-1 font-mono text-[11px] text-ink/80 transition-colors hover:bg-ink/10"
             >
-              {copiedTarget === 'key' ? <Check className="h-3.5 w-3.5 text-hud" /> : <Copy className="h-3.5 w-3.5" />}
+              {copiedTarget === 'key' ? <Check className="h-3.5 w-3.5 text-accent" /> : <Copy className="h-3.5 w-3.5" />}
               {copiedTarget === 'key' ? t('pay.success.copied') : t('pay.success.copyKey')}
             </button>
           </div>
-          <div className="mt-2 break-all font-mono text-xs text-white select-all sm:text-sm">
+          <div className="mt-2 break-all font-mono text-xs text-ink select-all sm:text-sm">
             {purchase.embedKey}
           </div>
         </div>
 
         {errorMsg && (
-          <p role="alert" className="mt-4 text-sm text-amber">
+          <p role="alert" className="mt-4 text-sm text-warn">
             {msgText(errorMsg, t)}
           </p>
         )}
@@ -231,21 +231,21 @@ function CheckoutSuccessContent() {
             type="button"
             disabled={downloading}
             onClick={handleDownload}
-            className="inline-flex h-10 items-center gap-2 rounded-lg bg-white px-4 text-sm font-medium text-black transition-colors hover:bg-white/85 disabled:opacity-60"
+            className="inline-flex h-10 items-center gap-2 rounded-lg bg-ink px-4 text-sm font-medium text-canvas transition-colors hover:bg-ink/85 disabled:opacity-60"
           >
             {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
             {downloading ? t('pay.success.downloading') : t('pay.success.download')}
           </button>
           <Link
             href="/me"
-            className="inline-flex h-10 items-center gap-2 rounded-lg border border-hud/40 bg-hud/10 px-4 text-sm font-medium text-hud transition-colors hover:bg-hud/20"
+            className="inline-flex h-10 items-center gap-2 rounded-lg border border-accent/40 bg-accent/10 px-4 text-sm font-medium text-accent transition-colors hover:bg-accent/20"
           >
             <Library className="h-4 w-4" />
             {t('pay.goLibrary')}
           </Link>
           <Link
             href={`/models/${purchase.modelId}`}
-            className="inline-flex h-10 items-center rounded-lg border border-white/20 px-4 text-sm text-white/80 transition-colors hover:bg-white/10"
+            className="inline-flex h-10 items-center rounded-lg border border-line px-4 text-sm text-ink/80 transition-colors hover:bg-ink/10"
           >
             {t('pay.success.viewModel')}
           </Link>
@@ -255,43 +255,43 @@ function CheckoutSuccessContent() {
       {/* Embed Snippets */}
       <section className={CARD}>
         <div className="flex items-center gap-2">
-          <Code2 className="h-4 w-4 text-hud" />
-          <h2 className="font-mono text-xs uppercase tracking-wider text-white">{t('pay.success.embedTitle')}</h2>
+          <Code2 className="h-4 w-4 text-accent" />
+          <h2 className="font-mono text-xs uppercase tracking-wider text-ink">{t('pay.success.embedTitle')}</h2>
         </div>
 
         <div className="mt-4 space-y-4">
           <div>
             <div className="flex items-center justify-between">
-              <span className="font-mono text-[11px] uppercase tracking-wider text-white/60">
+              <span className="font-mono text-[11px] uppercase tracking-wider text-ink/60">
                 {t('pay.success.webComponent')}
               </span>
               <button
                 type="button"
                 onClick={() => handleCopy('vm', webComponentSnippet)}
-                className="inline-flex items-center gap-1 font-mono text-[11px] text-hud hover:underline"
+                className="inline-flex items-center gap-1 font-mono text-[11px] text-accent hover:underline"
               >
                 {copiedTarget === 'vm' ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                 {copiedTarget === 'vm' ? t('pay.success.copied') : t('pay.success.copy')}
               </button>
             </div>
-            <pre className="mt-2 overflow-x-auto rounded-lg border border-white/10 bg-[#0d0d0d] p-3 font-mono text-xs text-white/80">
+            <pre className="mt-2 overflow-x-auto rounded-lg border border-line bg-card p-3 font-mono text-xs text-ink/80">
               <code>{webComponentSnippet}</code>
             </pre>
           </div>
 
           <div>
             <div className="flex items-center justify-between">
-              <span className="font-mono text-[11px] uppercase tracking-wider text-white/60">{t('pay.success.iframe')}</span>
+              <span className="font-mono text-[11px] uppercase tracking-wider text-ink/60">{t('pay.success.iframe')}</span>
               <button
                 type="button"
                 onClick={() => handleCopy('iframe', iframeSnippet)}
-                className="inline-flex items-center gap-1 font-mono text-[11px] text-hud hover:underline"
+                className="inline-flex items-center gap-1 font-mono text-[11px] text-accent hover:underline"
               >
                 {copiedTarget === 'iframe' ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                 {copiedTarget === 'iframe' ? t('pay.success.copied') : t('pay.success.copy')}
               </button>
             </div>
-            <pre className="mt-2 overflow-x-auto rounded-lg border border-white/10 bg-[#0d0d0d] p-3 font-mono text-xs text-white/80">
+            <pre className="mt-2 overflow-x-auto rounded-lg border border-line bg-card p-3 font-mono text-xs text-ink/80">
               <code>{iframeSnippet}</code>
             </pre>
           </div>
@@ -307,8 +307,8 @@ export default function CheckoutSuccessPage() {
     <main className="mx-auto max-w-[920px] px-4 pb-16 pt-24 md:px-6">
       <Suspense
         fallback={
-          <div className={`${CARD} flex items-center gap-3 text-white/70`}>
-            <Loader2 className="h-5 w-5 animate-spin text-hud" />
+          <div className={`${CARD} flex items-center gap-3 text-ink/70`}>
+            <Loader2 className="h-5 w-5 animate-spin text-accent" />
             <span className="font-mono text-xs uppercase tracking-wider">{t('pay.loading')}</span>
           </div>
         }

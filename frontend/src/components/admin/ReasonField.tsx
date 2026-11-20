@@ -35,7 +35,7 @@ export default function ReasonField({
   const length = value.trim().length;
   return (
     <div>
-      <label htmlFor={id} className="text-sm text-white/65">{label}</label>
+      <label htmlFor={id} className="text-sm text-ink-soft">{label}</label>
       <textarea
         id={id}
         value={value}
@@ -43,14 +43,14 @@ export default function ReasonField({
         maxLength={REASON_MAX}
         rows={rows}
         aria-describedby={`${id}-hint ${id}-count`}
-        className="mt-1.5 w-full rounded-lg border border-white/15 bg-black px-3 py-2 text-sm text-white placeholder:text-white/40 focus:border-white/50 focus:outline-none"
+        className="mt-1.5 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-ink placeholder:text-ink/40 focus:border-ink/50 focus:outline-none"
       />
-      <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2 text-xs text-white/50">
+      <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2 text-xs text-ink/50">
         <span id={`${id}-hint`}>{hint ?? t('admin.license.reasonHint')}</span>
         <span id={`${id}-count`} className="font-mono">{t('admin.license.count', { n: length, max: REASON_MAX })}</span>
       </div>
       {required && length > 0 && length < REASON_MIN && (
-        <p className="mt-1.5 text-xs text-amber">{t('admin.license.errShort', { min: REASON_MIN })}</p>
+        <p className="mt-1.5 text-xs text-warn">{t('admin.license.errShort', { min: REASON_MIN })}</p>
       )}
     </div>
   );

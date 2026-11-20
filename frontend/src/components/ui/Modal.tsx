@@ -67,14 +67,14 @@ export default function Modal({
 
   return createPortal(
     <div className="fixed inset-0 z-[70] grid place-items-center p-4">
-      <div aria-hidden className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => closeRef.current()} />
+      <div aria-hidden className="absolute inset-0 bg-canvas/70 backdrop-blur-sm" onClick={() => closeRef.current()} />
       <div
         ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className={`relative max-h-[90dvh] w-full overflow-y-auto rounded-lg border border-white/15 bg-black p-5 shadow-2xl sm:p-6 ${
+        className={`relative max-h-[90dvh] w-full overflow-y-auto rounded-lg border border-line bg-canvas p-5 shadow-2xl sm:p-6 ${
           size === 'lg' ? 'max-w-2xl' : 'max-w-lg'
         }`}
       >
@@ -84,7 +84,7 @@ export default function Modal({
             type="button"
             onClick={() => closeRef.current()}
             aria-label={t('modal.close')}
-            className="-mr-2 -mt-1 grid h-9 w-9 shrink-0 place-items-center rounded-lg text-white/65 transition-colors hover:text-white"
+            className="-mr-2 -mt-1 grid h-9 w-9 shrink-0 place-items-center rounded-lg text-ink-soft transition-colors hover:text-ink"
           >
             <X aria-hidden className="h-5 w-5" />
           </button>

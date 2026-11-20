@@ -9,7 +9,7 @@ export default function ReportButton({ children }: { children: React.ReactNode }
     <button
       type="button"
       onClick={openReport}
-      className="inline-flex h-10 items-center justify-center rounded-lg bg-white px-4 text-[15px] font-medium text-black transition-colors hover:bg-white/85"
+      className="inline-flex h-10 items-center justify-center rounded-lg bg-ink px-4 text-[15px] font-medium text-canvas transition-colors hover:bg-ink/85"
     >
       {children}
     </button>

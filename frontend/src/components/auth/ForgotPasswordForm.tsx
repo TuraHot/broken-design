@@ -10,7 +10,7 @@ import { authErrorText } from '@/lib/i18n/auth-error';
 import { useT } from '@/lib/i18n/client';
 
 const PRIMARY =
-  'h-10 w-full rounded-lg bg-white text-[15px] font-medium text-black transition-colors hover:bg-white/85 disabled:opacity-60';
+  'h-10 w-full rounded-lg bg-ink text-[15px] font-medium text-canvas transition-colors hover:bg-ink/85 disabled:opacity-60';
 
 export default function ForgotPasswordForm() {
   const router = useRouter();
@@ -55,17 +55,17 @@ export default function ForgotPasswordForm() {
     }
   };
 
-  const cls = (bad: boolean) => `${FIELD} ${bad ? 'border-red-400/70 focus:border-red-300' : 'border-white/15 focus:border-white/50'}`;
+  const cls = (bad: boolean) => `${FIELD} ${bad ? 'border-danger/70 focus:border-danger' : 'border-line focus:border-ink/50'}`;
 
   return (
     <div className="w-full max-w-[420px]">
-      <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70">{t('auth.label')}</p>
-      <h1 className="mt-4 font-display text-[clamp(26px,4vw,36px)] uppercase leading-[1.05] text-white">{t('auth.forgot.title')}</h1>
-      <p className="mt-3 text-[15px] leading-relaxed text-white/65">
+      <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-accent">{t('auth.label')}</p>
+      <h1 className="mt-4 font-display text-[clamp(26px,4vw,36px)] uppercase leading-[1.05] text-ink">{t('auth.forgot.title')}</h1>
+      <p className="mt-3 text-[15px] leading-relaxed text-ink-soft">
         {step === 'email' ? t('auth.forgot.leadEmail') : t('auth.forgot.leadCode')}
       </p>
 
-      <div className="mt-8 rounded-lg border border-white/10 bg-white/5 p-5 sm:p-6">
+      <div className="mt-8 rounded-lg border border-line bg-ink/5 p-5 sm:p-6">
         {step === 'email' ? (
           <form onSubmit={sendCode} noValidate className="grid gap-4">
             <Field id="email" label={t('auth.email')} error={error}>
@@ -86,18 +86,18 @@ export default function ForgotPasswordForm() {
           </form>
         ) : (
           <div className="grid gap-4">
-            <div className="flex items-center justify-between gap-3 rounded-lg border border-white/10 px-3 py-2 text-sm">
-              <span className="truncate text-white">{email.trim()}</span>
-              <button type="button" onClick={() => { setStep('email'); setError(undefined); }} className="shrink-0 text-white/65 underline-offset-4 hover:text-white hover:underline">
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-line px-3 py-2 text-sm">
+              <span className="truncate text-ink">{email.trim()}</span>
+              <button type="button" onClick={() => { setStep('email'); setError(undefined); }} className="shrink-0 text-ink-soft underline-offset-4 hover:text-ink hover:underline">
                 {t('auth.change')}
               </button>
             </div>
 
             {mockOtp && (
-              <div className="rounded-lg border border-amber/40 bg-amber/5 p-3 text-sm text-white/80">
-                <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-amber">{t('auth.forgot.otpLabel')}</p>
-                <p className="mt-2 select-all text-center font-mono text-base tracking-[0.4em] text-white">{mockOtp}</p>
-                <p className="mt-2 text-xs text-white/50">{t('auth.forgot.otpHint')}</p>
+              <div className="rounded-lg border border-warn/40 bg-warn/5 p-3 text-sm text-ink/80">
+                <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-warn">{t('auth.forgot.otpLabel')}</p>
+                <p className="mt-2 select-all text-center font-mono text-base tracking-[0.4em] text-ink">{mockOtp}</p>
+                <p className="mt-2 text-xs text-ink/50">{t('auth.forgot.otpHint')}</p>
               </div>
             )}
 
@@ -124,9 +124,9 @@ export default function ForgotPasswordForm() {
         )}
       </div>
 
-      <p className="mt-6 text-center text-sm text-white/65">
+      <p className="mt-6 text-center text-sm text-ink-soft">
         {t('auth.forgot.remembered')}{' '}
-        <Link href="/login" className="text-white underline-offset-4 hover:underline">
+        <Link href="/login" className="text-ink underline-offset-4 hover:underline">
           {t('auth.forgot.back')}
         </Link>
       </p>

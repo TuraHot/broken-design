@@ -11,7 +11,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: locale === 'th' ? 'นโยบายการคืนเงิน · Lixyte' : 'Refund Policy · Lixyte' };
 }
 
-const link = 'text-white underline underline-offset-4';
+const link = 'text-ink underline underline-offset-4';
 
 export default async function RefundsPage() {
   const { locale } = await getT();
@@ -67,8 +67,8 @@ function RefundsPageEn() {
           body: (
             <>
               <OL>
-                <li>Log in and open <strong className="font-medium text-white/80">Report a problem</strong> in the account menu or the footer.</li>
-                <li>Choose <strong className="font-medium text-white/80">A purchase or payment</strong>. Paste the model address if you have it.</li>
+                <li>Log in and open <strong className="font-medium text-ink">Report a problem</strong> in the account menu or the footer.</li>
+                <li>Choose <strong className="font-medium text-ink">A purchase or payment</strong>. Paste the model address if you have it.</li>
                 <li>Tell us what went wrong, the date, and the amount. An administrator reads your report and answers.</li>
               </OL>
               <P>You can follow the statement of the purchase in your <Link href="/me" className={link}>Library</Link>.</P>

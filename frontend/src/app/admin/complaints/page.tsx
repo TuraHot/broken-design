@@ -13,8 +13,8 @@ const COLUMNS: Column<AdminComplaint>[] = [
     cell: (c) => (
       <span className="block min-w-[150px]">
         <span className="block font-medium">{c.reporter.displayName}</span>
-        <span className="block break-all text-white/65">{c.reporter.email}</span>
-        <span className="mt-1 block font-mono text-[13px] text-white/65">{formatDate(c.createdAt)}</span>
+        <span className="block break-all text-ink-soft">{c.reporter.email}</span>
+        <span className="mt-1 block font-mono text-[13px] text-ink-soft">{formatDate(c.createdAt)}</span>
       </span>
     ),
   },
@@ -26,8 +26,8 @@ const COLUMNS: Column<AdminComplaint>[] = [
         <Badge>{t(CATEGORY_LABELS[c.category])}</Badge>
         {c.model && (
           <span className="mt-2 block">
-            <span className="block text-white">{c.model.title}</span>
-            {c.owner && <span className="block text-white/65">{t('admin.by', { name: c.owner.displayName })}</span>}
+            <span className="block text-ink">{c.model.title}</span>
+            {c.owner && <span className="block text-ink-soft">{t('admin.by', { name: c.owner.displayName })}</span>}
             <span className="mt-1 flex flex-wrap gap-2">
               {c.model.isHidden && <Badge tone="warn">{t('admin.hidden')}</Badge>}
               {c.owner?.isSuspended && <Badge tone="danger">{t('admin.ownerSuspended')}</Badge>}

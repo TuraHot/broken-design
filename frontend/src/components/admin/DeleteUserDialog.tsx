@@ -44,8 +44,8 @@ export default function DeleteUserDialog({
   return (
     <Modal title={t('admin.delete.title', { name: user.displayName })} onClose={onClose}>
       <form onSubmit={submit} noValidate className="grid gap-5">
-        <p className="text-sm text-white/65">
-          {user.displayName} <span className="text-white/50">({user.email})</span>
+        <p className="text-sm text-ink-soft">
+          {user.displayName} <span className="text-ink/50">({user.email})</span>
         </p>
 
         <ReasonField
@@ -57,22 +57,22 @@ export default function DeleteUserDialog({
           required
         />
 
-        <p className="rounded-lg border border-amber/40 bg-amber/10 px-3 py-2 text-sm text-amber">{t('admin.delete.warning')}</p>
+        <p className="rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-warn">{t('admin.delete.warning')}</p>
 
-        {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
+        {error && <p role="alert" className="text-sm text-danger">{error}</p>}
 
         <div className="flex flex-wrap justify-end gap-2">
           <button
             type="button"
             onClick={onClose}
-            className="h-10 rounded-lg border border-white/15 px-4 text-sm text-white/80 hover:border-white/40 hover:text-white"
+            className="h-10 rounded-lg border border-line px-4 text-sm text-ink/80 hover:border-ink/40 hover:text-ink"
           >
             {t('admin.license.cancel')}
           </button>
           <button
             type="submit"
             disabled={!valid || busy}
-            className="h-10 rounded-lg border border-red-400/70 px-4 text-sm font-medium text-red-300 transition-colors hover:bg-red-400/10 disabled:cursor-not-allowed disabled:opacity-50"
+            className="h-10 rounded-lg border border-danger/70 px-4 text-sm font-medium text-danger transition-colors hover:bg-danger/10 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {busy ? t('admin.license.saving') : t('admin.delete.submit')}
           </button>

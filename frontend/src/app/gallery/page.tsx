@@ -37,11 +37,11 @@ export default async function GalleryPage({
 
   return (
     <main className="mx-auto max-w-[1400px] px-4 pb-16 pt-24 md:px-6">
-      <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-hud/70">{t('gallery.label')}</p>
-      <h1 className="mt-4 font-display text-[clamp(28px,4vw,48px)] uppercase leading-[1.02] text-white">{t('nav.gallery')}</h1>
+      <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-accent">{t('gallery.label')}</p>
+      <h1 className="mt-4 font-display text-[clamp(28px,4vw,48px)] uppercase leading-[1.02] text-ink">{t('nav.gallery')}</h1>
 
       <div className="mt-8 flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
-        <p className="text-sm text-white/65">
+        <p className="text-sm text-ink-soft">
           {t(data.total === 1 ? 'gallery.countOne' : 'gallery.countMany', { n: data.total })}
         </p>
         <FilterBar params={params} tags={tags} />
@@ -56,8 +56,8 @@ export default async function GalleryPage({
           ))}
         </ul>
       ) : (
-        <div className="mt-4 rounded-lg border border-white/10 bg-white/5 p-10 text-center">
-          <p className="text-white">{t('gallery.empty')}</p>
+        <div className="mt-4 rounded-lg border border-line bg-ink/5 p-10 text-center">
+          <p className="text-ink">{t('gallery.empty')}</p>
         </div>
       )}
 

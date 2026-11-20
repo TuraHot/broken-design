@@ -433,6 +433,55 @@ test('GET /api/admin/models - includes hidden and deleted models with owner info
   );
 });
 
+test('GET /api/admin/models - status and license filters are combined with the search, values go in as parameters', async () => {
+  const seen: { sql: string; params: any[] }[] = [];
+  await withServer(
+    ACTIVE_ADMIN,
+    (sql, params) => {
+      if (sql.includes('FROM models m')) seen.push({ sql, params });
+      if (sql.includes('COUNT(*)::int AS total FROM models')) return { rowCount: 1, rows: [{ total: 0 }] };
+    },
+    async (base) => {
+      const res = await fetch(`${base}/models?q=rob&status=hidden&license=CC-BY`, { headers: { Authorization: `Bearer ${token()}` } });
+      assert.equal(res.status, 200);
+      assert.equal(seen.length, 2);
+      for (const { sql } of seen) {
+        assert.ok(sql.includes('m.deleted_at IS NULL AND m.hidden_at IS NOT NULL'));
+        assert.ok(sql.includes('m.license = $2::license_type'));
+      }
+      assert.deepEqual(seen[0].params, ['%rob%', 'CC-BY']);
+
+      seen.length = 0;
+      await fetch(`${base}/models?status=deleted`, { headers: { Authorization: `Bearer ${token()}` } });
+      assert.ok(seen[0].sql.includes('m.deleted_at IS NOT NULL'));
+      assert.deepEqual(seen[0].params, []);
+
+      seen.length = 0;
+      await fetch(`${base}/models?status=visible`, { headers: { Authorization: `Bearer ${token()}` } });
+      assert.ok(seen[0].sql.includes('m.deleted_at IS NULL AND m.hidden_at IS NULL'));
+    },
+  );
+});
+
+test('GET /api/admin/models - 400 for an unknown status or license, nothing is queried', async () => {
+  let queried = false;
+  await withServer(
+    ACTIVE_ADMIN,
+    (sql) => {
+      if (sql.includes('FROM models m')) queried = true;
+      return undefined;
+    },
+    async (base) => {
+      for (const qs of ['status=gone', 'license=MIT', "status=hidden'%20OR%201=1"]) {
+        const res = await fetch(`${base}/models?${qs}`, { headers: { Authorization: `Bearer ${token()}` } });
+        assert.equal(res.status, 400);
+        assert.equal((await res.json()).error.code, 'INVALID_QUERY');
+      }
+      assert.equal(queried, false);
+    },
+  );
+});
+
 // ─── PATCH /api/admin/models/:id/hide (reason, history, notice to the owner) ────────
 const HIDE_REASON = 'The preview shows content that is not allowed on the platform.';
 
@@ -668,6 +717,57 @@ test('PATCH /api/admin/complaints/:id - status only keeps the note; reopening cl
       });
       assert.equal(res.status, 200);
       assert.equal((await res.json()).handledAt, null);
+    },
+  );
+});
+
+test('PATCH /api/admin/complaints/:id - closing it notifies the reporter in the SAME statement, only on a real change to resolved/dismissed', async () => {
+  const statements: string[] = [];
+  await withServer(
+    ACTIVE_ADMIN,
+    (sql) => {
+      if (sql.includes('UPDATE complaints')) {
+        statements.push(sql);
+        return {
+          rowCount: 1,
+          rows: [{ id: COMPLAINT_ID, status: 'resolved', admin_note: 'Hidden the model.', handled_at: '2026-11-16T01:00:00.000Z', notified: true }],
+        };
+      }
+    },
+    async (base) => {
+      const res = await fetch(`${base}/complaints/${COMPLAINT_ID}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'resolved', adminNote: 'Hidden the model.' }),
+      });
+      assert.equal(res.status, 200);
+      assert.equal((await res.json()).reporterNotified, true);
+    },
+  );
+  assert.equal(statements.length, 1);
+  const sql = statements[0];
+  assert.match(sql, /INSERT INTO notifications/);
+  assert.match(sql, /'complaint_' \|\| upd\.status/);
+  assert.match(sql, /upd\.status IN \('resolved', 'dismissed'\) AND old\.status <> upd\.status/); // not again for the same result
+  assert.match(sql, /u\.deleted_at IS NULL/); // a deleted reporter gets nothing
+  assert.match(sql, /FOR UPDATE/);
+});
+
+test('PATCH /api/admin/complaints/:id - reporterNotified is false when the statement inserted no notice', async () => {
+  await withServer(
+    ACTIVE_ADMIN,
+    (sql) => {
+      if (sql.includes('UPDATE complaints')) {
+        return { rowCount: 1, rows: [{ id: COMPLAINT_ID, status: 'in_review', admin_note: null, handled_at: '2026-11-16T01:00:00.000Z', notified: false }] };
+      }
+    },
+    async (base) => {
+      const res = await fetch(`${base}/complaints/${COMPLAINT_ID}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'in_review' }),
+      });
+      assert.equal((await res.json()).reporterNotified, false);
     },
   );
 });

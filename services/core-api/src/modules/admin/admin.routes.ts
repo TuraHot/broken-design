@@ -376,12 +376,38 @@ adminRouter.delete('/users/:id', async (req, res) => {
 
 // ─── 4. GET /api/admin/models ───────────────────────────────────────────────
 // รวมโมเดลที่ถูกซ่อนและถูกลบ
+// Filters for the list: ?status=visible|hidden|deleted and ?license=CC0|CC-BY|CC-BY-NC|COMMERCIAL (both optional, combined with AND).
+const modelFilters = z.object({
+  status: z.enum(['visible', 'hidden', 'deleted']).optional(),
+  license: z.enum(['CC0', 'CC-BY', 'CC-BY-NC', 'COMMERCIAL']).optional(),
+});
+const MODEL_STATUS_SQL = {
+  visible: 'm.deleted_at IS NULL AND m.hidden_at IS NULL',
+  hidden: 'm.deleted_at IS NULL AND m.hidden_at IS NOT NULL',
+  deleted: 'm.deleted_at IS NOT NULL',
+} as const;
+
 adminRouter.get('/models', async (req, res) => {
   const { page, pageSize, offset, q } = parsePaging(req.query);
-  const search = q ? likePattern(q) : null;
+  const filters = modelFilters.safeParse(req.query);
+  if (!filters.success) {
+    throw new AppError(400, 'INVALID_QUERY', 'status must be visible, hidden or deleted; license must be CC0, CC-BY, CC-BY-NC or COMMERCIAL');
+  }
+  const { status, license } = filters.data;
 
-  const where = search ? `WHERE m.title ILIKE $1 ESCAPE '\\' OR u.display_name ILIKE $1 ESCAPE '\\'` : '';
-  const filterParams = search ? [search] : [];
+  const conditions: string[] = [];
+  const filterParams: unknown[] = [];
+  if (q) {
+    filterParams.push(likePattern(q));
+    const n = filterParams.length;
+    conditions.push(`(m.title ILIKE $${n} ESCAPE '\\' OR u.display_name ILIKE $${n} ESCAPE '\\')`);
+  }
+  if (status) conditions.push(MODEL_STATUS_SQL[status]);
+  if (license) {
+    filterParams.push(license);
+    conditions.push(`m.license = $${filterParams.length}::license_type`);
+  }
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
   const total = await db.query(
     `SELECT COUNT(*)::int AS total FROM models m JOIN users u ON u.id = m.owner_id ${where}`,
@@ -799,14 +825,31 @@ adminRouter.patch('/complaints/:id', async (req, res) => {
   const { status, adminNote } = body.data;
   const handled = status !== 'open';
 
+  // One statement: update the complaint and, when it has just been closed (resolved or dismissed) and was not
+  // closed with that same status before, put a notice in the reporter's inbox with the result and the admin's note.
+  // Saving the same result again, or moving to open / in_review, sends nothing. A deleted reporter gets no notice.
   const result = await db.query(
-    `UPDATE complaints
-     SET status = $2,
-         admin_note = CASE WHEN $3::boolean THEN $4::text ELSE admin_note END,
-         handled_by = CASE WHEN $5::boolean THEN $6::uuid ELSE NULL END,
-         handled_at = CASE WHEN $5::boolean THEN NOW() ELSE NULL END
-     WHERE id = $1
-     RETURNING id, status, admin_note, handled_at`,
+    `WITH old AS (
+       SELECT id, status, reporter_id, category, model_id FROM complaints WHERE id = $1 FOR UPDATE
+     ), upd AS (
+       UPDATE complaints c
+       SET status = $2,
+           admin_note = CASE WHEN $3::boolean THEN $4::text ELSE c.admin_note END,
+           handled_by = CASE WHEN $5::boolean THEN $6::uuid ELSE NULL END,
+           handled_at = CASE WHEN $5::boolean THEN NOW() ELSE NULL END
+       FROM old
+       WHERE c.id = old.id
+       RETURNING c.id, c.status, c.admin_note, c.handled_at
+     ), note AS (
+       INSERT INTO notifications (user_id, kind, model_id, data)
+       SELECT old.reporter_id, 'complaint_' || upd.status, old.model_id,
+              jsonb_build_object('complaintId', upd.id, 'category', old.category, 'note', upd.admin_note)
+       FROM upd JOIN old ON old.id = upd.id
+       JOIN users u ON u.id = old.reporter_id AND u.deleted_at IS NULL
+       WHERE upd.status IN ('resolved', 'dismissed') AND old.status <> upd.status
+       RETURNING id
+     )
+     SELECT upd.*, EXISTS (SELECT 1 FROM note) AS notified FROM upd`,
     [id, status, adminNote !== undefined, adminNote ? adminNote : null, handled, req.user!.id],
   );
   if (result.rowCount === 0) {
@@ -814,7 +857,7 @@ adminRouter.patch('/complaints/:id', async (req, res) => {
   }
 
   const r = result.rows[0];
-  res.json({ id: r.id, status: r.status, adminNote: r.admin_note, handledAt: r.handled_at });
+  res.json({ id: r.id, status: r.status, adminNote: r.admin_note, handledAt: r.handled_at, reporterNotified: r.notified === true });
 });
 
 // ─── Creator Applications (Admin Approval) ──────────────────────────────────

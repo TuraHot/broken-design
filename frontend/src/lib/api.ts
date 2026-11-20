@@ -357,7 +357,7 @@ export interface NoticeItem {
   id: string;
   kind: string;
   modelId: string | null;
-  data: { modelTitle?: string; oldLicense?: string; newLicense?: string; reason?: string | null; until?: string | null; auto?: boolean };
+  data: { modelTitle?: string; oldLicense?: string; newLicense?: string; reason?: string | null; until?: string | null; auto?: boolean; note?: string | null };
   readAt: string | null;
   createdAt: string;
 }

@@ -23,6 +23,13 @@ export interface Column<T> {
   cell: (row: T, api: RowApi<T>, t: Translate) => React.ReactNode;
 }
 
+interface FilterDef {
+  param: string;
+  label: MessageKey;
+  initial: string;
+  options: { value: string; label: MessageKey }[];
+}
+
 const PAGE_SIZE = 25;
 const NAV_BTN = 'inline-flex items-center gap-2 rounded-lg border border-white/15 px-3 py-1.5 text-sm text-white/65 transition-colors hover:border-white/30 hover:text-white disabled:cursor-not-allowed disabled:text-white/25 disabled:hover:border-white/15';
 
@@ -38,8 +45,8 @@ export default function AdminList<T extends { id: string }>({
   heading: MessageKey;
   searchLabel: MessageKey;
   columns: Column<T>[];
-  /** Optional dropdown sent to the API as `?<param>=<value>` (an empty value means "no filter"). */
-  filter?: { param: string; label: MessageKey; initial: string; options: { value: string; label: MessageKey }[] };
+  /** Optional dropdown(s) sent to the API as `?<param>=<value>` (an empty value means "no filter"). */
+  filter?: FilterDef | FilterDef[];
   /** Adds two date fields sent to the API as `?from=YYYY-MM-DD&to=YYYY-MM-DD` (both days included). */
   dateRange?: boolean;
 }) {
@@ -52,7 +59,11 @@ export default function AdminList<T extends { id: string }>({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
-  const [filterValue, setFilterValue] = useState(filter?.initial ?? '');
+  const filters = filter ? (Array.isArray(filter) ? filter : [filter]) : [];
+  const [filterValues, setFilterValues] = useState<Record<string, string>>(() =>
+    Object.fromEntries(filters.map((f) => [f.param, f.initial])),
+  );
+  const filterKey = JSON.stringify(filterValues);
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
 
@@ -61,7 +72,7 @@ export default function AdminList<T extends { id: string }>({
     setLoading(true);
     const sp = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) });
     if (q) sp.set('q', q);
-    if (filter && filterValue) sp.set(filter.param, filterValue);
+    for (const [param, value] of Object.entries(filterValues)) if (value) sp.set(param, value);
     if (dateRange && from) sp.set('from', from);
     if (dateRange && to) sp.set('to', to);
 
@@ -77,9 +88,9 @@ export default function AdminList<T extends { id: string }>({
         setLoading(false);
       });
     return () => ctrl.abort();
-    // `filter` is a fresh object each render; only the chosen value matters.
+    // `filterValues` is read through `filterKey`: only the chosen values matter.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [path, page, q, attempt, filterValue, from, to]);
+  }, [path, page, q, attempt, filterKey, from, to]);
 
   const api: RowApi<T> = {
     update: useCallback((id, change) => {
@@ -119,21 +130,22 @@ export default function AdminList<T extends { id: string }>({
         <button type="submit" className="h-9 rounded-lg border border-white/15 px-3 text-sm text-white/80 transition-colors hover:border-white/40 hover:text-white">
           {t('admin.search')}
         </button>
-        {filter && (
+        {filters.map((f) => (
           <select
-            aria-label={t(filter.label)}
-            value={filterValue}
+            key={f.param}
+            aria-label={t(f.label)}
+            value={filterValues[f.param] ?? ''}
             onChange={(e) => {
               setPage(1);
-              setFilterValue(e.target.value);
+              setFilterValues((v) => ({ ...v, [f.param]: e.target.value }));
             }}
             className="h-9 rounded-lg border border-white/15 bg-black px-3 text-sm text-white focus:border-white/50 focus:outline-none"
           >
-            {filter.options.map((o) => (
+            {f.options.map((o) => (
               <option key={o.value} value={o.value}>{t(o.label)}</option>
             ))}
           </select>
-        )}
+        ))}
         {dateRange && (
           // One date range: two dates that belong together, kept side by side with visible labels.
           <div role="group" aria-label={t('admin.dateRange')} className="flex flex-wrap items-center gap-x-3 gap-y-2">

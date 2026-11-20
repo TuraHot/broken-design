@@ -132,7 +132,7 @@ Agent ทุกตัว **ห้ามละเมิด** กฎต่อไ�
   - `GET /api/admin/purchases` — รายการสั่งซื้อทั้งหมดพร้อมข้อมูลผู้ซื้อ, โมเดล และ `watermark_hash` (ไม่ส่ง `embed_key`) กรองได้ด้วย `?status=paid|pending`, `?from=` และ `?to=` (`YYYY-MM-DD` รวมวันสุดท้าย ตามเวลา UTC) ร่วมกับ `q`
   - `GET /api/admin/purchases/:id` — รายละเอียดการซื้อรายการเดียว (ผู้ซื้อ, โมเดล + เจ้าของ + license ปัจจุบัน, ยอดและ license ที่ล็อกตอนซื้อ, เวลา, `provider_session_id`, `watermark_hash`) อ่านอย่างเดียว ไม่ส่ง `embed_key`
   - `GET /api/admin/complaints` — รายการคำร้องเรียน (กรอง `?status=` ได้, เรียง `open` และ `in_review` ขึ้นก่อน)
-  - `PATCH /api/admin/complaints/:id` — เปลี่ยนสถานะคำร้องเรียน (`open`, `in_review`, `resolved`, `dismissed`) พร้อมบันทึก `admin_note`
+  - `PATCH /api/admin/complaints/:id` — เปลี่ยนสถานะคำร้องเรียน (`open`, `in_review`, `resolved`, `dismissed`) พร้อมบันทึก `admin_note`; เมื่อเปลี่ยนเป็น `resolved`/`dismissed` (สถานะใหม่จริง) จะใส่ notice `complaint_resolved`/`complaint_dismissed` พร้อม `note` ในกล่องแจ้งเตือนของผู้ร้องเรียนใน statement เดียวกัน (ไม่ส่งอีเมล, ไม่ส่งซ้ำถ้าบันทึกสถานะเดิม, บัญชีที่ถูกลบไม่ได้รับ)
 - **Complaints (`/api/complaints`):**
   - `POST /api/complaints` — ผู้ใช้ที่ล็อกอินส่งคำร้องเรียน (`category`: `model|account|purchase|other`, `modelId?`, `message` 10–2000 ตัวอักษร; จำกัดไม่เกิน 5 ครั้ง/ชั่วโมง ต่อผู้ใช้)
 

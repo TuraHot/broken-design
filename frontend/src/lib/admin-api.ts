@@ -283,7 +283,7 @@ export const setModelLicense = (id: string, license: string, reason: string) =>
   });
 
 export const updateComplaint = (id: string, status: ComplaintStatus, adminNote?: string) =>
-  adminFetch<{ id: string; status: ComplaintStatus; adminNote: string | null; handledAt: string | null }>(
+  adminFetch<{ id: string; status: ComplaintStatus; adminNote: string | null; handledAt: string | null; reporterNotified: boolean }>(
     `/complaints/${encodeURIComponent(id)}`,
     { method: 'PATCH', body: JSON.stringify(adminNote === undefined ? { status } : { status, adminNote }) },
   ).then(announceWaitingChanged);

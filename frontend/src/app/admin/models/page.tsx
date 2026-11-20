@@ -77,6 +77,31 @@ export default function AdminModelsPage() {
       heading="admin.nav.models"
       searchLabel="admin.search.models"
       columns={COLUMNS}
+      filter={[
+        {
+          param: 'status',
+          label: 'admin.filter.status',
+          initial: '',
+          options: [
+            { value: '', label: 'admin.status.all' },
+            { value: 'visible', label: 'admin.visible' },
+            { value: 'hidden', label: 'admin.hidden' },
+            { value: 'deleted', label: 'admin.deleted' },
+          ],
+        },
+        {
+          param: 'license',
+          label: 'admin.filter.license',
+          initial: '',
+          options: [
+            { value: '', label: 'admin.license.all' },
+            { value: 'CC0', label: 'admin.licenseOpt.CC0' },
+            { value: 'CC-BY', label: 'admin.licenseOpt.CC-BY' },
+            { value: 'CC-BY-NC', label: 'admin.licenseOpt.CC-BY-NC' },
+            { value: 'COMMERCIAL', label: 'admin.licenseOpt.COMMERCIAL' },
+          ],
+        },
+      ]}
     />
   );
 }

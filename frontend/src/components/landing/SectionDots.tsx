@@ -9,9 +9,9 @@ import type { MessageKey } from '@/lib/i18n/messages';
 
 export const LANDING_SECTIONS: { id: string; label: MessageKey }[] = [
   { id: 'hero', label: 'home.nav.hero' },
-  { id: 'popular', label: 'home.popular' },
+  { id: 'how', label: 'home.nav.how' },
   { id: 'categories', label: 'home.categories' },
-  { id: 'arrivals', label: 'home.arrivals' },
+  { id: 'popular', label: 'home.popular' },
   { id: 'join', label: 'home.getStarted' },
 ];
 
@@ -70,7 +70,7 @@ export function ScrollCue({ target = 'popular' }: { target?: string }) {
   );
 }
 
-/** `ids` are the sections that exist on this render (popular and arrivals only appear when there are models). */
+/** `ids` are the sections that exist on this render (popular only appears when there are models). */
 export default function SectionDots({ ids }: { ids: string[] }) {
   const t = useT();
   const current = useCurrentSection(ids);

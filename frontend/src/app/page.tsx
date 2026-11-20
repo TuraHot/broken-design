@@ -1,34 +1,24 @@
-// Landing — hero (bold type on the left, the framed 3D lily on the right), then popular models, categories, new
-// arrivals and a closing call to action. A scroll-down arrow and dots on the right edge jump between the sections.
+// Landing — hero (bold type on the left, the framed 3D lily on the right), then how it works, categories, popular
+// models and a closing call to action. A scroll-down arrow and dots on the right edge jump between the sections.
 import Link from "next/link";
-import { ArrowRight, ArrowUpRight, Scan } from "lucide-react";
+import { ArrowUpRight, Scan } from "lucide-react";
+import Band from "@/components/landing/Band";
 import Categories from "@/components/landing/Categories";
 import HeroFrame from "@/components/landing/HeroFrame";
-import PopularCarousel from "@/components/landing/PopularCarousel";
+import HowItWorks from "@/components/landing/HowItWorks";
+import NumberedHeading from "@/components/landing/NumberedHeading";
+import PopularGrid from "@/components/landing/PopularGrid";
 import SectionDots, { ScrollCue } from "@/components/landing/SectionDots";
-import SectionHeading from "@/components/landing/SectionHeading";
-import ModelCard from "@/components/gallery/ModelCard";
 import PixieCursor from "@/components/PixieCursor";
 import { fetchModels } from "@/lib/api";
 import { getT } from "@/lib/i18n/server";
 
-const HUD_CLIP =
-  "polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px))";
-
 export default async function HomePage() {
   const { t } = await getT();
-  // Popular = top of the popularity-sorted list. The API has no "recent" sort yet, so new arrivals take the
-  // next models in that list as a stand-in.
+  // Popular = top of the popularity-sorted list (top 15, one row that drifts sideways)
   const { items } = await fetchModels({ page: 1 });
-  const popular = items.slice(0, 8);
-  const arrivals = items.slice(8, 14);
-  const sectionIds = [
-    "hero",
-    ...(popular.length > 0 ? ["popular"] : []),
-    "categories",
-    ...(arrivals.length > 0 ? ["arrivals"] : []),
-    "join",
-  ];
+  const popular = items.slice(0, 15);
+  const sectionIds = ["hero", "how", "categories", ...(popular.length > 0 ? ["popular"] : []), "join"];
 
   return (
     <main>
@@ -79,60 +69,49 @@ export default async function HomePage() {
         <ScrollCue target={sectionIds[1]} />
       </section>
 
-      <div className="relative z-10 mx-auto grid max-w-[1400px] grid-cols-[minmax(0,1fr)] gap-20 px-4 pb-20 pt-8 md:px-6">
-        {popular.length > 0 && (
-          <section id="popular" className="scroll-mt-20" aria-label={t('home.popularAria')}>
-            <SectionHeading label={t('home.trending')} title={t('home.popular')} href="/gallery" />
-            <PopularCarousel models={popular} />
-          </section>
-        )}
+      {/* The sections below the hero are stacked bands, numbered /02 to /05, with no gaps between them */}
+      <Band tint>
+        <HowItWorks />
+      </Band>
 
+      <Band>
         <section id="categories" className="scroll-mt-20" aria-label={t('home.categories')}>
-          <SectionHeading label={t('home.browse')} title={t('home.categories')} />
+          <NumberedHeading index="03" title={t('home.categories')} />
           <Categories />
         </section>
+      </Band>
 
-        {arrivals.length > 0 && (
-          <section id="arrivals" className="scroll-mt-20" aria-label={t('home.arrivals')}>
-            <SectionHeading label={t('home.fresh')} title={t('home.arrivals')} href="/gallery" />
-            <ul className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
-              {arrivals.map((m) => (
-                <li key={m.id}>
-                  <ModelCard model={m} />
-                </li>
-              ))}
-            </ul>
+      {popular.length > 0 && (
+        <Band tint full>
+          <section id="popular" className="scroll-mt-20" aria-label={t('home.popularAria')}>
+            <div className="mx-auto max-w-[1400px] px-4 md:px-6">
+              <NumberedHeading index="04" title={t('home.popular')} href="/gallery" />
+            </div>
+            <PopularGrid models={popular} />
           </section>
-        )}
+        </Band>
+      )}
 
-        <section
-          id="join"
-          aria-label={t('home.joinAria')}
-          className="scroll-mt-20 border border-accent/40 bg-card/70 p-6 backdrop-blur-sm md:p-10"
-          style={{ clipPath: HUD_CLIP }}
-        >
-          <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+      <Band>
+        <section id="join" aria-label={t('home.joinAria')} className="scroll-mt-20">
+          <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
             <div>
-              <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-accent/70">
-                {t('home.joinLabel')}
-              </p>
-              <h2 className="mt-3 font-display text-[clamp(20px,2.6vw,30px)] uppercase leading-snug text-ink">
+              <p className="font-mono text-[13px] text-accent">/05</p>
+              <h2 className="mt-3 font-[family-name:var(--font-barlow)] text-[clamp(32px,4vw,56px)] uppercase leading-[0.95] text-ink">
                 {t('home.joinTitle')}
               </h2>
-              <p className="mt-3 max-w-[52ch] text-[15px] leading-relaxed text-ink-soft">
-                {t('home.joinBody')}
-              </p>
+              <p className="mt-4 max-w-[52ch] font-mono text-[12px] leading-relaxed text-ink">{t('home.joinBody')}</p>
             </div>
             <Link
               href="/login"
-              className="inline-flex shrink-0 items-center gap-2 self-start rounded-lg bg-ink px-3.5 py-1.5 text-[15px] font-medium text-canvas transition-opacity hover:opacity-85 md:self-auto"
+              className="inline-flex shrink-0 items-center gap-4 self-start bg-ink px-5 py-3 font-mono text-[11px] uppercase tracking-[0.12em] text-canvas transition-opacity hover:opacity-85 md:self-auto"
             >
               {t('home.getStarted')}
-              <ArrowRight aria-hidden className="h-4 w-4" />
+              <ArrowUpRight aria-hidden className="h-4 w-4 text-accent" />
             </Link>
           </div>
         </section>
-      </div>
+      </Band>
     </main>
   );
 }

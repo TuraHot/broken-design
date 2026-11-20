@@ -37,6 +37,13 @@ html[data-theme='light'] body {
   --font-mono: var(--font-jetbrains);
 }
 
+/* Landing "Popular models": the track holds two copies of the cards, so moving by one copy plus one gap loops. */
+@keyframes popular-drift {
+  to {
+    transform: translateX(calc(-50% - 0.5rem));
+  }
+}
+
 /* Last line of the hero title: brand gradient in dark, plain ink in light. */
 html:not([data-theme='light']) .hero-accent {
   background-image: linear-gradient(90deg, rgb(var(--c-accent)), rgb(var(--c-violet)) 55%, rgb(var(--c-warn)));

@@ -1,9 +1,9 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
-import { ownerActiveSql } from '../models/availability';
 import { db } from '../../config/db';
 import { requireAuth, isSuspended } from '../../middlewares/auth.middleware';
 import { AppError } from '../../middlewares/error.middleware';
 import { notifyModelLike, notifyUser } from '../../config/socket';
+import { ownerActiveSql } from '../models/availability';
 
 export const interactionsRouter = Router();
 
@@ -74,7 +74,10 @@ interactionsRouter.post(
         `SELECT suspended_at, suspended_until FROM users WHERE id = $1`,
         [userId],
       );
-      if (userCheck.rows[0] && isSuspended(userCheck.rows[0])) {
+      if (userCheck.rows.length === 0) {
+        throw new AppError(401, 'UNAUTHORIZED', 'Account not found');
+      }
+      if (isSuspended(userCheck.rows[0])) {
         throw new AppError(403, 'ACCOUNT_SUSPENDED', 'Your account has been suspended by an administrator');
       }
 

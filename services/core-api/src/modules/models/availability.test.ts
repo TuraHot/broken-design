@@ -3,13 +3,13 @@ import assert from 'node:assert/strict';
 import { isModelUnavailable, MODEL_SELLABLE_SQL, ownerActiveSql } from './availability';
 
 test('ownerActiveSql - requires the owner to be neither suspended nor deleted', () => {
-  assert.equal(ownerActiveSql('u'), 'u.suspended_at IS NULL AND u.deleted_at IS NULL');
+  assert.equal(ownerActiveSql('u'), '(u.suspended_at IS NULL OR u.suspended_until <= NOW()) AND u.deleted_at IS NULL');
 });
 
 test('MODEL_SELLABLE_SQL - model visible and owner active', () => {
   assert.equal(
     MODEL_SELLABLE_SQL,
-    'm.deleted_at IS NULL AND m.hidden_at IS NULL AND o.suspended_at IS NULL AND o.deleted_at IS NULL',
+    'm.deleted_at IS NULL AND m.hidden_at IS NULL AND (o.suspended_at IS NULL OR o.suspended_until <= NOW()) AND o.deleted_at IS NULL',
   );
 });
 

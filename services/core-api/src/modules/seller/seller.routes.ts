@@ -4,6 +4,7 @@ import { requireActiveSeller, requireAuth, isSuspended } from '../../middlewares
 import { db } from '../../config/db';
 import { env } from '../../config/env';
 import { AppError } from '../../middlewares/error.middleware';
+import { ownerActiveSql } from '../models/availability';
 
 export const sellerRouter = Router();
 
@@ -385,7 +386,7 @@ sellerRouter.post('/apply', requireAuth, async (req, res) => {
              role = CASE WHEN role = 'user' THEN 'creator'::user_role ELSE role END
          WHERE id = $2
            AND role <> 'admin'
-           AND suspended_at IS NULL
+           AND ${ownerActiveSql('users')}
            AND EXISTS (SELECT 1 FROM used_code)
          RETURNING id
        ),

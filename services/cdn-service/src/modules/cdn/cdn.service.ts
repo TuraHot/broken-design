@@ -35,6 +35,15 @@ export interface CdnModel {
   owner_deleted_at: Date | string | null;
 }
 
+/** The suspension that counts: `suspended_at`, unless it was a timed one whose end has passed (the sweeper clears it later). */
+function suspensionInForce(
+  user: { suspended_at?: Date | string | null; suspended_until?: Date | string | null } | null | undefined,
+): Date | string | null {
+  if (!user?.suspended_at) return null;
+  if (user.suspended_until && new Date(user.suspended_until).getTime() <= Date.now()) return null;
+  return user.suspended_at;
+}
+
 export const isPaid = (m: CdnModel) => Number(m.price_cents) > 0;
 
 function normaliseModelRow(row: CdnModel): CdnModel {
@@ -54,7 +63,8 @@ export async function loadModel(id: string): Promise<CdnModel> {
   try {
     const result = await db.query(
       `SELECT m.id, m.owner_id, m.title, m.license, m.file_hash, m.preview_hash, m.poster_hash,
-              m.price_cents, m.hidden_at, m.deleted_at, u.suspended_at AS owner_suspended_at, u.deleted_at AS owner_deleted_at
+              m.price_cents, m.hidden_at, m.deleted_at, CASE WHEN u.suspended_until IS NULL OR u.suspended_until > NOW() THEN u.suspended_at END AS owner_suspended_at,
+              u.deleted_at AS owner_deleted_at
          FROM models m
          JOIN users u ON u.id = m.owner_id
         WHERE m.id = $1`,
@@ -66,7 +76,7 @@ export async function loadModel(id: string): Promise<CdnModel> {
     const { data, error } = await supabase
       .from("models")
       .select(
-        "id, owner_id, title, license, file_hash, preview_hash, poster_hash, price_cents, hidden_at, deleted_at, users!models_owner_id_fkey(suspended_at, deleted_at)",
+        "id, owner_id, title, license, file_hash, preview_hash, poster_hash, price_cents, hidden_at, deleted_at, users!models_owner_id_fkey(suspended_at, suspended_until, deleted_at)",
       )
       .eq("id", id)
       .maybeSingle();
@@ -86,7 +96,7 @@ export async function loadModel(id: string): Promise<CdnModel> {
         price_cents: data.price_cents,
         hidden_at: data.hidden_at,
         deleted_at: data.deleted_at,
-        owner_suspended_at: ownerRel?.suspended_at ?? null,
+        owner_suspended_at: suspensionInForce(ownerRel),
         owner_deleted_at: ownerRel?.deleted_at ?? null,
       };
     }
@@ -108,11 +118,17 @@ export async function loadUserAvatar(userId: string): Promise<CdnUserAvatar> {
   }
 
   let row:
-    | { id: string; avatar_hash: string | null; suspended_at: Date | string | null; deleted_at: Date | string | null }
+    | {
+        id: string;
+        avatar_hash: string | null;
+        suspended_at: Date | string | null;
+        suspended_until?: Date | string | null;
+        deleted_at: Date | string | null;
+      }
     | undefined;
   try {
     const result = await db.query(
-      `SELECT id, avatar_hash, suspended_at, deleted_at FROM users WHERE id = $1`,
+      `SELECT id, avatar_hash, suspended_at, suspended_until, deleted_at FROM users WHERE id = $1`,
       [userId],
     );
     row = result.rows[0] as typeof row;
@@ -120,7 +136,7 @@ export async function loadUserAvatar(userId: string): Promise<CdnUserAvatar> {
     if (!supabase) throw err;
     const { data, error } = await supabase
       .from("users")
-      .select("id, avatar_hash, suspended_at, deleted_at")
+      .select("id, avatar_hash, suspended_at, suspended_until, deleted_at")
       .eq("id", userId)
       .maybeSingle();
     if (error) throw err;
@@ -128,7 +144,7 @@ export async function loadUserAvatar(userId: string): Promise<CdnUserAvatar> {
   }
 
   const hash = row?.avatar_hash?.trim() || null;
-  if (!row || row.suspended_at || row.deleted_at || !hash) {
+  if (!row || suspensionInForce(row) || row.deleted_at || !hash) {
     throw new AppError(404, "AVATAR_NOT_FOUND", "User avatar not found");
   }
   return { id: row.id, avatar_hash: hash };

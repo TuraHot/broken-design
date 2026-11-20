@@ -135,6 +135,40 @@ export default function AdminUsersPage() {
       heading="admin.nav.users"
       searchLabel="admin.search.users"
       columns={buildColumns(myId)}
+      filter={[
+        {
+          param: 'role',
+          label: 'admin.filter.role',
+          initial: '',
+          options: [
+            { value: '', label: 'admin.role.all' },
+            { value: 'user', label: 'admin.role.user' },
+            { value: 'creator', label: 'admin.role.creator' },
+            { value: 'admin', label: 'admin.role.admin' },
+          ],
+        },
+        {
+          param: 'status',
+          label: 'admin.filter.status',
+          initial: '',
+          options: [
+            { value: '', label: 'admin.status.all' },
+            { value: 'active', label: 'admin.status.active' },
+            { value: 'suspended', label: 'admin.suspended' },
+            { value: 'deleted', label: 'admin.deleted' },
+          ],
+        },
+        {
+          param: 'seller',
+          label: 'admin.filter.seller',
+          initial: '',
+          options: [
+            { value: '', label: 'admin.seller.all' },
+            { value: 'yes', label: 'admin.seller.yes' },
+            { value: 'no', label: 'admin.seller.no' },
+          ],
+        },
+      ]}
     />
   );
 }

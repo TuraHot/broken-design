@@ -87,7 +87,7 @@ const updateProfileSchema = z
     bio: z
       .string()
       .trim()
-      .max(500, 'Bio must not exceed 500 characters')
+      .max(1000, 'Bio must not exceed 1000 characters')
       .optional(),
   })
   .refine((data) => data.displayName !== undefined || data.bio !== undefined, {
@@ -142,7 +142,7 @@ authRouter.post('/register', registerLimiter, async (req, res) => {
     const result = await db.query(
       `INSERT INTO users (email, password_hash, display_name)
        VALUES ($1, $2, $3)
-       RETURNING id, email, display_name, role, is_seller, avatar_hash`,
+       RETURNING id, email, display_name, COALESCE(bio, '') AS bio, role, is_seller, avatar_hash`,
       [normalizedEmail, passwordHash, displayName],
     );
 
@@ -166,6 +166,7 @@ authRouter.post('/register', registerLimiter, async (req, res) => {
         id: user.id,
         email: user.email,
         display_name: user.display_name,
+        bio: user.bio || '',
         role: user.role,
         is_seller: user.is_seller,
         avatar_url: buildAvatarUrl(user.id, user.avatar_hash),
@@ -196,7 +197,7 @@ authRouter.post('/login', loginLimiter, async (req, res) => {
   const { email, password } = parsed.data;
 
   const result = await db.query(
-    `SELECT id, email, password_hash, display_name, role, is_seller, avatar_hash, suspended_at, suspended_until, suspension_reason
+    `SELECT id, email, password_hash, display_name, COALESCE(bio, '') AS bio, role, is_seller, avatar_hash, suspended_at, suspended_until, suspension_reason
      FROM users
      WHERE email = $1`,
     [email.toLowerCase()],
@@ -254,6 +255,7 @@ authRouter.post('/login', loginLimiter, async (req, res) => {
       id: user.id,
       email: user.email,
       display_name: user.display_name,
+      bio: user.bio || '',
       role: user.role,
       is_seller: user.is_seller,
       avatar_url: buildAvatarUrl(user.id, user.avatar_hash),

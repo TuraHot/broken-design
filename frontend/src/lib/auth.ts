@@ -154,6 +154,7 @@ export interface UpdateProfileParams {
   displayName?: string;
   bio?: string;
 }
+export type UpdateProfileInput = UpdateProfileParams;
 
 // อัปเดตข้อมูลโปรไฟล์ (ชื่อที่แสดง / bio) ของบัญชีปัจจุบัน (PATCH /api/auth/profile)
 export async function updateProfile(

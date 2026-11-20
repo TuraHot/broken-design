@@ -141,15 +141,51 @@ adminRouter.get('/overview', async (_req, res) => {
 });
 
 // ─── 2. GET /api/admin/users ────────────────────────────────────────────────
+const userFilters = z.object({
+  role: z.enum(['user', 'creator', 'admin']).optional(),
+  status: z.enum(['active', 'suspended', 'deleted']).optional(),
+  seller: z.enum(['yes', 'no']).optional(),
+});
+
 adminRouter.get('/users', async (req, res) => {
   const { page, pageSize, offset, q } = parsePaging(req.query);
+  const filters = userFilters.safeParse(req.query);
+  if (!filters.success) {
+    throw new AppError(400, 'INVALID_QUERY', 'role must be user, creator or admin; status must be active, suspended or deleted; seller must be yes or no');
+  }
+  const { role, status, seller } = filters.data;
   const search = q ? likePattern(q) : null;
 
+  const conditions: string[] = [];
+  const filterParams: unknown[] = [];
+
   // A deleted account is searched by the address it had (original_email); its email column holds a placeholder.
-  const where = search
-    ? `WHERE email ILIKE $1 ESCAPE '\\' OR display_name ILIKE $1 ESCAPE '\\' OR original_email ILIKE $1 ESCAPE '\\'`
-    : '';
-  const filterParams = search ? [search] : [];
+  if (search) {
+    filterParams.push(search);
+    const n = filterParams.length;
+    conditions.push(`(email ILIKE $${n} ESCAPE '\\' OR display_name ILIKE $${n} ESCAPE '\\' OR original_email ILIKE $${n} ESCAPE '\\')`);
+  }
+
+  if (role) {
+    filterParams.push(role);
+    conditions.push(`role = $${filterParams.length}`);
+  }
+
+  if (seller === 'yes') {
+    conditions.push(`is_seller = TRUE`);
+  } else if (seller === 'no') {
+    conditions.push(`is_seller = FALSE`);
+  }
+
+  if (status === 'active') {
+    conditions.push(`deleted_at IS NULL AND suspended_at IS NULL`);
+  } else if (status === 'suspended') {
+    conditions.push(`deleted_at IS NULL AND suspended_at IS NOT NULL`);
+  } else if (status === 'deleted') {
+    conditions.push(`deleted_at IS NOT NULL`);
+  }
+
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
   const total = await db.query(`SELECT COUNT(*)::int AS total FROM users ${where}`, filterParams);
   const rows = await db.query(

@@ -1,11 +1,10 @@
 'use client';
 
-// Top navigation — logo, Gallery / Docs / Creator, search box (goes to /gallery?q=), Log in or account menu
+// Top navigation — logo, Gallery / Docs / Creator, Log in or account menu
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import { FormEvent, MouseEvent, useEffect, useState, useTransition } from 'react';
-import { Loader2, Search, X } from 'lucide-react';
-import { startNavigationLoading } from '@/components/ui/NavigationProgress';
+import { usePathname } from 'next/navigation';
+import { MouseEvent, useEffect, useState } from 'react';
+import { Loader2 } from 'lucide-react';
 import { hidesPublicChrome } from '@/lib/auth-paths';
 import { creatorHandle } from '@/lib/creators';
 import { readSession, SESSION_UPDATED_EVENT } from '@/lib/session';
@@ -26,11 +25,7 @@ const LINKS: { href: string; label: MessageKey; desktopOnly?: boolean; hideBelow
 export default function Navbar() {
   const pathname = usePathname();
   const t = useT();
-  const router = useRouter();
-  const [query, setQuery] = useState('');
-  const [mobileSearch, setMobileSearch] = useState(false);
   const [pendingHref, setPendingHref] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
   const [creatorDashboardHref, setCreatorDashboardHref] = useState<string | null>(null);
 
   useEffect(() => {
@@ -68,39 +63,7 @@ export default function Navbar() {
     setPendingHref(href);
   };
 
-  const submit = (e: FormEvent) => {
-    e.preventDefault();
-    if (isPending || pendingHref !== null) return;
-    const q = query.trim();
-    const target = q ? `/gallery?q=${encodeURIComponent(q)}` : '/gallery';
-    startNavigationLoading('/gallery');
-    startTransition(() => {
-      router.push(target);
-    });
-  };
-
   if (hidesPublicChrome(pathname)) return null;
-
-  const searchField = (
-    <form onSubmit={submit} role="search" aria-busy={isPending} className="relative w-full">
-      {isPending ? (
-        <Loader2
-          aria-hidden
-          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-accent motion-reduce:animate-none"
-        />
-      ) : (
-        <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink/50" />
-      )}
-      <input
-        type="search"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder={t('nav.searchPlaceholder')}
-        aria-label={t('nav.searchLabel')}
-        className="h-9 w-full rounded-lg border border-ink/15 bg-ink/5 pl-9 pr-3 text-sm text-ink placeholder:text-ink/40 focus:border-ink/50 focus:outline-none"
-      />
-    </form>
-  );
 
   return (
     <header className="fixed inset-x-0 top-0 z-50 border-b border-line bg-canvas/90 backdrop-blur">
@@ -146,25 +109,12 @@ export default function Navbar() {
           })}
         </ul>
 
-        <div className="hidden w-full max-w-xs md:block">{searchField}</div>
-
         <div className="ml-auto flex items-center gap-1 text-[15px] sm:gap-3">
-          <button
-            type="button"
-            onClick={() => setMobileSearch((v) => !v)}
-            aria-label={mobileSearch ? t('nav.closeSearch') : t('nav.openSearch')}
-            aria-expanded={mobileSearch}
-            className="grid h-9 w-8 place-items-center rounded-lg text-ink/80 hover:text-ink md:hidden"
-          >
-            {mobileSearch ? <X className="h-5 w-5" /> : <Search className="h-5 w-5" />}
-          </button>
           <ThemeToggle />
           <LanguageSwitch />
           <AccountMenu />
         </div>
       </nav>
-
-      {mobileSearch && <div className="border-t border-line px-4 py-3 md:hidden">{searchField}</div>}
     </header>
   );
 }

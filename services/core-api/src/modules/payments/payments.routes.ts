@@ -456,7 +456,7 @@ paymentsRouter.get('/me/purchases', requireAuth, async (req, res) => {
   const result = await db.query(
     `SELECT p.id, p.model_id, p.embed_key, p.amount_cents, p.currency AS purchase_currency,
             p.license_type, p.watermark_hash, p.paid_at, p.created_at,
-            m.title, m.price_cents, m.currency, m.license
+            m.title, m.price_cents, m.currency, m.license, m.poster_hash
      FROM purchases p
      JOIN models m ON m.id = p.model_id
      WHERE p.user_id = $1 AND p.status = 'paid'
@@ -477,6 +477,7 @@ paymentsRouter.get('/me/purchases', requireAuth, async (req, res) => {
       embedKey: r.embed_key,
       paidAt: r.paid_at ?? r.created_at,
       purchasedAt: r.paid_at ?? r.created_at,
+      posterUrl: r.poster_hash ? `${env.cdnServiceUrl}/cdn/models/${r.model_id}/poster.webp` : null,
     })),
   });
 });

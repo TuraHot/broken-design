@@ -1,6 +1,7 @@
 // Gallery — paged grid of publicly visible 3D models. Search, filters, and page live in URL params.
 import type { Metadata } from 'next';
 import FilterBar from '@/components/gallery/FilterBar';
+import GallerySearchBar from '@/components/gallery/GallerySearchBar';
 import ModelCard from '@/components/gallery/ModelCard';
 import Pagination from '@/components/gallery/Pagination';
 import { fetchAvailableTags, fetchModels } from '@/lib/api';
@@ -40,11 +41,15 @@ export default async function GalleryPage({
       <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-accent">{t('gallery.label')}</p>
       <h1 className="mt-4 font-display text-[clamp(28px,4vw,48px)] uppercase leading-[1.02] text-ink">{t('nav.gallery')}</h1>
 
-      <div className="mt-8 flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+      <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <GallerySearchBar initialQuery={params.q ?? ''} params={params} />
+        <FilterBar params={params} tags={tags} />
+      </div>
+
+      <div className="mt-4 flex items-center justify-between">
         <p className="text-sm text-ink-soft">
           {t(data.total === 1 ? 'gallery.countOne' : 'gallery.countMany', { n: data.total })}
         </p>
-        <FilterBar params={params} tags={tags} />
       </div>
 
       {data.items.length > 0 ? (

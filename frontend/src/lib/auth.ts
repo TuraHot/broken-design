@@ -70,6 +70,13 @@ async function authRequest<T>(
   return data as T;
 }
 
+/**
+ * The login page found no account for the email: it saves the email under this key in the tab's sessionStorage and goes
+ * to /register, which reads it once to fill the email field. It is not put in the URL, so it stays out of browser
+ * history, referrers and server logs.
+ */
+export const REGISTER_EMAIL_KEY = 'lixyte-register-email';
+
 // ตรวจสอบว่า Email มีบัญชีแล้วหรือไม่
 export async function checkEmail(email: string): Promise<boolean> {
   const result = await authRequest<CheckEmailResponse>('check-email', {

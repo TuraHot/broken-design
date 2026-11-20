@@ -1,25 +1,24 @@
 'use client';
 
-// Email-first sign-in: enter an email, we check if it exists in the database,
-// then ask for its password (known email) or register with display name (new email).
-// Connected to Core API (/api/auth/check-email, /api/auth/login, /api/auth/register).
+// Email-first sign-in: enter an email, we check if it exists in the database, then ask for its password. An email with no
+// account is sent to /register (its own page) with the email already filled in; nothing is created on this page.
+// Connected to Core API (/api/auth/check-email, /api/auth/login).
 import Link from 'next/link';
 import { FormEvent, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Eye, EyeOff } from 'lucide-react';
-import { checkEmail, login, register } from '@/lib/auth';
+import { checkEmail, login, REGISTER_EMAIL_KEY } from '@/lib/auth';
 import { authErrorText } from '@/lib/i18n/auth-error';
 import { useT } from '@/lib/i18n/client';
 import type { MessageKey } from '@/lib/i18n/messages';
 import { saveSession } from '@/lib/session';
 import { EMAIL_RE, FIELD, Field } from './Field';
 
-type Step = 'email' | 'login' | 'signup';
+type Step = 'email' | 'login';
 type Translate = (key: MessageKey) => string;
 
 interface Values {
   email: string;
-  name: string;
   password: string;
 }
 type Errors = Partial<Record<keyof Values, string>>;
@@ -31,16 +30,13 @@ function validate(step: Step, v: Values, t: Translate): Errors {
     else if (!EMAIL_RE.test(v.email.trim())) errors.email = t('auth.errEmailBad');
     return errors;
   }
-  if (step === 'signup' && !v.name.trim()) errors.name = t('auth.errName');
-  if (!v.password) errors.password = step === 'login' ? t('auth.errPasswordLogin') : t('auth.errPasswordNew');
-  else if (step === 'signup' && v.password.length < 8) errors.password = t('auth.errPasswordShort');
+  if (!v.password) errors.password = t('auth.errPasswordLogin');
   return errors;
 }
 
 const COPY: Record<Step, { title: MessageKey; lead: MessageKey; submit: MessageKey }> = {
   email: { title: 'auth.email.title', lead: 'auth.email.lead', submit: 'auth.email.submit' },
   login: { title: 'auth.login.title', lead: 'auth.login.lead', submit: 'auth.login.submit' },
-  signup: { title: 'auth.signup.title', lead: 'auth.signup.lead', submit: 'auth.signup.submit' },
 };
 
 const PRIMARY =
@@ -51,12 +47,12 @@ export default function AuthForm() {
   const searchParams = useSearchParams();
   const t = useT();
   const [step, setStep] = useState<Step>('email');
-  const [values, setValues] = useState<Values>({ email: '', name: '', password: '' });
+  const [values, setValues] = useState<Values>({ email: '', password: '' });
   const [errors, setErrors] = useState<Errors>({});
   const [showPassword, setShowPassword] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [checking, setChecking] = useState(false);
-  const [registeredNotice, setRegisteredNotice] = useState(() => Boolean(searchParams.get('registered')));
+  const registeredNotice = Boolean(searchParams.get('registered')); // set by the register page after it creates an account
 
   const copy = COPY[step];
 
@@ -86,7 +82,17 @@ export default function AuthForm() {
       try {
         setChecking(true);
         const exists = await checkEmail(values.email);
-        goTo(exists ? 'login' : 'signup');
+        if (exists) {
+          goTo('login');
+        } else {
+          // No account for this email: hand it to the register page (in this tab's storage, not in the URL).
+          try {
+            sessionStorage.setItem(REGISTER_EMAIL_KEY, values.email.trim());
+          } catch {
+            // storage blocked: the register page just opens with an empty email
+          }
+          router.push('/register');
+        }
       } catch (err) {
         setErrors({ email: authErrorText(err, t, 'auth.errVerifyEmail') });
       } finally {
@@ -95,18 +101,9 @@ export default function AuthForm() {
       return;
     }
 
-    if (step === 'login' || step === 'signup') {
+    if (step === 'login') {
       try {
         setChecking(true);
-        if (step === 'signup') {
-          // Do not sign in yet: back to the email step so the new user logs in first.
-          await register(values.email, values.password, values.name);
-          goTo('email');
-          setValues({ email: '', name: '', password: '' });
-          setRegisteredNotice(true);
-          return;
-        }
-
         const result = await login(values.email, values.password);
 
         // Store tokens for authentication across the app (per-tab session isolation)
@@ -132,13 +129,13 @@ export default function AuthForm() {
           id="password"
           name="password"
           type={showPassword ? 'text' : 'password'}
-          autoComplete={step === 'login' ? 'current-password' : 'new-password'}
-          autoFocus={step !== 'signup'}
+          autoComplete="current-password"
+          autoFocus
           value={values.password}
           onChange={update('password')}
           aria-invalid={Boolean(errors.password)}
           aria-describedby={described('password')}
-          placeholder={step === 'signup' ? t('auth.phNewPassword') : t('auth.phPassword')}
+          placeholder={t('auth.phPassword')}
           className={`${fieldClass('password')} pr-11`}
         />
         <button
@@ -200,25 +197,7 @@ export default function AuthForm() {
             </Field>
           )}
 
-          {step === 'signup' && (
-            <Field id="name" label={t('auth.displayName')} error={errors.name}>
-              <input
-                id="name"
-                name="name"
-                type="text"
-                autoComplete="name"
-                autoFocus
-                value={values.name}
-                onChange={update('name')}
-                aria-invalid={Boolean(errors.name)}
-                aria-describedby={described('name')}
-                placeholder={t('auth.phName')}
-                className={fieldClass('name')}
-              />
-            </Field>
-          )}
-
-          {(step === 'login' || step === 'signup') && passwordField}
+          {step === 'login' && passwordField}
 
           {step === 'login' && (
             <div className="-mt-2 text-right">

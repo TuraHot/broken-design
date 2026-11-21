@@ -54,7 +54,7 @@ modelsRouter.get('/', async (req, res, next) => {
 
     if (q) {
       params.push(likePattern(q));
-      conditions.push(`(m.title ILIKE $${params.length} ESCAPE '\\' OR m.description ILIKE $${params.length} ESCAPE '\\')`);
+      conditions.push(`(m.title ILIKE $${params.length} ESCAPE '\\')`);
     }
 
     if (tag) {

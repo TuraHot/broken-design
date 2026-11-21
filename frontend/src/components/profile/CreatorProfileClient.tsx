@@ -23,6 +23,7 @@ import {
   X,
 } from 'lucide-react';
 import ModelCard from '@/components/gallery/ModelCard';
+import CreatorBanner3D from '@/components/profile/CreatorBanner3D';
 import DonateCard from '@/components/profile/DonateCard';
 import UserAvatar from '@/components/ui/UserAvatar';
 import {
@@ -77,6 +78,14 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
   const [payoutAccount, setPayoutAccount] = useState('');
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!statusMsg) return;
+    const timer = setTimeout(() => {
+      setStatusMsg(null);
+    }, 4500);
+    return () => clearTimeout(timer);
+  }, [statusMsg]);
   const [ready, setReady] = useState(false);
   const [deletedIds, setDeletedIds] = useState<Set<string>>(() => new Set());
 
@@ -305,35 +314,13 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
 
   return (
     <main className="pb-16 pt-16">
-      {/* Full-width Cover Banner (VGen prototype style) */}
-      <div className="relative h-40 w-full overflow-hidden border-b border-line bg-card sm:h-52">
-        <svg aria-hidden viewBox="0 0 1240 240" preserveAspectRatio="none" className="h-full w-full">
-          <defs>
-            <linearGradient id="vgen-cover-holo" x1="0" x2="1" y1="0" y2="0">
-              <stop offset="0" stopColor="#8fd3ff" />
-              <stop offset="0.35" stopColor="#b892ff" />
-              <stop offset="0.7" stopColor="#ff9ec7" />
-              <stop offset="1" stopColor="#ffb070" />
-            </linearGradient>
-          </defs>
-          <g fill="none" stroke="url(#vgen-cover-holo)" vectorEffect="non-scaling-stroke">
-            <path d="M0 155 C220 185 380 45 620 95 S1020 190 1240 80" strokeOpacity="0.65" strokeWidth="1.5" />
-            <path d="M0 185 C260 205 420 95 650 135 S1040 215 1240 125" strokeOpacity="0.3" strokeWidth="1.2" />
-            <path d="M0 110 C190 135 350 20 590 60 S990 140 1240 45" strokeOpacity="0.2" strokeWidth="1" />
-          </g>
-        </svg>
-
-        {isOwnerCreator && (
-          <button
-            type="button"
-            onClick={() => setPreviewPublic((v) => !v)}
-            className="absolute bottom-3 right-4 inline-flex items-center gap-2 rounded-full border border-line bg-canvas/75 px-3.5 py-1.5 text-xs font-medium text-ink backdrop-blur transition-colors hover:bg-canvas"
-          >
-            <span>{previewPublic ? t('profile.exitPreview') : t('profile.preview')}</span>
-            <span className={`h-2 w-2 rounded-full ${previewPublic ? 'bg-warn' : 'bg-emerald-500'}`} />
-          </button>
-        )}
-      </div>
+      {/* 3D Showcase Cover Banner */}
+      <CreatorBanner3D
+        models={publicModels.length > 0 ? publicModels : activeSellerModels}
+        isOwnerCreator={isOwnerCreator}
+        previewPublic={previewPublic}
+        onTogglePreview={() => setPreviewPublic((v) => !v)}
+      />
 
       {/* Main Container: 2-Column VGen Layout */}
       <div className="mx-auto max-w-[1400px] px-4 md:px-6">
@@ -469,16 +456,6 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                 </>
               )}
             </nav>
-
-            {statusMsg && (
-              <div
-                role="status"
-                className="mt-4 flex items-center gap-2 rounded-lg border border-accent/30 bg-accent/10 px-4 py-3 text-sm text-accent"
-              >
-                <AlertCircle className="h-4 w-4 shrink-0" />
-                <span>{statusMsg}</span>
-              </div>
-            )}
 
             {/* TAB 1: Public Models */}
             {currentTab === 'models' && (
@@ -1040,6 +1017,26 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
             </div>
           </div>
         </div>
+      )}
+
+      {/* Floating Toast Notification at corner of screen */}
+      {statusMsg && (
+        <aside
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-6 right-6 z-50 flex max-w-sm items-center gap-3 rounded-xl border border-accent/40 bg-card/95 px-4 py-3 text-sm text-accent shadow-2xl backdrop-blur-md animate-in fade-in slide-in-from-bottom-4 duration-200"
+        >
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span className="flex-1 font-medium">{statusMsg}</span>
+          <button
+            type="button"
+            onClick={() => setStatusMsg(null)}
+            aria-label={t('modal.close')}
+            className="rounded p-1 text-accent/60 transition-colors hover:bg-accent/10 hover:text-accent"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </aside>
       )}
     </main>
   );

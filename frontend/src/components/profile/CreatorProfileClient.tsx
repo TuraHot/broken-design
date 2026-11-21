@@ -5,7 +5,7 @@
 // (Models | Dashboard | Wallet & Withdraw for creator owner), with Donate at the bottom.
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle,
   Check,
@@ -43,6 +43,7 @@ import { formatCount, formatMoney, formatPrice } from '@/lib/format';
 import { useLocale, useT } from '@/lib/i18n/client';
 import { readSession, updateSessionUser } from '@/lib/session';
 import type {
+  Model,
   SellerModelItem,
   SellerSalesSummary,
   SellerWalletResponse,
@@ -88,6 +89,21 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
   }, [statusMsg]);
   const [ready, setReady] = useState(false);
   const [deletedIds, setDeletedIds] = useState<Set<string>>(() => new Set());
+  const [featuredModelIds, setFeaturedModelIds] = useState<string[] | null>(() => {
+    if (initialCreator?.featuredModelIds && Array.isArray(initialCreator.featuredModelIds)) {
+      return initialCreator.featuredModelIds;
+    }
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem(`lixyte_featured_${handle}`);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed)) return parsed;
+        }
+      } catch {}
+    }
+    return null;
+  });
 
   const [editingModel, setEditingModel] = useState<SellerModelItem | null>(null);
   const [deletingModel, setDeletingModel] = useState<SellerModelItem | null>(null);
@@ -202,6 +218,9 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
     if (isMine && u.bio && !initialCreator?.bio) {
       setBio(u.bio);
     }
+    if (isMine && u.featured_model_ids && Array.isArray(u.featured_model_ids)) {
+      setFeaturedModelIds(u.featured_model_ids);
+    }
     if (!isMine) return;
 
     (async () => {
@@ -305,6 +324,72 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
   const showOwnerTabs = isOwnerCreator && !previewPublic;
   const currentTab: TabKey = showOwnerTabs ? activeTab : 'models';
 
+  const allCreatorModels = publicModels.length > 0 ? publicModels : activeSellerModels;
+
+  const effectiveFeaturedModels = useMemo(() => {
+    if (featuredModelIds === null) {
+      // Default to first 5 models if never customized
+      return allCreatorModels.slice(0, 5);
+    }
+    const map = new Map(allCreatorModels.map((m) => [m.id, m]));
+    return featuredModelIds
+      .map((id) => map.get(id))
+      .filter((m): m is (Model | SellerModelItem) => Boolean(m))
+      .slice(0, 5);
+  }, [featuredModelIds, allCreatorModels]);
+
+  const handleAddFeaturedModel = async (modelId: string) => {
+    const currentBase =
+      featuredModelIds !== null ? featuredModelIds : effectiveFeaturedModels.map((m) => m.id);
+
+    if (currentBase.includes(modelId)) return;
+    if (currentBase.length >= 5) {
+      setStatusMsg('สามารถเลือกโมเดลขึ้นโชว์ได้สูงสุด 5 ชิ้น');
+      return;
+    }
+
+    const nextIds = [...currentBase, modelId];
+    setFeaturedModelIds(nextIds);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(`lixyte_featured_${handle}`, JSON.stringify(nextIds));
+      } catch {}
+    }
+
+    if (token && isOwnerCreator) {
+      try {
+        await updateProfile({ featuredModelIds: nextIds }, token);
+        updateSessionUser({ featured_model_ids: nextIds });
+        setStatusMsg('บันทึกโมเดลขึ้นโชว์บนแบนเนอร์แล้ว');
+      } catch (err: any) {
+        setStatusMsg(err?.message || 'ไม่สามารถบันทึกโมเดลโชว์ได้');
+      }
+    }
+  };
+
+  const handleRemoveFeaturedModel = async (modelId: string) => {
+    const currentBase =
+      featuredModelIds !== null ? featuredModelIds : effectiveFeaturedModels.map((m) => m.id);
+
+    const nextIds = currentBase.filter((id) => id !== modelId);
+    setFeaturedModelIds(nextIds);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(`lixyte_featured_${handle}`, JSON.stringify(nextIds));
+      } catch {}
+    }
+
+    if (token && isOwnerCreator) {
+      try {
+        await updateProfile({ featuredModelIds: nextIds }, token);
+        updateSessionUser({ featured_model_ids: nextIds });
+        setStatusMsg('นำโมเดลออกจากแบนเนอร์แล้ว');
+      } catch (err: any) {
+        setStatusMsg(err?.message || 'ไม่สามารถบันทึกการเปลี่ยนแปลงได้');
+      }
+    }
+  };
+
   const tabClass = (tab: TabKey) =>
     `relative whitespace-nowrap pb-3 text-sm font-medium transition-colors ${
       currentTab === tab
@@ -316,10 +401,13 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
     <main className="pb-16 pt-16">
       {/* 3D Showcase Cover Banner */}
       <CreatorBanner3D
-        models={publicModels.length > 0 ? publicModels : activeSellerModels}
+        featuredModels={effectiveFeaturedModels}
+        allModels={allCreatorModels}
         isOwnerCreator={isOwnerCreator}
         previewPublic={previewPublic}
         onTogglePreview={() => setPreviewPublic((v) => !v)}
+        onAddModel={handleAddFeaturedModel}
+        onRemoveModel={handleRemoveFeaturedModel}
       />
 
       {/* Main Container: 2-Column VGen Layout */}

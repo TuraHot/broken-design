@@ -89,10 +89,20 @@ const updateProfileSchema = z
       .trim()
       .max(1000, 'Bio must not exceed 1000 characters')
       .optional(),
+    featuredModelIds: z
+      .array(z.string().uuid())
+      .max(5, 'Maximum 5 featured models allowed')
+      .optional(),
   })
-  .refine((data) => data.displayName !== undefined || data.bio !== undefined, {
-    message: 'At least one field (displayName or bio) must be provided',
-  });
+  .refine(
+    (data) =>
+      data.displayName !== undefined ||
+      data.bio !== undefined ||
+      data.featuredModelIds !== undefined,
+    {
+      message: 'At least one field (displayName, bio, or featuredModelIds) must be provided',
+    },
+  );
 
 // POST /api/auth/check-email
 // ตรวจสอบว่า Email มีบัญชีอยู่ในระบบแล้วหรือไม่
@@ -197,7 +207,7 @@ authRouter.post('/login', loginLimiter, async (req, res) => {
   const { email, password } = parsed.data;
 
   const result = await db.query(
-    `SELECT id, email, password_hash, display_name, COALESCE(bio, '') AS bio, role, is_seller, avatar_hash, suspended_at, suspended_until, suspension_reason
+    `SELECT id, email, password_hash, display_name, COALESCE(bio, '') AS bio, role, is_seller, avatar_hash, suspended_at, suspended_until, suspension_reason, featured_model_ids
      FROM users
      WHERE email = $1`,
     [email.toLowerCase()],
@@ -259,6 +269,7 @@ authRouter.post('/login', loginLimiter, async (req, res) => {
       role: user.role,
       is_seller: user.is_seller,
       avatar_url: buildAvatarUrl(user.id, user.avatar_hash),
+      featured_model_ids: Array.isArray(user.featured_model_ids) ? user.featured_model_ids : null,
     },
   });
 });
@@ -268,7 +279,7 @@ authRouter.get('/me', requireAuth, async (req, res) => {
   let result;
   try {
     result = await db.query(
-      `SELECT id, email, display_name, bio, role, is_seller, avatar_hash, suspended_at
+      `SELECT id, email, display_name, bio, role, is_seller, avatar_hash, suspended_at, featured_model_ids
        FROM users
        WHERE id = $1`,
       [req.user!.id],
@@ -299,12 +310,12 @@ authRouter.get('/me', requireAuth, async (req, res) => {
       role: user.role,
       is_seller: user.is_seller,
       avatar_url: buildAvatarUrl(user.id, user.avatar_hash),
+      featured_model_ids: Array.isArray((user as any).featured_model_ids) ? (user as any).featured_model_ids : null,
     },
   });
 });
 
-// PATCH /api/auth/profile — update display_name and/or bio for the signed-in account
-// (User avatar binaries are managed separately by cdn-service in the `profile_logo` bucket.)
+// PATCH /api/auth/profile — update display_name, bio, and/or featured_model_ids for the signed-in account
 authRouter.patch('/profile', requireAuth, async (req, res) => {
   const parsed = updateProfileSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -327,67 +338,32 @@ authRouter.patch('/profile', requireAuth, async (req, res) => {
     throw new AppError(403, 'ACCOUNT_SUSPENDED', 'This account has been suspended');
   }
 
-  const nextDisplayName = parsed.data.displayName !== undefined ? parsed.data.displayName : currentUser.display_name;
-  const hasBio = parsed.data.bio !== undefined;
+  const setClauses: string[] = [];
+  const values: any[] = [];
+  let idx = 1;
 
-  let user: any;
-  try {
-    if (hasBio && parsed.data.displayName !== undefined) {
-      const updated = await db.query(
-        `UPDATE users
-         SET display_name = $1,
-             bio = $2
-         WHERE id = $3
-         RETURNING id, email, display_name, bio, role, is_seller, avatar_hash`,
-        [nextDisplayName, parsed.data.bio, req.user!.id],
-      );
-      user = updated.rows[0];
-    } else if (hasBio) {
-      const updated = await db.query(
-        `UPDATE users
-         SET bio = $1
-         WHERE id = $2
-         RETURNING id, email, display_name, bio, role, is_seller, avatar_hash`,
-        [parsed.data.bio, req.user!.id],
-      );
-      user = updated.rows[0];
-    } else {
-      const updated = await db.query(
-        `UPDATE users
-         SET display_name = $1
-         WHERE id = $2
-         RETURNING id, email, display_name, role, is_seller, avatar_hash`,
-        [nextDisplayName, req.user!.id],
-      );
-      user = updated.rows[0];
-    }
-  } catch (err: any) {
-    if (err?.code === '42703') {
-      try {
-        await db.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT DEFAULT ''");
-        const updated = await db.query(
-          `UPDATE users
-           SET display_name = $1,
-               bio = $2
-           WHERE id = $3
-           RETURNING id, email, display_name, bio, role, is_seller, avatar_hash`,
-          [nextDisplayName, parsed.data.bio || '', req.user!.id],
-        );
-        user = updated.rows[0];
-      } catch {
-        const updated = await db.query(
-          `UPDATE users
-           SET display_name = $1
-           WHERE id = $2
-           RETURNING id, email, display_name, role, is_seller, avatar_hash`,
-          [nextDisplayName, req.user!.id],
-        );
-        user = { ...updated.rows[0], bio: parsed.data.bio || '' };
-      }
-    } else {
-      throw err;
-    }
+  if (parsed.data.displayName !== undefined) {
+    setClauses.push(`display_name = $${idx++}`);
+    values.push(parsed.data.displayName);
   }
+  if (parsed.data.bio !== undefined) {
+    setClauses.push(`bio = $${idx++}`);
+    values.push(parsed.data.bio);
+  }
+  if (parsed.data.featuredModelIds !== undefined) {
+    setClauses.push(`featured_model_ids = $${idx++}`);
+    values.push(parsed.data.featuredModelIds);
+  }
+
+  values.push(req.user!.id);
+  const updated = await db.query(
+    `UPDATE users
+     SET ${setClauses.join(', ')}
+     WHERE id = $${idx}
+     RETURNING id, email, display_name, bio, role, is_seller, avatar_hash, featured_model_ids`,
+    values,
+  );
+  const user = updated.rows[0];
 
   res.json({
     message: 'Profile updated',
@@ -395,10 +371,11 @@ authRouter.patch('/profile', requireAuth, async (req, res) => {
       id: user.id,
       email: user.email,
       display_name: user.display_name,
-      bio: (user as any).bio || '',
+      bio: user.bio || '',
       role: user.role,
       is_seller: user.is_seller,
       avatar_url: buildAvatarUrl(user.id, user.avatar_hash),
+      featured_model_ids: Array.isArray(user.featured_model_ids) ? user.featured_model_ids : null,
     },
   });
 });

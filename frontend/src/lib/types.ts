@@ -43,6 +43,7 @@ export interface AuthUser {
   is_seller: boolean;
   avatar_url?: string | null;
   bio?: string | null;
+  featured_model_ids?: string[] | null;
 }
 
 export interface PurchaseItem {

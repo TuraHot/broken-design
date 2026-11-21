@@ -5,15 +5,13 @@
 // (Models | Dashboard | Wallet & Withdraw for creator owner), with Donate at the bottom.
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle,
-  Check,
   Coins,
   Download,
   Image as ImageIcon,
   Layers,
-  Loader2,
   Pencil,
   Plus,
   RefreshCw,
@@ -23,6 +21,7 @@ import {
   X,
 } from 'lucide-react';
 import ModelCard from '@/components/gallery/ModelCard';
+import CreatorBanner3D from '@/components/profile/CreatorBanner3D';
 import DonateCard from '@/components/profile/DonateCard';
 import UserAvatar from '@/components/ui/UserAvatar';
 import {
@@ -42,6 +41,7 @@ import { formatCount, formatMoney, formatPrice } from '@/lib/format';
 import { useLocale, useT } from '@/lib/i18n/client';
 import { readSession, updateSessionUser } from '@/lib/session';
 import type {
+  Model,
   SellerModelItem,
   SellerSalesSummary,
   SellerWalletResponse,
@@ -77,8 +77,31 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
   const [payoutAccount, setPayoutAccount] = useState('');
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!statusMsg) return;
+    const timer = setTimeout(() => {
+      setStatusMsg(null);
+    }, 4500);
+    return () => clearTimeout(timer);
+  }, [statusMsg]);
   const [ready, setReady] = useState(false);
   const [deletedIds, setDeletedIds] = useState<Set<string>>(() => new Set());
+  const [featuredModelIds, setFeaturedModelIds] = useState<string[] | null>(() => {
+    if (initialCreator?.featuredModelIds && Array.isArray(initialCreator.featuredModelIds)) {
+      return initialCreator.featuredModelIds;
+    }
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem(`lixyte_featured_${handle}`);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed)) return parsed;
+        }
+      } catch {}
+    }
+    return null;
+  });
 
   const [editingModel, setEditingModel] = useState<SellerModelItem | null>(null);
   const [deletingModel, setDeletingModel] = useState<SellerModelItem | null>(null);
@@ -193,6 +216,9 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
     if (isMine && u.bio && !initialCreator?.bio) {
       setBio(u.bio);
     }
+    if (isMine && u.featured_model_ids && Array.isArray(u.featured_model_ids)) {
+      setFeaturedModelIds(u.featured_model_ids);
+    }
     if (!isMine) return;
 
     (async () => {
@@ -296,6 +322,72 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
   const showOwnerTabs = isOwnerCreator && !previewPublic;
   const currentTab: TabKey = showOwnerTabs ? activeTab : 'models';
 
+  const allCreatorModels = publicModels.length > 0 ? publicModels : activeSellerModels;
+
+  const effectiveFeaturedModels = useMemo(() => {
+    if (featuredModelIds === null) {
+      // Default to first 5 models if never customized
+      return allCreatorModels.slice(0, 5);
+    }
+    const map = new Map(allCreatorModels.map((m) => [m.id, m]));
+    return featuredModelIds
+      .map((id) => map.get(id))
+      .filter((m): m is (Model | SellerModelItem) => Boolean(m))
+      .slice(0, 5);
+  }, [featuredModelIds, allCreatorModels]);
+
+  const handleAddFeaturedModel = async (modelId: string) => {
+    const currentBase =
+      featuredModelIds !== null ? featuredModelIds : effectiveFeaturedModels.map((m) => m.id);
+
+    if (currentBase.includes(modelId)) return;
+    if (currentBase.length >= 5) {
+      setStatusMsg('สามารถเลือกโมเดลขึ้นโชว์ได้สูงสุด 5 ชิ้น');
+      return;
+    }
+
+    const nextIds = [...currentBase, modelId];
+    setFeaturedModelIds(nextIds);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(`lixyte_featured_${handle}`, JSON.stringify(nextIds));
+      } catch {}
+    }
+
+    if (token && isOwnerCreator) {
+      try {
+        await updateProfile({ featuredModelIds: nextIds }, token);
+        updateSessionUser({ featured_model_ids: nextIds });
+        setStatusMsg('บันทึกโมเดลขึ้นโชว์บนแบนเนอร์แล้ว');
+      } catch (err: any) {
+        setStatusMsg(err?.message || 'ไม่สามารถบันทึกโมเดลโชว์ได้');
+      }
+    }
+  };
+
+  const handleRemoveFeaturedModel = async (modelId: string) => {
+    const currentBase =
+      featuredModelIds !== null ? featuredModelIds : effectiveFeaturedModels.map((m) => m.id);
+
+    const nextIds = currentBase.filter((id) => id !== modelId);
+    setFeaturedModelIds(nextIds);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(`lixyte_featured_${handle}`, JSON.stringify(nextIds));
+      } catch {}
+    }
+
+    if (token && isOwnerCreator) {
+      try {
+        await updateProfile({ featuredModelIds: nextIds }, token);
+        updateSessionUser({ featured_model_ids: nextIds });
+        setStatusMsg('นำโมเดลออกจากแบนเนอร์แล้ว');
+      } catch (err: any) {
+        setStatusMsg(err?.message || 'ไม่สามารถบันทึกการเปลี่ยนแปลงได้');
+      }
+    }
+  };
+
   const tabClass = (tab: TabKey) =>
     `relative whitespace-nowrap pb-3 text-sm font-medium transition-colors ${
       currentTab === tab
@@ -305,35 +397,16 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
 
   return (
     <main className="pb-16 pt-16">
-      {/* Full-width Cover Banner (VGen prototype style) */}
-      <div className="relative h-40 w-full overflow-hidden border-b border-line bg-card sm:h-52">
-        <svg aria-hidden viewBox="0 0 1240 240" preserveAspectRatio="none" className="h-full w-full">
-          <defs>
-            <linearGradient id="vgen-cover-holo" x1="0" x2="1" y1="0" y2="0">
-              <stop offset="0" stopColor="#8fd3ff" />
-              <stop offset="0.35" stopColor="#b892ff" />
-              <stop offset="0.7" stopColor="#ff9ec7" />
-              <stop offset="1" stopColor="#ffb070" />
-            </linearGradient>
-          </defs>
-          <g fill="none" stroke="url(#vgen-cover-holo)" vectorEffect="non-scaling-stroke">
-            <path d="M0 155 C220 185 380 45 620 95 S1020 190 1240 80" strokeOpacity="0.65" strokeWidth="1.5" />
-            <path d="M0 185 C260 205 420 95 650 135 S1040 215 1240 125" strokeOpacity="0.3" strokeWidth="1.2" />
-            <path d="M0 110 C190 135 350 20 590 60 S990 140 1240 45" strokeOpacity="0.2" strokeWidth="1" />
-          </g>
-        </svg>
-
-        {isOwnerCreator && (
-          <button
-            type="button"
-            onClick={() => setPreviewPublic((v) => !v)}
-            className="absolute bottom-3 right-4 inline-flex items-center gap-2 rounded-full border border-line bg-canvas/75 px-3.5 py-1.5 text-xs font-medium text-ink backdrop-blur transition-colors hover:bg-canvas"
-          >
-            <span>{previewPublic ? t('profile.exitPreview') : t('profile.preview')}</span>
-            <span className={`h-2 w-2 rounded-full ${previewPublic ? 'bg-warn' : 'bg-emerald-500'}`} />
-          </button>
-        )}
-      </div>
+      {/* 3D Showcase Cover Banner */}
+      <CreatorBanner3D
+        featuredModels={effectiveFeaturedModels}
+        allModels={allCreatorModels}
+        isOwnerCreator={isOwnerCreator}
+        previewPublic={previewPublic}
+        onTogglePreview={() => setPreviewPublic((v) => !v)}
+        onAddModel={handleAddFeaturedModel}
+        onRemoveModel={handleRemoveFeaturedModel}
+      />
 
       {/* Main Container: 2-Column VGen Layout */}
       <div className="mx-auto max-w-[1400px] px-4 md:px-6">
@@ -469,16 +542,6 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                 </>
               )}
             </nav>
-
-            {statusMsg && (
-              <div
-                role="status"
-                className="mt-4 flex items-center gap-2 rounded-lg border border-accent/30 bg-accent/10 px-4 py-3 text-sm text-accent"
-              >
-                <AlertCircle className="h-4 w-4 shrink-0" />
-                <span>{statusMsg}</span>
-              </div>
-            )}
 
             {/* TAB 1: Public Models */}
             {currentTab === 'models' && (
@@ -1040,6 +1103,26 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
             </div>
           </div>
         </div>
+      )}
+
+      {/* Floating Toast Notification at corner of screen */}
+      {statusMsg && (
+        <aside
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-6 right-6 z-50 flex max-w-sm items-center gap-3 rounded-xl border border-accent/40 bg-card/95 px-4 py-3 text-sm text-accent shadow-2xl backdrop-blur-md animate-in fade-in slide-in-from-bottom-4 duration-200"
+        >
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span className="flex-1 font-medium">{statusMsg}</span>
+          <button
+            type="button"
+            onClick={() => setStatusMsg(null)}
+            aria-label={t('modal.close')}
+            className="rounded p-1 text-accent/60 transition-colors hover:bg-accent/10 hover:text-accent"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </aside>
       )}
     </main>
   );

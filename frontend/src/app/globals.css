@@ -114,3 +114,13 @@ html[data-theme='light'] .text-accent\/70,
 html[data-theme='light'] .text-accent\/80 {
   color: rgb(var(--c-accent));
 }
+
+/* Suppress native search cancel button in WebKit/Blink browsers to prevent duplicate 'X' */
+input[type="search"]::-webkit-search-cancel-button,
+input[type="search"]::-webkit-search-decoration,
+input[type="search"]::-webkit-search-results-button,
+input[type="search"]::-webkit-search-results-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+}

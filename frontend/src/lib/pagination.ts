@@ -125,10 +125,9 @@ export function queryModels(models: Model[], params: ModelsParams, pageSize = PA
     if (!isPublicModel(m)) return false;
     if (q) {
       const inTitle = m.title.toLowerCase().includes(q);
-      const inDesc = (m.description ?? '').toLowerCase().includes(q);
       const inCreator = m.creator.toLowerCase().includes(q);
       const inTags = m.tags.some((t) => t.toLowerCase().includes(q));
-      if (!inTitle && !inDesc && !inCreator && !inTags) return false;
+      if (!inTitle && !inCreator && !inTags) return false;
     }
     if (params.tag && !m.tags.some((t) => t.toLowerCase() === params.tag!.toLowerCase())) return false;
     if (params.license && m.license !== params.license) return false;

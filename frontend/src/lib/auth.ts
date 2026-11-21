@@ -10,6 +10,7 @@ export interface AuthUser {
   is_seller: boolean;
   avatar_url?: string | null;
   bio?: string | null;
+  featured_model_ids?: string[] | null;
 }
 
 // ผลลัพธ์เมื่อ Login หรือ Register สำเร็จ
@@ -153,10 +154,11 @@ async function accountRequest(url: string, init: RequestInit): Promise<any> {
 export interface UpdateProfileParams {
   displayName?: string;
   bio?: string;
+  featuredModelIds?: string[];
 }
 export type UpdateProfileInput = UpdateProfileParams;
 
-// อัปเดตข้อมูลโปรไฟล์ (ชื่อที่แสดง / bio) ของบัญชีปัจจุบัน (PATCH /api/auth/profile)
+// อัปเดตข้อมูลโปรไฟล์ (ชื่อที่แสดง / bio / featuredModelIds) ของบัญชีปัจจุบัน (PATCH /api/auth/profile)
 export async function updateProfile(
   params: string | UpdateProfileParams,
   token: string,
@@ -167,6 +169,7 @@ export async function updateProfile(
       : {
           ...(params.displayName !== undefined ? { displayName: params.displayName.trim() } : {}),
           ...(params.bio !== undefined ? { bio: params.bio.trim() } : {}),
+          ...(params.featuredModelIds !== undefined ? { featuredModelIds: params.featuredModelIds } : {}),
         };
 
   const data = await accountRequest(`${CORE_API_URL}/api/auth/profile`, {

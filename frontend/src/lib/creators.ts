@@ -6,6 +6,7 @@ export interface CreatorProfile {
   name: string;
   avatarUrl?: string;
   bio: string;
+  featuredModelIds?: string[] | null;
   models: Model[];
   totalDownloads: number;
   totalLikes: number;

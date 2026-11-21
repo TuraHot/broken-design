@@ -31,11 +31,12 @@ creatorsRouter.get('/:handle', async (req, res) => {
       email: string;
       avatar_hash: string | null;
       bio?: string | null;
+      featured_model_ids?: string[] | null;
     }[];
   };
   try {
     candidatesRes = await db.query(
-      `SELECT u.id, u.display_name, u.email, u.avatar_hash, u.bio
+      `SELECT u.id, u.display_name, u.email, u.avatar_hash, u.bio, u.featured_model_ids
        FROM users u
        WHERE ${ownerActiveSql('u')}
          AND u.role <> 'admin'
@@ -51,7 +52,7 @@ creatorsRouter.get('/:handle', async (req, res) => {
     );
   } catch {
     candidatesRes = await db.query(
-      `SELECT u.id, u.display_name, u.email, u.avatar_hash
+      `SELECT u.id, u.display_name, u.email, u.avatar_hash, u.bio
        FROM users u
        WHERE ${ownerActiveSql('u')}
          AND u.role <> 'admin'
@@ -123,6 +124,7 @@ creatorsRouter.get('/:handle', async (req, res) => {
     name: displayName,
     avatarUrl,
     bio: creator.bio || '',
+    featuredModelIds: Array.isArray(creator.featured_model_ids) ? creator.featured_model_ids : null,
     models,
     totalDownloads,
     totalLikes,

@@ -139,3 +139,22 @@ test('POST /api/models/:id/like - a model whose owner an admin deleted is 404', 
     db.query = originalQuery;
   }
 });
+
+test('POST /api/models/:id/like - a token whose user row is missing is 401, not a database error', async () => {
+  const originalQuery = db.query.bind(db);
+  (db as any).query = async () => ({ rowCount: 0, rows: [] });
+
+  const server = app.listen(0);
+  const port = (server.address() as any).port;
+  try {
+    const res = await fetch(`http://localhost:${port}/api/models/${MODEL_ID}/like`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token()}` },
+    });
+    assert.equal(res.status, 401);
+    assert.equal((await res.json()).error?.code, 'UNAUTHORIZED');
+  } finally {
+    server.close();
+    db.query = originalQuery;
+  }
+});

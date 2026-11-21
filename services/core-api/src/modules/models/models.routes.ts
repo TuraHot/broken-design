@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { db } from '../../config/db';
 import { requireAuth, isSuspended } from '../../middlewares/auth.middleware';
 import { AppError } from '../../middlewares/error.middleware';
+import { ownerActiveSql } from './availability';
 import { formatModelResponse, type ModelPresenterRow } from './model.presenter';
 
 export const modelsRouter = Router();
@@ -38,8 +39,7 @@ modelsRouter.get('/', async (req, res, next) => {
     const conditions: string[] = [
       'm.hidden_at IS NULL',
       'm.deleted_at IS NULL',
-      'u.suspended_at IS NULL',
-      'u.deleted_at IS NULL',
+      ownerActiveSql('u'),
     ];
     const params: unknown[] = [];
 
@@ -136,8 +136,7 @@ modelsRouter.get('/tags', async (_req, res, next) => {
        JOIN users u ON u.id = m.owner_id
        WHERE m.hidden_at IS NULL
          AND m.deleted_at IS NULL
-         AND u.suspended_at IS NULL
-         AND u.deleted_at IS NULL
+         AND ${ownerActiveSql('u')}
        ORDER BY tag ASC`
     );
     const tags = result.rows.map((r) => r.tag).filter(Boolean);
@@ -180,8 +179,7 @@ modelsRouter.get('/:id', async (req, res, next) => {
        WHERE m.id = $1
          AND m.hidden_at IS NULL
          AND m.deleted_at IS NULL
-         AND u.suspended_at IS NULL
-         AND u.deleted_at IS NULL`,
+         AND ${ownerActiveSql('u')}`,
       [id],
     );
 

@@ -1,13 +1,20 @@
 // Small display helpers shared by model cards and the model page
 
-/** `$15`, `$8.50` (whole dollars have no decimals). */
-export const formatPrice = (cents: number) => `$${(cents / 100).toFixed(cents % 100 === 0 ? 0 : 2)}`;
+/** Thai baht, amounts in satang: `1500` -> `฿15`, `850` -> `฿8.50` (whole baht have no decimals). */
+export const formatPrice = (satang: number) =>
+  `฿${(satang / 100).toLocaleString('en-US', {
+    minimumFractionDigits: satang % 100 === 0 ? 0 : 2,
+    maximumFractionDigits: 2,
+  })}`;
 
 /** `3120` -> `3,120` */
 export const formatCount = (n: number) => n.toLocaleString('en-US');
 
-/** `2900, 'USD'` -> `$29.00`; falls back to `29.00 XYZ` for an unknown currency code. */
-export function formatMoney(cents: number, currency = 'USD') {
+/** `2900, 'THB'` -> `฿29.00`; other currencies use the standard symbol; falls back to `29.00 XYZ` for an unknown code. */
+export function formatMoney(cents: number, currency = 'THB') {
+  if (currency.toUpperCase() === 'THB') {
+    return `฿${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
   try {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(cents / 100);
   } catch {

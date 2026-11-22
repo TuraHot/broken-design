@@ -116,9 +116,9 @@ sellerRouter.get('/status', requireAuth, async (req, res) => {
   res.json({ isSeller: result.rows[0].is_seller });
 });
 
-// The wallet is single-currency: only USD sales count toward the balance and payouts are recorded as USD, so a sale in
-// another currency (e.g. THB satang) is never added to the USD total as if it were USD cents.
-const WALLET_CURRENCY = 'USD';
+// The wallet is single-currency (Thai baht, amounts in satang): only THB sales count toward the balance and payouts are
+// recorded as THB, so a sale in another currency is never added to the total as if it were satang.
+const WALLET_CURRENCY = 'THB';
 
 type Queryable = Pick<typeof db, 'query'>;
 

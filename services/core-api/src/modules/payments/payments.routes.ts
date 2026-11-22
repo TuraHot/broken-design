@@ -22,7 +22,7 @@ function getStripe(): Stripe {
 }
 
 function toThbSatang(amountCents: number, currency: string): number {
-  const cur = (currency || 'USD').toUpperCase();
+  const cur = (currency || 'THB').toUpperCase();
   // Stripe PromptPay requires THB in satang (minimum 1000 satang = 10 THB)
   const satang = cur === 'THB' ? amountCents : Math.round(amountCents * 35);
   return Math.max(1000, satang);
@@ -141,7 +141,7 @@ paymentsRouter.post('/models/:id/checkout', requireAuth, requireBuyer, async (re
   // สร้างคำสั่งซื้อใหม่ status=pending พร้อมล็อก amount_cents, currency, license_type
   const embedKey = generateEmbedKey();
   const amountCents = Number(model.price_cents) || 0;
-  const currency = String(model.currency || 'USD').trim();
+  const currency = String(model.currency || 'THB').trim();
   const licenseType = String(model.license || 'COMMERCIAL').trim();
 
   let purchaseId: string;

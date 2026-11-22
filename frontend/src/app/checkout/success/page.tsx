@@ -192,7 +192,7 @@ function CheckoutSuccessContent() {
         <h1 className="mt-3 font-display text-2xl uppercase text-ink sm:text-3xl">{purchase.title}</h1>
         <p className="mt-2 text-sm text-ink-soft">
           {t('pay.success.paid', {
-            amount: formatMoney(purchase.amountCents, purchase.currency || 'USD'),
+            amount: formatMoney(purchase.amountCents, purchase.currency || 'THB'),
             license: purchase.licenseType,
             date: formatDate(purchase.paidAt),
           })}

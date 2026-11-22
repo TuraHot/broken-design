@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS models (
     preview_hash CHAR(64),
     poster_hash CHAR(64),
     price_cents INTEGER NOT NULL DEFAULT 0 CHECK (price_cents >= 0),
-    currency CHAR(3) NOT NULL DEFAULT 'USD',
+    currency CHAR(3) NOT NULL DEFAULT 'THB',
     view_count BIGINT NOT NULL DEFAULT 0,
     download_count BIGINT NOT NULL DEFAULT 0,
     hidden_at TIMESTAMPTZ,
@@ -64,7 +64,7 @@ CREATE TABLE IF NOT EXISTS purchases (
     model_id UUID NOT NULL REFERENCES models(id) ON DELETE RESTRICT,
     status purchase_status NOT NULL DEFAULT 'pending',
     amount_cents INTEGER NOT NULL DEFAULT 0,
-    currency VARCHAR(10) NOT NULL DEFAULT 'USD',
+    currency VARCHAR(10) NOT NULL DEFAULT 'THB',
     license_type VARCHAR(50) NOT NULL DEFAULT 'COMMERCIAL',
     watermark_hash VARCHAR(128),
     paid_at TIMESTAMPTZ,
@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS purchases (
 
 -- Safe migration for existing databases
 ALTER TABLE purchases ADD COLUMN IF NOT EXISTS amount_cents INTEGER NOT NULL DEFAULT 0;
-ALTER TABLE purchases ADD COLUMN IF NOT EXISTS currency VARCHAR(10) NOT NULL DEFAULT 'USD';
+ALTER TABLE purchases ADD COLUMN IF NOT EXISTS currency VARCHAR(10) NOT NULL DEFAULT 'THB';
 ALTER TABLE purchases ADD COLUMN IF NOT EXISTS license_type VARCHAR(50) NOT NULL DEFAULT 'COMMERCIAL';
 ALTER TABLE purchases ADD COLUMN IF NOT EXISTS watermark_hash VARCHAR(128);
 ALTER TABLE purchases ADD COLUMN IF NOT EXISTS paid_at TIMESTAMPTZ;
@@ -131,7 +131,7 @@ CREATE TABLE IF NOT EXISTS creator_withdrawals (
     platform_fee_cents INTEGER NOT NULL CHECK (platform_fee_cents >= 0),
     net_amount_cents INTEGER NOT NULL CHECK (net_amount_cents >= 0),
     fee_rate_bps INTEGER NOT NULL DEFAULT 700,
-    currency VARCHAR(10) NOT NULL DEFAULT 'USD',
+    currency VARCHAR(10) NOT NULL DEFAULT 'THB',
     payout_method VARCHAR(50) NOT NULL DEFAULT 'promptpay',
     payout_account VARCHAR(255) NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'paid', 'rejected')),
@@ -336,3 +336,9 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_by UUID REFERENCES users(id) 
 ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_reason TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS original_email VARCHAR(255);
 CREATE INDEX IF NOT EXISTS idx_users_original_email ON users (LOWER(original_email)) WHERE original_email IS NOT NULL;
+
+-- 14. Default currency is Thai baht (amounts in satang). Existing rows keep the currency they were saved with; only the
+-- default for new rows changes.
+ALTER TABLE models ALTER COLUMN currency SET DEFAULT 'THB';
+ALTER TABLE purchases ALTER COLUMN currency SET DEFAULT 'THB';
+ALTER TABLE creator_withdrawals ALTER COLUMN currency SET DEFAULT 'THB';

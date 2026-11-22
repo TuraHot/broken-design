@@ -7,6 +7,10 @@ import { ownerActiveSql } from '../models/availability';
 
 export const interactionsRouter = Router();
 
+// A like notice for the same liker and model is skipped if one was already sent within this many seconds, so toggling
+// like/unlike quickly cannot flood the owner's inbox or bell.
+const LIKE_NOTICE_COOLDOWN_SECONDS = 24 * 60 * 60;
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // GET /api/me/likes (Batch fetch all model IDs liked by the current user — avoids N+1 requests on /gallery)
@@ -126,9 +130,17 @@ interactionsRouter.post(
           const likerName = userRes.rows[0]?.display_name || 'มีผู้ใช้งาน';
 
           // Insert notice into database inbox
-          await db.query(
+          // The NOT EXISTS runs in the same statement as the insert, so two quick requests cannot both pass the check.
+          const inserted = await db.query(
             `INSERT INTO notifications (user_id, kind, model_id, data)
-             VALUES ($1, 'model_liked', $2, $3::jsonb)`,
+             SELECT $1, 'model_liked', $2, $3::jsonb
+             WHERE NOT EXISTS (
+               SELECT 1 FROM notifications
+               WHERE user_id = $1 AND kind = 'model_liked' AND model_id = $2
+                 AND data->>'liker_id' = $4
+                 AND created_at > NOW() - make_interval(secs => $5)
+             )
+             RETURNING id`,
             [
               model.owner_id,
               id,
@@ -138,8 +150,14 @@ interactionsRouter.post(
                 model_title: model.title,
                 message: `${likerName} ได้กดถูกใจโมเดล 3D "${model.title}" ของคุณ`,
               }),
+              userId,
+              LIKE_NOTICE_COOLDOWN_SECONDS,
             ],
           );
+          if (!inserted.rowCount) {
+            res.json({ liked, likeCount });
+            return;
+          }
 
           // Emit real-time notification to owner via Socket.IO
           notifyUser(model.owner_id, {

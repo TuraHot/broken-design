@@ -54,7 +54,10 @@ modelsRouter.get('/', async (req, res, next) => {
 
     if (q) {
       params.push(likePattern(q));
-      conditions.push(`(m.title ILIKE $${params.length} ESCAPE '\\')`);
+      const pIdx = params.length;
+      conditions.push(
+        `(m.title ILIKE $${pIdx} ESCAPE '\\' OR u.display_name ILIKE $${pIdx} ESCAPE '\\' OR EXISTS (SELECT 1 FROM unnest(m.tags) AS t WHERE t ILIKE $${pIdx} ESCAPE '\\'))`,
+      );
     }
 
     if (tag) {

@@ -213,6 +213,90 @@ test('PATCH /api/auth/profile - updates display_name and validates auth, input, 
   }
 });
 
+test('PATCH /api/auth/profile - validates featuredModelIds ownership, deduplicates, and allows expired timed suspension', async () => {
+  const originalQuery = db.query.bind(db);
+  const ownedModelId = '11111111-1111-4111-8111-111111111111';
+  const foreignModelId = '22222222-2222-4222-8222-222222222222';
+  let savedFeaturedIds: string[] = [];
+
+  (db as any).query = async (sql: string, params: any[]) => {
+    if (sql.includes('FROM users') && sql.includes('suspended_until')) {
+      return {
+        rows: [
+          {
+            id: params[0],
+            display_name: 'Old Name',
+            suspended_at: '2026-11-01T00:00:00.000Z',
+            suspended_until: new Date(Date.now() - 60_000).toISOString(),
+          },
+        ],
+      };
+    }
+    if (sql.includes('SELECT id FROM models WHERE owner_id = $1')) {
+      const requested = params[1] as string[];
+      const matching = requested.filter((id) => id === ownedModelId).map((id) => ({ id }));
+      return { rows: matching, rowCount: matching.length };
+    }
+    if (sql.includes('UPDATE users') && sql.includes('featured_model_ids = $1')) {
+      savedFeaturedIds = params[0];
+      return {
+        rows: [
+          {
+            id: params[1],
+            email: 'user@example.com',
+            display_name: 'Old Name',
+            bio: '',
+            role: 'creator',
+            is_seller: true,
+            avatar_hash: null,
+            featured_model_ids: params[0],
+          },
+        ],
+      };
+    }
+    return { rows: [] };
+  };
+
+  const token = jwt.sign(
+    { id: 'u-123', email: 'user@example.com', role: 'creator' },
+    env.jwtSecret,
+    { expiresIn: '1h' },
+  );
+
+  const server = app.listen(0);
+  const port = (server.address() as any).port;
+  try {
+    // 1. Foreign or deleted model UUID -> 400 INVALID_FEATURED_MODELS
+    const badRes = await fetch(`http://localhost:${port}/api/auth/profile`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ featuredModelIds: [ownedModelId, foreignModelId] }),
+    });
+    assert.equal(badRes.status, 400);
+    assert.equal((await badRes.json()).error?.code, 'INVALID_FEATURED_MODELS');
+
+    // 2. Duplicate owned UUIDs are deduplicated and accepted even with an expired timed suspension
+    const okRes = await fetch(`http://localhost:${port}/api/auth/profile`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ featuredModelIds: [ownedModelId, ownedModelId] }),
+    });
+    assert.equal(okRes.status, 200);
+    assert.deepEqual(savedFeaturedIds, [ownedModelId]);
+    const okBody = await okRes.json();
+    assert.deepEqual(okBody.user.featured_model_ids, [ownedModelId]);
+  } finally {
+    (db as any).query = originalQuery;
+    server.close();
+  }
+});
+
 // ─── login of a suspended account: the message says why and until when ──────
 async function loginWith(row: Record<string, unknown>, extra?: (sql: string) => any, options: { sweepLifts: boolean } = { sweepLifts: true }) {
   const originalQuery = db.query.bind(db);

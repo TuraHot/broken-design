@@ -110,7 +110,7 @@ export default function ModelActions({
     return { key: fallback };
   };
 
-  const performDownload = async (id: string, token: string) => {
+  const performDownload = async (id: string, token?: string | null) => {
     try {
       await downloadModelGlb(id, title, token);
       setStatus({ key: "model.dlStarted" });
@@ -136,7 +136,7 @@ export default function ModelActions({
 
     const session = readSession();
     setSignedIn(session !== null);
-    if (!session) {
+    if (!free && !session) {
       setStatus({ key: "model.dlLogin" });
       return;
     }
@@ -145,7 +145,7 @@ export default function ModelActions({
       busyRef.current = true;
       setBusy(true);
       setStatus(null);
-      await performDownload(modelId, session.token);
+      await performDownload(modelId, session?.token ?? null);
     } catch (err) {
       setStatus(failure(err, "model.dlFailed"));
     } finally {
@@ -241,7 +241,7 @@ export default function ModelActions({
       ) : (
         <button
           type="button"
-          disabled={!ready || !signedIn || busy || isOwner || checkingPurchased}
+          disabled={!ready || (!free && !signedIn) || busy || isOwner || checkingPurchased}
           onClick={free ? handleDownload : handleBuy}
           className={`inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg px-3.5 text-[15px] font-medium transition-colors ${
             isOwner
@@ -260,7 +260,7 @@ export default function ModelActions({
         </button>
       )}
 
-      {ready && !signedIn && (
+      {ready && !signedIn && !free && (
         <p className="text-xs text-ink-soft">
           {t("model.loginPre")}{" "}
           <Link href="/login" className="font-medium text-accent underline underline-offset-2 hover:text-ink">

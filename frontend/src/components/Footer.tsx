@@ -19,6 +19,7 @@ const GROUPS: { title: MessageKey; links: FooterLink[] }[] = [
       { href: '/gallery', label: 'footer.gallery' },
       { href: '/docs', label: 'footer.docs' },
       { href: '/licenses', label: 'footer.licenses' },
+      { href: '/verify', label: 'footer.verify' },
     ],
   },
   {

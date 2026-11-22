@@ -2,7 +2,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { db } from '../../config/db';
-import { requireAuth } from '../../middlewares/auth.middleware';
+import { isSuspended, requireAuth } from '../../middlewares/auth.middleware';
 import { AppError } from '../../middlewares/error.middleware';
 
 export const complaintsRouter = Router();
@@ -37,9 +37,9 @@ complaintsRouter.post('/', requireAuth, async (req, res) => {
   const userId = req.user!.id;
 
   // สถานะบัญชีเช็กจาก DB (ไม่เชื่อ JWT)
-  const user = await db.query(`SELECT suspended_at FROM users WHERE id = $1`, [userId]);
+  const user = await db.query(`SELECT suspended_at, suspended_until FROM users WHERE id = $1`, [userId]);
   if (user.rowCount === 0) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
-  if (user.rows[0].suspended_at) {
+  if (isSuspended(user.rows[0])) {
     throw new AppError(403, 'ACCOUNT_SUSPENDED', 'Your account has been suspended by an administrator');
   }
 

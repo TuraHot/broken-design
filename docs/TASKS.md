@@ -1,6 +1,6 @@
 # TASKS — Lixyte task board
 
-อัปเดตล่าสุด: 2026-11-17 · สถานะตรวจจากโค้ดบน `main` หลัง merge PR #15 (`origin/kzwnjuy`), branch `origin/Pek`, และ branch `origin/ham` รวมถึงสร้างตาราง `complaints` บน PostgreSQL จริงแล้ว (ผลเทสต์ล่าสุดผ่านครบทั้งระบบ: `cdn-service` 23/23, `core-api` 48/48, `frontend` 4/4 = **75/75**)
+อัปเดตล่าสุด: 2026-11-22 · สถานะตรวจจากโค้ดบน `main` หลังแก้ไข Range/Watermark cache, วันหมดระงับบน CDN/Core-API, ระบบ `/verify`, และการปรับปรุงเสถียรภาพทั่วทั้งระบบเรียบร้อยแล้ว (ผลเทสต์ล่าสุดในขณะนี้: `cdn-service` 54, `core-api` 136+, `frontend` 24 tests)
 คอลัมน์ **ผู้รับ** แบ่งตามหลักว่าแต่ละคนทำ Frontend ของ backend ที่ตัวเองดูแล แก้ได้เมื่อทีมปรับการแบ่งงาน (ตาราง §7 ใน `README.md`)
 
 สถานะ: `[x]` ใช้ได้ · `[~]` ทำบางส่วน (UI อย่างเดียว / placeholder / ทำแค่ฝั่งเดียว) · `[ ]` ยังไม่มี
@@ -13,7 +13,8 @@
 | [x] | `/` หน้าแรก | เจี๊ยบ | - | |
 | [x] | `/gallery` | เป้ก | `GET /api/models` | ค้นหาและตัวกรอง tag / license / price ทำงานผ่าน URL แสดงเฉพาะโมเดลจริงจาก Core API (ตัดข้อมูลตัวอย่างออกแล้ว) คอมเมนต์หัวไฟล์ `page.tsx` ยังเขียนว่า "UI only" ซึ่งล้าสมัย |
 | [x] | `/models/[id]` | นนท์ | `GET /api/models/:id`, CDN | viewer 3D จาก CDN, ดาวน์โหลด, เริ่มซื้อ ยังไม่มีถูกใจ/คอมเมนต์ และ Playground |
-| [~] | `/creators/[handle]` | เจี๊ยบ | `/api/creators/:handle` (ไม่มี) | UI อ่านอย่างเดียว ข้อมูลตัวอย่าง |
+| [x] | `/creators/[handle]` | เจี๊ยบ / แฮม | `GET /api/creators/:handle`, `PATCH /api/auth/profile` | โปรไฟล์ครีเอเตอร์, แบนเนอร์ 3D 5 ช่อง, แก้ไข bio/โมเดล (สำหรับเจ้าของ), Donate card (UI) |
+| [x] | `/verify` | ทีม | `POST /cdn/verify-watermark` | หน้าอัปโหลด `.glb` ตรวจลายน้ำ Layer 1 & Layer 2 พร้อมลิงก์กลับโมเดลต้นทาง |
 | [x] | `/creator` | เจี๊ยบ | - | |
 | [x] | `/docs` | เจี๊ยบ | - | คู่มือฝังโมเดล (`<vm-model>`, iframe, embed key, ดาวน์โหลด, การขาย, CDN, แก้ปัญหา) เนื้อหาเขียนจากพฤติกรรมจริงของระบบ ทีมควรอ่านตรวจความถูกต้อง |
 | [x] | `/licenses` | เจี๊ยบ | - | การ์ด 4 ไลเซนส์ + ตารางเทียบ ใช้ข้อมูลจาก `lib/licenses.ts` **ยังไม่ได้ตัดสิน:** สิทธิ์แก้ไขโมเดลของไลเซนส์ COMMERCIAL (หน้าเขียนว่า "Not defined yet") |
@@ -87,9 +88,12 @@
 ### ยังค้าง
 | สถานะ | งาน | ผู้รับ | หมายเหตุ |
 |---|---|---|---|
-| [ ] | endpoint ลืมรหัสผ่าน | ต้า | หน้า `/forgot-password` รออยู่ |
-| [ ] | rate limit ให้ `/api/auth/*` โดยเฉพาะ `check-email` | ต้า | ตอนนี้ใครก็ถามได้ว่าอีเมลไหนสมัครไว้แล้ว |
-| [ ] | `PATCH /api/models/:id` | แฮม | ยังเป็น TODO |
+| [x] | `endpoint ลืมรหัสผ่าน` (`forgot-password`, `verify-reset-otp`, `reset-password`) | ต้า | ต่อหน้า `/forgot-password` และ `/reset-password` ครบ (มี `devOtp` นอก production) |
+| [x] | rate limit ให้ `/api/auth/*` และ CDN upload | ต้า / นนท์ | `checkEmailLimiter`, `loginLimiter`, `registerLimiter`, `passwordResetLimiter`, `uploadLimiter`, `avatarLimiter` |
+| [x] | `PATCH /api/models/:id` & `/api/models/:id/assets` | แฮม | เจ้าของหรือแอดมินแก้ข้อมูลได้ พร้อมบังคับ `PREVIEW_REQUIRED` และตรวจลายน้ำเมื่อเปลี่ยนไฟล์ |
+| [x] | `/checkout/[id]` & `/checkout/success` | ภีม | ต่อ Stripe PromptPay QR และ Mock confirm + แสดง `embed_key` หลังจ่ายสำเร็จ |
+| [x] | `GET /api/creators/:handle` & `POST /api/models/:id/like` | ทีม | โปรไฟล์ครีเอเตอร์, แบนเนอร์ 5 ช่อง, และระบบกดถูกใจเรียลไทม์ผ่าน Socket.IO |
+| [x] | Stripe webhook `POST /api/webhooks/stripe` | ภีม | ใช้ `express.raw` + `stripe.webhooks.constructEvent` ตรวจลายเซ็นครบ |
 | [x] | สร้าง `modules/admin/admin.routes.ts` และผูก `/api/admin` ใน `app.ts` | เจี๊ยบ | ตรวจ admin + `suspended_at` จากฐานข้อมูลในโมดูลเอง (`requireActiveAdmin`) แฮมจะย้ายไปรวมใน `auth.middleware.ts` ภายหลังก็ได้ |
 | [x] | `GET /api/admin/overview` | เจี๊ยบ | ผู้ใช้ โมเดล คำสั่งซื้อ `paid` ยอดรวม (`amount_cents`) |
 | [x] | `GET /api/admin/models` | เจี๊ยบ | รวมโมเดลที่ซ่อนและถูกลบ + เจ้าของ |
@@ -106,11 +110,11 @@
 
 | สถานะ | งาน | ผู้รับ | หมายเหตุ |
 |---|---|---|---|
-| [ ] | เอา `DEV_CREATOR_TOKEN` ออกจากโค้ด `frontend/src/app/upload/page.tsx` ไปไว้ใน `.env.local` | แฮม | เคยย้ายแล้ว แต่ merge ทำให้กลับมาเป็นค่าฝังในโค้ด token เดิมยังอยู่ในประวัติ git |
-| [ ] | เลิกใช้ค่าตกหล่น `'dev-secret'` ของ `JWT_SECRET` และค่าตกหล่นของ `WATERMARK_SECRET` (ให้ระบบไม่ยอมเริ่มเมื่อไม่ตั้งค่าใน production) | แฮม | ทั้ง core-api และ cdn-service |
-| [ ] | แก้ `requireAdmin` / `requireSeller` ให้ตรวจ role และ `suspended_at` จากฐานข้อมูล | แฮม | ตอนนี้เชื่อ role ใน JWT เท่านั้น (ฝั่ง seller router ตรวจฐานข้อมูลเองแล้ว) |
-| [ ] | ตรึง `algorithms: ['HS256']` และตรวจ payload ของ JWT ตอน `jwt.verify` | แฮม | ทั้งสองบริการ |
-| [ ] | ให้ CORS `*` ของ cdn-service ใช้เฉพาะ route สตรีม | นนท์ | อัปโหลดต้องใช้ token แล้ว แต่ CORS ยังเปิดหมด |
+| [x] | เอา `DEV_CREATOR_TOKEN` ออกจากโค้ด `frontend/src/app/upload/page.tsx` | แฮม | นำออกแล้ว ใช้ session จากผู้ใช้งานจริง |
+| [x] | เลิกใช้ค่าตกหล่น `'dev-secret'` ของ `JWT_SECRET` และ `WATERMARK_SECRET` ใน Production | แฮม | `assertProductionSecrets` ปฏิเสธการสตาร์ททันทีเมื่อ `NODE_ENV=production` |
+| [x] | แก้ `requireAdmin`, `requireSeller`, `requireActiveAdmin`, `requireActiveSeller`, `requireBuyer` ให้ตรวจ DB | แฮม / เจี๊ยบ | เช็กจาก PostgreSQL พร้อมรองรับ `suspended_until` ทั้งสองเซอร์วิส |
+| [x] | ตรึง `algorithms: ['HS256']` และตรวจ payload ของ JWT ตอน `jwt.verify` | แฮม | ทำครบทั้ง `core-api` และ `cdn-service` |
+| [x] | ให้ CORS `*` ของ cdn-service ใช้เฉพาะ route สตรีม `/cdn/*` | นนท์ | `/api/*` และ `/verify-watermark` จำกัด origin ตาม `allowedOrigins()` แล้ว |
 | [ ] | เปลี่ยนรหัสผ่านบัญชีตัวอย่าง (admin / creator) ก่อน deploy | แฮม | ค่าเริ่มต้นเขียนอยู่ใน `schema.sql`, `seedAdmin.ts` และ README |
 | [ ] | ส่ง embed key ผ่าน header หรือ token อายุสั้นแทน query string | นนท์ | ตอนนี้ key รั่วลง log และ referrer ได้ |
 

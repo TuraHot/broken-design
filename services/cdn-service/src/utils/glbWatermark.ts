@@ -50,19 +50,33 @@ function createSilentIO(): NodeIO {
   return io;
 }
 
+const vertexPrefixCache = new Map<string, string>();
+const MAX_VERTEX_PREFIX_CACHE = 10_000;
+
 /**
  * สร้าง 64-bit prefix (16 hex chars) ที่ผูกกับ modelId และ WATERMARK_SECRET
  * เพื่อให้สามารถตรวจสอบ Vertex Steganography ได้แม้ว่า asset.extras จะถูกลบออกจากการ Export ใหม่
  */
-export function computeModelVertexPrefixHex(
+function computeModelVertexPrefixHex(
   modelId: string,
   secret: string = env.watermarkSecret,
 ): string {
-  return crypto
+  const cleanId = modelId.trim();
+  const cacheKey = `${secret}:${cleanId}`;
+  const cached = vertexPrefixCache.get(cacheKey);
+  if (cached) return cached;
+
+  const digest = crypto
     .createHmac("sha256", secret)
-    .update(`broken-design:vertex:${modelId.trim()}`)
+    .update(`broken-design:vertex:${cleanId}`)
     .digest("hex")
     .slice(0, 16);
+
+  if (vertexPrefixCache.size >= MAX_VERTEX_PREFIX_CACHE) {
+    vertexPrefixCache.clear();
+  }
+  vertexPrefixCache.set(cacheKey, digest);
+  return digest;
 }
 
 /**

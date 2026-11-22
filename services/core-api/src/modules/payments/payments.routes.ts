@@ -94,7 +94,7 @@ paymentsRouter.post('/models/:id/checkout', requireAuth, requireBuyer, async (re
   // ดึงราคา ประเภท License และสถานะเจ้าของจากฐานข้อมูลจริง
   const modelRow = await db.query(
     `SELECT m.id, m.title, m.price_cents, m.currency, m.license, m.deleted_at, m.hidden_at, m.owner_id,
-            u.suspended_at AS owner_suspended_at, u.deleted_at AS owner_deleted_at
+            u.suspended_at AS owner_suspended_at, u.suspended_until AS owner_suspended_until, u.deleted_at AS owner_deleted_at
      FROM models m
      LEFT JOIN users u ON u.id = m.owner_id
      WHERE m.id = $1`,
@@ -233,7 +233,7 @@ paymentsRouter.post('/purchases/:id/confirm-mock', requireAuth, requireMockProvi
   if (result.rowCount === 0) {
     // อาจจ่ายไปแล้ว, โมเดลถูกซ่อน/ลบ/เจ้าของถูกระงับ, หรือไม่ใช่ของตัวเอง
     const check = await db.query(
-      `SELECT p.status, m.deleted_at, m.hidden_at, o.suspended_at AS owner_suspended_at, o.deleted_at AS owner_deleted_at
+      `SELECT p.status, m.deleted_at, m.hidden_at, o.suspended_at AS owner_suspended_at, o.suspended_until AS owner_suspended_until, o.deleted_at AS owner_deleted_at
        FROM purchases p
        LEFT JOIN models m ON m.id = p.model_id
        LEFT JOIN users o ON o.id = m.owner_id
@@ -286,7 +286,7 @@ paymentsRouter.post('/models/:id/pay-mock', requireAuth, requireMockProvider, re
   if (result.rowCount === 0) {
     const check = await db.query(
       `SELECT p.id, p.model_id, p.embed_key, p.status, p.paid_at,
-              m.deleted_at, m.hidden_at, o.suspended_at AS owner_suspended_at, o.deleted_at AS owner_deleted_at
+              m.deleted_at, m.hidden_at, o.suspended_at AS owner_suspended_at, o.suspended_until AS owner_suspended_until, o.deleted_at AS owner_deleted_at
        FROM purchases p
        LEFT JOIN models m ON m.id = p.model_id
        LEFT JOIN users o ON o.id = m.owner_id
@@ -335,7 +335,7 @@ paymentsRouter.post('/purchases/:id/qr', requireAuth, requireBuyer, async (req, 
   const result = await db.query(
     `SELECT p.id, p.model_id, p.status, p.amount_cents, p.currency, p.provider_session_id,
             m.title, m.deleted_at, m.hidden_at,
-            o.suspended_at AS owner_suspended_at, o.deleted_at AS owner_deleted_at
+            o.suspended_at AS owner_suspended_at, o.suspended_until AS owner_suspended_until, o.deleted_at AS owner_deleted_at
      FROM purchases p
      JOIN models m ON m.id = p.model_id
      LEFT JOIN users o ON o.id = m.owner_id

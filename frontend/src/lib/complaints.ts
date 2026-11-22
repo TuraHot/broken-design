@@ -1,6 +1,6 @@
 // Sending a complaint to core-api (`POST /api/complaints`). Needs a signed-in user.
 import { CORE_API_URL } from './api';
-import { readSession } from './session';
+import { clearSession, readSession } from './session';
 
 export const COMPLAINT_CATEGORIES = [
   { value: 'model', label: 'A model (copied, offensive, broken…)' },
@@ -50,6 +50,13 @@ export async function submitComplaint(input: { category: ComplaintCategoryValue;
   }
 
   const data = await res.json().catch(() => null);
-  if (!res.ok) throw new ComplaintError('API', data?.error?.message ?? '');
+  if (!res.ok) {
+    const code = data?.error?.code;
+    if (res.status === 401 && (code === 'ACCOUNT_DELETED' || code === 'INVALID_TOKEN')) {
+      clearSession();
+      throw new ComplaintError('LOGIN');
+    }
+    throw new ComplaintError('API', data?.error?.message ?? '');
+  }
   return data as { id: string; status: string; createdAt: string };
 }

@@ -10,10 +10,11 @@ const HUD_CLIP =
   'polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px))';
 
 /** Notify the global HUD navigation indicator when triggering programmatic navigation. */
-export function startNavigationLoading(targetPath: string) {
+function startNavigationLoading(targetPath: string) {
   if (typeof window === 'undefined') return;
   window.dispatchEvent(new CustomEvent<string>(NAV_START_EVENT, { detail: targetPath }));
 }
+void startNavigationLoading;
 
 function NavigationProgressInner() {
   const t = useT();

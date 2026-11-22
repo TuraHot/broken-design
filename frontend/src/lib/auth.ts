@@ -1,5 +1,6 @@
 
 import { CDN_SERVICE_URL, CORE_API_URL } from './api';
+import { clearSession } from './session';
 
 // ข้อมูลผู้ใช้ที่ Backend ส่งกลับมา
 export interface AuthUser {
@@ -145,6 +146,10 @@ async function accountRequest(url: string, init: RequestInit): Promise<any> {
   }
   const data = await response.json().catch(() => null);
   if (!response.ok) {
+    const code = data?.error?.code;
+    if (response.status === 401 && (code === 'ACCOUNT_DELETED' || code === 'INVALID_TOKEN')) {
+      clearSession();
+    }
     const message = data?.error?.message;
     throw message ? new AuthError('API', message) : new AuthError('GENERIC');
   }

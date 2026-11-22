@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import { Router } from 'express';
 import { z } from 'zod';
 import { db } from '../../config/db';
-import { requireActiveAdmin, requireAuth } from '../../middlewares/auth.middleware';
+import { isSuspended, requireActiveAdmin, requireAuth } from '../../middlewares/auth.middleware';
 import { AppError } from '../../middlewares/error.middleware';
 import { disconnectUser } from '../../config/socket';
 
@@ -47,7 +47,7 @@ adminRouter.get('/overview', async (_req, res) => {
     db.query(
       `SELECT
          (SELECT COUNT(*)::int FROM users WHERE deleted_at IS NULL) AS total_users,
-         (SELECT COUNT(*)::int FROM users WHERE deleted_at IS NULL AND suspended_at IS NOT NULL) AS suspended_users,
+         (SELECT COUNT(*)::int FROM users WHERE deleted_at IS NULL AND suspended_at IS NOT NULL AND (suspended_until IS NULL OR suspended_until > NOW())) AS suspended_users,
          (SELECT COUNT(*)::int FROM users WHERE deleted_at IS NULL AND role = 'admin') AS admin_users,
          (SELECT COUNT(*)::int FROM users WHERE deleted_at IS NULL AND is_seller = TRUE AND role <> 'admin') AS seller_users,
          (SELECT COUNT(*)::int FROM users WHERE deleted_at IS NULL AND created_at > NOW() - INTERVAL '7 days') AS new_users_7d,
@@ -178,9 +178,9 @@ adminRouter.get('/users', async (req, res) => {
   }
 
   if (status === 'active') {
-    conditions.push(`deleted_at IS NULL AND suspended_at IS NULL`);
+    conditions.push(`deleted_at IS NULL AND (suspended_at IS NULL OR suspended_until <= NOW())`);
   } else if (status === 'suspended') {
-    conditions.push(`deleted_at IS NULL AND suspended_at IS NOT NULL`);
+    conditions.push(`deleted_at IS NULL AND suspended_at IS NOT NULL AND (suspended_until IS NULL OR suspended_until > NOW())`);
   } else if (status === 'deleted') {
     conditions.push(`deleted_at IS NOT NULL`);
   }
@@ -442,7 +442,8 @@ adminRouter.get('/models', async (req, res) => {
   const rows = await db.query(
     `SELECT m.id, m.title, m.license, m.price_cents, m.currency, m.view_count, m.download_count,
             m.hidden_at, m.deleted_at, m.created_at,
-            u.id AS owner_id, u.display_name AS owner_name, u.suspended_at AS owner_suspended_at
+            u.id AS owner_id, u.display_name AS owner_name, u.suspended_at AS owner_suspended_at,
+            u.suspended_until AS owner_suspended_until
      FROM models m
      JOIN users u ON u.id = m.owner_id
      ${where}
@@ -465,7 +466,10 @@ adminRouter.get('/models', async (req, res) => {
       owner: {
         id: m.owner_id,
         displayName: m.owner_name,
-        isSuspended: m.owner_suspended_at !== null,
+        isSuspended: isSuspended({
+          suspended_at: m.owner_suspended_at,
+          suspended_until: m.owner_suspended_until,
+        }),
       },
       createdAt: m.created_at,
     })),

@@ -21,37 +21,7 @@ export function calculateWithdrawalBreakdown(grossAmountCents: number, feeRateBp
   };
 }
 
-// ─── 1. POST /api/seller/enable ─────────────────────────────────────────────
-// ปิดช่องทางเปิดโหมดคนขายทันที — ผู้ใช้ใหม่ต้องผ่านระบบสมัคร 2 ขั้นตอน (/api/seller/apply) ด้วย Invite Code หรือรออนุมัติจากแอดมิน
-sellerRouter.post('/enable', requireAuth, async (req, res) => {
-  const userId = req.user!.id;
-
-  const check = await db.query<{ is_seller: boolean; role: string; suspended_at: Date | string | null; suspended_until: Date | string | null }>(
-    `SELECT is_seller, role, suspended_at, suspended_until FROM users WHERE id = $1`,
-    [userId],
-  );
-  if (check.rowCount === 0) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
-
-  const row = check.rows[0];
-  if (row.role === 'admin') {
-    throw new AppError(403, 'ADMIN_CANNOT_SELL', 'Admin accounts cannot become sellers');
-  }
-  if (isSuspended(row)) {
-    throw new AppError(403, 'ACCOUNT_SUSPENDED', 'Your account has been suspended by an administrator');
-  }
-  if (row.is_seller) {
-    res.json({ message: 'Seller mode is already enabled' });
-    return;
-  }
-
-  throw new AppError(
-    403,
-    'CREATOR_APPLICATION_REQUIRED',
-    'Direct seller activation is disabled. Please apply at /creator with an invite code or submit an application for admin approval.',
-  );
-});
-
-// ─── 2. GET /api/seller/models ──────────────────────────────────────────────
+// ─── 1. GET /api/seller/models ──────────────────────────────────────────────
 // โมเดลของฉัน (คนขาย)
 sellerRouter.get('/models', requireAuth, requireActiveSeller, async (req, res) => {
   const userId = req.user!.id;

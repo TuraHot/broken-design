@@ -59,6 +59,12 @@ if (!isTest) {
       console.warn("[CDN-Service] Failed to clean stale tmp uploads:", err?.message || err);
     });
 
+  // Periodically prune expired tmp_uploads & cached watermarked GLBs during long uptimes.
+  const cleanupIntervalMs = Math.max(60_000, Math.min(env.tmpCleanupMaxAgeMs, 30 * 60_000));
+  setInterval(() => {
+    void cleanupStaleTmpUploads(env.tmpUploadDir, env.tmpCleanupMaxAgeMs).catch(() => undefined);
+  }, cleanupIntervalMs).unref();
+
   if (env.storageProvider === "supabase" && supabase) {
     for (const bucket of [env.supabaseStorageBucket, env.supabaseAvatarBucket]) {
       void ensureSupabaseModelsBucket(bucket).catch((err) => {

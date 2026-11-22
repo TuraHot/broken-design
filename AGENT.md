@@ -101,22 +101,26 @@ Agent ทุกตัว **ห้ามละเมิด** กฎต่อไ�
   - `POST /api/auth/register` — สมัครสมาชิก (`bcrypt` + ออก JWT)
   - `POST /api/auth/login` — ล็อกอิน (บล็อกผู้ใช้ที่ `suspended_at IS NOT NULL` ด้วย `403 ACCOUNT_SUSPENDED` โดยข้อความบอกเหตุผลและวันหมดเวลา เพราะผู้ถูกระงับเข้ามาอ่านใบเตือนในเว็บไม่ได้ ถ้า `suspended_until` ผ่านแล้วจะปลดและให้ล็อกอินต่อ)
 - **Models (`/api/models`):**
-  - `GET /api/models?q=&tag=&license=&price=free|paid&page=` — ค้นหา กรอง แบ่งหน้า (กรอง `hidden_at IS NULL AND deleted_at IS NULL AND u.suspended_at IS NULL`)
+  - `GET /api/models?q=&tag=&license=&price=free|paid&page=` — ค้นหา (ชื่อโมเดล, ชื่อครีเอเตอร์, แท็ก) กรอง แบ่งหน้า (กรอง `hidden_at IS NULL AND deleted_at IS NULL` และ `(u.suspended_at IS NULL OR u.suspended_until <= NOW()) AND u.deleted_at IS NULL`)
   - `GET /api/models/:id` — รายละเอียดโมเดล (ไม่ส่ง `fileUrl` ของโมเดลเสียเงิน)
-  - `PATCH /api/models/:id` — แก้ไขรายละเอียด/ราคา/สัญญาอนุญาต *(ยังเป็น TODO stub — รอดำเนินการ)*
+  - `PATCH /api/models/:id` — แก้ไขรายละเอียด/ราคา/แท็ก/สัญญาอนุญาต (`requireAuth` + ตรวจเจ้าของหรือแอดมิน + `PREVIEW_REQUIRED`)
   - `DELETE /api/models/:id` — Soft Delete (`deleted_at = NOW()`, เฉพาะเจ้าของหรือแอดมิน)
 - **Payments (`/api`):**
   - **แอดมินซื้อไม่ได้:** `checkout`, `confirm-mock`, `pay-mock` และ `purchases/:id/qr` ใช้ middleware `requireBuyer` (`auth.middleware.ts`) ที่ถามบทบาทจากฐานข้อมูลทุกครั้ง (ไม่เชื่อ role ใน JWT) แอดมินได้ `403 ADMIN_CANNOT_BUY` และบัญชีที่ถูกระงับได้ `403 ACCOUNT_SUSPENDED` (เส้นทาง QR เดิมไม่มีการเช็กระงับเลย ตอนนี้มีแล้ว) หน้าเว็บส่งแอดมินกลับ `/admin` ทุกหน้า ไม่มีปุ่ม "ดูเว็บไซต์" อีก
   - **บัญชีที่ถูกระงับซื้อหรือแก้คีย์ไม่ได้:** `checkout`, `confirm-mock`, `pay-mock` และ `regenerate-key` ใช้ middleware `requireNotSuspended` (`auth.middleware.ts`) ที่ถามฐานข้อมูลทุกครั้ง (token อยู่ได้ 1 วัน) ตอบ `403 ACCOUNT_SUSPENDED` / `401` ถ้าไม่พบบัญชี และไม่ปล่อยผ่านเมื่อฐานข้อมูลผิดพลาด ห้ามใส่กับ `/api/me/notifications` เพราะผู้ถูกระงับต้องอ่านเหตุผลได้
   - `POST /api/models/:id/checkout` — สร้างรายการสั่งซื้อรายชิ้น (`status = 'pending'`), ล็อก `amount_cents`, `currency`, `license_type` จากตาราง `models`, และสุ่ม `embed_key` 48 ตัวอักษร hex (`crypto.randomBytes(24)`)
   - `POST /api/purchases/:id/confirm-mock` (และ `/api/models/:id/pay-mock`) — ยืนยันจ่ายเงินจำลอง (`status = 'paid'`, `paid_at = NOW()`) เมื่อ `PAYMENT_PROVIDER=mock`
+  - `POST /api/purchases/:id/qr` และ `POST /api/webhooks/stripe` — สร้าง QR PromptPay ผ่าน Stripe หรือ Mock QR และรับ Webhook พร้อมตรวจ `stripe-signature`
   - `GET /api/me/purchases` — ดึงรายการโมเดลที่ซื้อแล้วพร้อม `embed_key`, `amount_cents`, `currency`, `license_type`, `watermark_hash`, `paid_at`
   - `POST /api/purchases/:id/regenerate-key` — สร้าง `embed_key` ใหม่แทนที่รหัสเดิมทันที
 - **Seller (`/api/seller`):**
-  - `POST /api/seller/enable` — เปิดโหมดคนขาย (`is_seller = true`)
+  - `POST /api/seller/apply` และ `GET /api/seller/application` — สมัครเป็นครีเอเตอร์ด้วย Invite Code (Atomic CTE) หรือส่งคำขอให้แอดมินอนุมัติ
   - `GET /api/seller/status` — ตรวจสถานะคนขาย
   - `GET /api/seller/models` — รายการโมเดลของคนขาย (ไม่รวมโมเดลที่ถูก Soft Delete)
-  - `GET /api/seller/sales` — สรุปรายได้และประวัติการขาย
+  - `GET /api/seller/sales`, `GET /api/seller/wallet`, `POST /api/seller/withdraw` — สรุปรายได้ กระเป๋าเงิน และขอถอนเงินแบบ Transaction + Row Lock
+- **Creators & Social (`/api/creators`, `/api/models/:id/like`):**
+  - `GET /api/creators/:handle` — โปรไฟล์ครีเอเตอร์, Bio, โมเดลเด่น 5 ช่อง (`featuredModelIds`), และโมเดลสาธารณะ
+  - `POST /api/models/:id/like`, `GET /api/models/:id/like`, `GET /api/me/likes` — กดถูกใจพร้อม Socket.IO real-time updates และแจ้งเตือนเจ้าของโมเดล
 - **Admin (`/api/admin`):** *(ทุก Route ตรวจ `role === 'admin'` และ `suspended_at IS NULL` จากฐานข้อมูลจริงผ่าน `requireActiveAdmin`)*
   - `GET /api/admin/overview` — สรุปยอดรวมระบบ, สถิติ 7 วันล่าสุด, สัดส่วน Free/Paid & License, Top 5 โมเดล, รายการซื้อและผู้ใช้ล่าสุด, คำร้องเรียนที่เปิดอยู่
   - `GET /api/admin/users` — รายชื่อผู้ใช้ (ค้นหาด้วย `q` + แบ่งหน้า `page`, `pageSize`)
@@ -188,16 +192,17 @@ Agent ทุกตัว **ห้ามละเมิด** กฎต่อไ�
 | **Database & Cloud Storage** (`supabase/schema.sql` + Supabase Bucket `models`) | **100%** | ✅ พร้อมใช้งาน | ครบทุกตาราง (`users`, `models`, `purchases`, `likes`, `comments`, `complaints`), คอลัมน์ Single-item purchase & watermark, Seed accounts/model และอัปโหลดไฟล์ `.glb` ใน `storage_data/` ขึ้น Supabase bucket `models` เรียบร้อยแล้ว |
 | **CDN Service, Upload & Watermarking** (`services/cdn-service`) | **100%** | ✅ **23/23 tests** | `POST /api/models`, `GET /cdn/models/:id/:hash.glb`, `/preview.glb`, `/file.glb?key=`, `/download`, `/poster.webp`, `POST /cdn/verify-watermark`, HTTP Range (`206`/`416`), ETag (`304`), Rate Limit, Constant-time `embed_key` check, Dual-layer GLB Watermarking (Metadata HMAC + 64-vertex steganography) |
 | **Core API — Auth & CORS** (`services/core-api/src/modules/auth`, `config/cors.ts`) | **100%** | ✅ **6/6 tests** | `POST /api/auth/check-email`, `POST /api/auth/register`, `POST /api/auth/login` (**2/2**), และ CORS `localhost`/`127.0.0.1` handling (**4/4**) |
-| **Core API — Models** (`services/core-api/src/modules/models`) | **90%** | ✅ ใช้งานได้ (ขาด `PATCH`) | `GET /api/models` (search, tag, license, price, pagination), `GET /api/models/:id` (ซ่อน `fileUrl` สำหรับโมเดลเสียเงิน), `DELETE /api/models/:id` (Soft delete) \| **คงเหลือ:** `PATCH /api/models/:id` (แก้ไขชื่อ/รายละเอียด/ราคา/สัญญาอนุญาต — ยังเป็น TODO stub) |
+| **`PATCH /api/models/:id` & Models** (`services/core-api/src/modules/models`) | **100%** | ✅ พร้อมใช้งาน | `GET /api/models` (search ชื่อ/ผู้สร้าง/แท็ก, filter, pagination), `GET /api/models/:id`, `PATCH /api/models/:id`, `DELETE /api/models/:id` |
+| **Interactions (`likes`)** (`services/core-api/src/modules/interactions`) | **100%** | ✅ พร้อมใช้งาน | `POST /api/models/:id/like`, `GET /api/models/:id/like`, `GET /api/me/likes` + Socket.IO real-time updates *(ระบบ comment ยังไม่เปิดใช้)* |
+| **Frontend — Verify Watermark** (`frontend/src/app/verify/page.tsx`) | **100%** | ✅ พร้อมใช้งาน | หน้า `/verify` เชื่อม `POST /cdn/verify-watermark` ตรวจ Layer 1 HMAC + Layer 2 Vertex Steganography รองรับ Light/Dark และ EN/TH |
 | **Core API — Payments** (`services/core-api/src/modules/payments`) | **100%** | ✅ **15/15 tests** | `POST /api/models/:id/checkout`, `POST /api/purchases/:id/confirm-mock`, `POST /api/models/:id/pay-mock`, `GET /api/me/purchases`, `GET /api/purchases/:id`, `POST /api/purchases/:id/regenerate-key` |
-| **Core API — Seller** (`services/core-api/src/modules/seller`) | **100%** | ✅ **5/5 tests** | `POST /api/seller/enable`, `GET /api/seller/status`, `GET /api/seller/models`, `GET /api/seller/sales` |
+| **Core API — Seller** (`services/core-api/src/modules/seller`) | **100%** | ✅ พร้อมใช้งาน | `POST /api/seller/apply`, `GET /api/seller/application`, `GET /api/seller/status`, `GET /api/seller/models`, `GET /api/seller/sales`, `GET /api/seller/wallet`, `POST /api/seller/withdraw` |
 | **Core API — Admin & Complaints** (`services/core-api/src/modules/admin`, `complaints`) | **100%** | ✅ **49/49 tests** | `/api/admin/*` ครบทั้ง 12 endpoints (`overview`, `users`, `users/:id/suspend`, `users/:id/suspensions`, `models`, `models/:id/hide`, `models/:id/license`, `models/:id/history`, `purchases`, `purchases/:id`, `complaints`, `complaints/:id`) ผ่าน **38/38** (รวมเทสต์ sweeper 2 ข้อ) + `POST /api/complaints` (rate limit 5/hr) ผ่าน **5/5** + `/api/me/notifications` ผ่าน **6/6** *(รวม Core API ทั้งหมด **83/83 tests**)* |
 | **Frontend — Public Pages, Error Pages (`403`/`404`/`500`), Auth, Upload & Embed** (`frontend`) | **100%** | ✅ **4/4 tests** | หน้าแรก (`/`), `/gallery` (ค้นหา/กรอง/แบ่งหน้า), `/models/[id]`, `/creator`, `/creators/[handle]`, `/upload`, `/login`, `/embed/[id]`, `public/embed.js` (`<vm-model>`), เมนูบัญชี (`AccountMenu.tsx`), หน้า `403`, `not-found.tsx` (404), และ `error.tsx` (500) |
 | **Frontend — Admin Dashboard & Report Modal** (`frontend/src/app/admin/*`) | **100%** | ✅ พร้อมใช้งาน | `/admin`, `/admin/models`, `/admin/users`, `/admin/purchases`, `/admin/complaints` พร้อม Modal แจ้งปัญหา (`ReportForm.tsx`) ในเมนูผู้ใช้และ Footer *(เหลือเชื่อมปุ่ม Report ใน `/models/[id]` ให้เรียก `useReport().openReport()`)* |
-| **Frontend — Buyer & Seller Dashboards** (`frontend/src/app/me`, `seller`) | **100%** | ✅ พร้อมใช้งาน | `/me` (รายการที่ซื้อ, `embed_key`, Regenerate Key, ดาวน์โหลด `.glb` ฝังลายน้ำ, เปิดโหมดคนขาย) และ `/seller` (สรุปรายได้, ยอดขาย, โมเดลของฉัน, Soft Delete) เชื่อม API จริงครบ |
-| **Frontend — Mock Checkout & Optional Pages** (`frontend`) | **🚧** | 🚧 รอพัฒนา | ยังขาด `/pay/mock/[id]` (หน้าจำลองชำระเงิน) และหน้าเสริม `/verify` ตรวจลายน้ำ (`/docs`, `/licenses` และหน้ากฎหมายร่าง 5 หน้า — `/terms`, `/privacy`, `/seller-terms`, `/refunds`, `/dmca` — ทำแล้ว) |
+| **Frontend — Buyer, Seller & Checkout Flows** (`frontend/src/app/me`, `seller`, `checkout/[id]`) | **100%** | ✅ พร้อมใช้งาน | `/me` (รายการที่ซื้อ, `embed_key`, Regenerate Key, ดาวน์โหลด `.glb` ฝังลายน้ำ), `/creators/[handle]` (โปรไฟล์ + แบนเนอร์ 3D 5 ช่อง + แท็บ Seller Dashboard & Wallet), `/checkout/[id]`, `/checkout/success`, และ `/verify` เชื่อม API จริงครบ |
 
-> **หมายเหตุเพิ่มเติม:** โมดูล `interactions.routes.ts` (Like/Comment) และหน้า `/forgot-password` ปัจจุบันยังเป็น Stub/UI-only ตามลำดับ (อยู่นอก Scope หลักของระบบซื้อขายรายชิ้นและ CDN v1)
+> **หมายเหตุเพิ่มเติม:** ตาราง `comments` มีใน schema แล้ว แต่ระบบคอมเมนต์และการเชื่อมต่อปุ่ม Google Sign-in / Donate จริงยังอยู่นอก Scope v1 (`forgot-password`, `PATCH /api/models/:id`, `/checkout/[id]`, `/verify`, `likes` พัฒนาเสร็จเรียบร้อยแล้ว)
 
 ---
 
@@ -228,24 +233,15 @@ Agent ทุกตัว **ห้ามละเมิด** กฎต่อไ�
 
 ---
 
-### Phase 2: แก้ไขโมเดล, หน้าจ่ายเงินจำลอง และการปรับปรุงความปลอดภัย (Current Priority 🚧)
-
-เมื่อผู้ใช้งานสั่งให้พัฒนาต่อในส่วนที่เหลือ Agent ต้องยึดแนวทางและลำดับความสำคัญดังนี้:
-
-1. **งานที่ 1 — พัฒนา `PATCH /api/models/:id` และการปรับปรุงความปลอดภัย Backend (`services/core-api/` — แฮม & ต้า):**
-   - **Models Edit (`services/core-api/src/modules/models/models.routes.ts`):** พัฒนา `PATCH /api/models/:id` (จากเดิมที่เป็น TODO stub) ให้เจ้าของโมเดลหรือแอดมินแก้ไข `title`, `description`, `tags`, `license`, `price_cents`
-   - **Security Hardening (`docs/ARCHITECTURE.md` §5):** แก้ `requireAdmin` / `requireSeller` ใน `auth.middleware.ts` ให้ตรวจ DB เสมอ, เอา `DEV_CREATOR_TOKEN` ออกจาก `frontend/src/app/upload/page.tsx`, และเพิ่ม rate limit บน `/api/auth/*`
-
-2. **งานที่ 2 — เชื่อมต่อ Mock Checkout และปรับแต่งส่วนที่เหลือ (`frontend/` — ภีม, แฮม & นนท์):**
-   - **Mock Checkout (`/pay/mock/[id]`):** หน้าจำลองการชำระเงินที่เรียก `POST /api/purchases/:id/confirm-mock` (ตอนนี้ checkout redirect มาหน้านี้แล้วยัง 404 อยู่)
-   - **Seller Edit Page (`/seller/models/[id]`):** หน้าแก้ไขข้อมูล/ราคาโมเดล (คู่กับ `PATCH /api/models/:id`)
-   - **Report Button (`/models/[id]`):** เพิ่มปุ่ม Report ที่เรียก `useReport().openReport()` (เปิด Popup แจ้งปัญหาพร้อมกรอกลิงก์โมเดลอัตโนมัติ)
+### Phase 2: การขัดเกลาและปรับปรุงก่อนเปิดใช้งานจริง (Completed / Pre-launch Checklist)
+1. ✅ `PATCH /api/models/:id` & `/api/models/:id/assets`, `POST /api/auth/forgot-password` / `verify-reset-otp` / `reset-password`, `/checkout/[id]` (PromptPay QR & Mock confirm), `/verify` (Watermark Inspector), ระบบ Like + Socket.IO, และระบบ Light/Dark + EN/TH เสร็จสมบูรณ์
+2. **Pre-launch Remaining:** หมุนเวียนรหัสผ่าน Seed (`admin@brokendesign.com`, `creator@brokendesign.com`), แทนที่อีเมล `[TO DECIDE]` ในเอกสารกฎหมาย/หน้าติดต่อ, และพิจารณาเปลี่ยนส่ง `embed_key` ผ่าน header หรือ short-lived token สำหรับ embedded client
 
 ---
 
 ### Phase 3: การต่อยอดหลังเวอร์ชันแรก (Post-v1 Future Roadmap 🚀)
-1. **Watermark Inspector UI (`/verify` หรือในหน้า Admin/Creator):** หน้าเว็บสำหรับอัปโหลดไฟล์ `.glb` ต้องสงสัยเพื่อเรียก `POST /cdn/verify-watermark` และแสดงผลลัพธ์ `isValidMetadata`, `isValidVertexWatermark`, `vertexBitMatchRatio`, และ `purchaseId` ของผู้ซื้อที่นำไฟล์ไปเผยแพร่
-2. **Real Stripe Checkout Integration:** เปิดใช้งาน Stripe Checkout Session และ `POST /api/webhooks/stripe` ที่ตรวจสอบ `stripe-signature` แบบ Idempotent เมื่อ `PAYMENT_PROVIDER=stripe`
+1. **Live Donate & Google OAuth:** เชื่อมต่อระบบชำระเงินจริงให้กับ `DonateCard.tsx` และเปิดใช้งาน OAuth สำหรับปุ่ม Sign in with Google
+2. **Comments System:** พัฒนา API และ UI สำหรับตาราง `comments` พร้อมระบบกลั่นกรอง
 3. **Automated 3D Optimization & Domain Lock:** บีบอัดโมเดลอัตโนมัติด้วย Draco / Meshopt ตอนอัปโหลด และเพิ่มตัวเลือกผูก `embed_key` กับรายชื่อโดเมนที่อนุญาต (Allowed Origins)
 
 ---

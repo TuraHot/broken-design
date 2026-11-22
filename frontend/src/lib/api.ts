@@ -1,6 +1,7 @@
 import { cache } from 'react';
 import type { CreatorProfile } from './creators';
 import { isPublicModel, PAGE_SIZE, queryModels } from './pagination';
+import { clearSession } from './session';
 import {
   GALLERY_TAGS,
   type Model,
@@ -174,6 +175,10 @@ async function coreApiFetch<T>(path: string, token: string, init: RequestInit = 
   });
   if (!res.ok) {
     const err = await res.json().catch(() => null);
+    const code = err?.error?.code;
+    if (res.status === 401 && (code === 'ACCOUNT_DELETED' || code === 'INVALID_TOKEN')) {
+      clearSession();
+    }
     const message = err?.error?.message;
     throw message ? new ApiError(message, true) : new ApiError(`Request failed (${res.status})`, false);
   }
@@ -364,6 +369,10 @@ export async function replaceModelAssets(
   });
   if (!res.ok) {
     const err = await res.json().catch(() => null);
+    const code = err?.error?.code;
+    if (res.status === 401 && (code === 'ACCOUNT_DELETED' || code === 'INVALID_TOKEN')) {
+      clearSession();
+    }
     throw new Error(err?.error?.message || `Asset update failed (${res.status})`);
   }
   return res.json();

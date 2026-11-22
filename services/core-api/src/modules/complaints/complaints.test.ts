@@ -33,7 +33,7 @@ const post = (url: string, body: unknown, auth = true) =>
   });
 
 const OK_USER = (sql: string) =>
-  sql.includes('SELECT suspended_at FROM users') ? { rowCount: 1, rows: [{ suspended_at: null }] } : undefined;
+  sql.includes('SELECT suspended_at') ? { rowCount: 1, rows: [{ suspended_at: null, suspended_until: null }] } : undefined;
 
 test('POST /api/complaints - requires login', async () => {
   await withServer(() => undefined, async (url) => {
@@ -96,7 +96,7 @@ test('POST /api/complaints - 404 for an unknown model, 403 for a suspended accou
   );
 
   await withServer(
-    (sql) => (sql.includes('SELECT suspended_at FROM users') ? { rowCount: 1, rows: [{ suspended_at: '2026-11-01T00:00:00.000Z' }] } : undefined),
+    (sql) => (sql.includes('SELECT suspended_at') ? { rowCount: 1, rows: [{ suspended_at: '2026-11-01T00:00:00.000Z' }] } : undefined),
     async (url) => {
       const res = await post(url, { category: 'other', message: 'A long enough message.' });
       assert.equal(res.status, 403);

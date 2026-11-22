@@ -56,8 +56,22 @@ let models: Record<string, Row>;
 let purchases: Row[];
 let users: Record<string, Row>;
 let downloadIncrements: string[];
+let watermarkHashUpdates: number;
+
+function cleanupWatermarkCache() {
+  try {
+    for (const entry of fs.readdirSync(env.tmpUploadDir)) {
+      if (entry.startsWith("wm-") && entry.endsWith(".glb")) {
+        fs.rmSync(path.join(env.tmpUploadDir, entry), { force: true });
+      }
+    }
+  } catch {
+    // tmpUploadDir may not exist yet.
+  }
+}
 
 function resetDb() {
+  cleanupWatermarkCache();
   const base = {
     owner_id: OWNER,
     file_hash: FULL_HASH,
@@ -92,6 +106,7 @@ function resetDb() {
     [STRANGER]: { suspended_at: null },
   };
   downloadIncrements = [];
+  watermarkHashUpdates = 0;
 }
 
 (db as any).query = async (sql: string, params: any[] = []) => {
@@ -178,6 +193,7 @@ function resetDb() {
               is_seller: u.is_seller ?? true,
               avatar_hash: u.avatar_hash ?? null,
               suspended_at: u.suspended_at ?? null,
+              suspended_until: u.suspended_until ?? null,
               deleted_at: u.deleted_at ?? null,
             },
           ]
@@ -207,12 +223,14 @@ function resetDb() {
           purchased: Boolean(match),
           purchase_id: match?.id ?? null,
           license_type: match?.license_type ?? null,
+          watermark_hash: match?.watermark_hash ?? null,
         },
       ],
       rowCount: 1,
     };
   }
   if (sql.includes("UPDATE purchases SET watermark_hash")) {
+    watermarkHashUpdates += 1;
     const p = purchases.find((item) => item.id === params[1]);
     if (p) p.watermark_hash = params[0];
     return { rows: [], rowCount: p ? 1 : 0 };
@@ -234,6 +252,7 @@ const base = `http://localhost:${port}/cdn`;
 const apiBase = `http://localhost:${port}/api`;
 after(() => {
   server.close();
+  cleanupWatermarkCache();
   fs.rmSync(TEST_STORAGE_DIR, { recursive: true, force: true });
 });
 beforeEach(resetDb);
@@ -1204,4 +1223,128 @@ test("upload validation: rejects overflowing price_cents and overly long descrip
   });
   assert.equal(descRes.status, 400);
   assert.equal(await errCode(descRes), "BAD_REQUEST");
+});
+
+test("download: Range bytes=0-0 does not inflate download_count, and paid Range chunks reuse cached watermarked GLB", async () => {
+  // 1. Free model: bytes=0-0 returns 1 byte without incrementing download_count
+  const freeProbe = await get(`/models/${FREE_ID}/download`, { Range: "bytes=0-0" });
+  assert.equal(freeProbe.status, 206);
+  assert.equal((await freeProbe.arrayBuffer()).byteLength, 1);
+  await waitTick();
+  assert.deepEqual(downloadIncrements, []);
+
+  // Full range bytes=0- on free model DOES count once
+  const freeFullRange = await get(`/models/${FREE_ID}/download`, { Range: "bytes=0-" });
+  assert.equal(freeFullRange.status, 206);
+  assert.deepEqual(Buffer.from(await freeFullRange.arrayBuffer()), FULL);
+  await waitTick();
+  assert.deepEqual(downloadIncrements, [FREE_ID]);
+  downloadIncrements = [];
+
+  // 2. Paid real GLB: multi-range download embeds watermark once and skips repeat DB writes
+  const rawGlb = await createSampleGlbBuffer(72);
+  models[PAID_ID].file_hash = store(rawGlb, "glb");
+  models[PAID_ID].license = "COMMERCIAL";
+  const purchaseId = "99999999-9999-4999-8999-999999999999";
+  purchases[0].id = purchaseId;
+  purchases[0].license_type = "COMMERCIAL";
+  delete purchases[0].watermark_hash;
+
+  // Probe chunk 0-0: builds cache & saves watermark_hash once, does NOT count as a download
+  const paidProbe = await get(`/models/${PAID_ID}/download`, {
+    Authorization: `Bearer ${token(BUYER)}`,
+    Range: "bytes=0-0",
+  });
+  assert.equal(paidProbe.status, 206);
+  const probeRangeHeader = paidProbe.headers.get("content-range")!;
+  const totalSize = Number(probeRangeHeader.split("/")[1]);
+  assert.ok(totalSize > 200);
+  const byte0 = Buffer.from(await paidProbe.arrayBuffer());
+  assert.equal(byte0.length, 1);
+  await waitTick();
+  assert.equal(watermarkHashUpdates, 1);
+  assert.deepEqual(downloadIncrements, []);
+
+  // Wait 15ms so any uncached embedLicenseAndWatermark call would produce a different issuedAt timestamp
+  await new Promise((r) => setTimeout(r, 15));
+
+  // Second range (bytes=1-199) + remaining bytes (bytes=200-) read from cache without touching DB again
+  const chunk1 = await get(`/models/${PAID_ID}/download`, {
+    Authorization: `Bearer ${token(BUYER)}`,
+    Range: "bytes=1-199",
+  });
+  assert.equal(chunk1.status, 206);
+  const buf1 = Buffer.from(await chunk1.arrayBuffer());
+
+  const chunk2 = await get(`/models/${PAID_ID}/download`, {
+    Authorization: `Bearer ${token(BUYER)}`,
+    Range: "bytes=200-",
+  });
+  assert.equal(chunk2.status, 206);
+  const buf2 = Buffer.from(await chunk2.arrayBuffer());
+  await waitTick();
+
+  assert.equal(watermarkHashUpdates, 1, "cache hit must not re-update watermark_hash");
+  assert.deepEqual(downloadIncrements, [], "partial range chunks must not increment download_count");
+
+  // Reassembled chunks must form a completely valid watermarked GLB
+  const reassembled = Buffer.concat([byte0, buf1, buf2]);
+  assert.equal(reassembled.length, totalSize);
+  const verified = await verifyGlbWatermark(reassembled, PAID_ID);
+  assert.equal(verified.isValidMetadata, true);
+  assert.equal(verified.isValidVertexWatermark, true);
+  assert.equal((verified.extractedMetadata as any)?.purchaseId, purchaseId);
+});
+
+test("suspension expiry: expired suspended_until allows creator upload and buyer download, while active timed suspension blocks both", async () => {
+  const glb = await createSampleGlbBuffer(72);
+
+  // 1. Active timed suspension in the future -> blocks both upload and paid download
+  users[OWNER] = {
+    role: "creator",
+    is_seller: true,
+    suspended_at: new Date(Date.now() - 3600_000),
+    suspended_until: new Date(Date.now() + 3600_000),
+  };
+  users[BUYER] = {
+    suspended_at: new Date(Date.now() - 3600_000),
+    suspended_until: new Date(Date.now() + 3600_000),
+  };
+
+  const activeUploadForm = new FormData();
+  activeUploadForm.append("file", new Blob([new Uint8Array(glb)], { type: "model/gltf-binary" }), "active-susp.glb");
+  activeUploadForm.append("title", "Active Timed Suspension");
+  const blockedUpload = await fetch(`${apiBase}/models`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token(OWNER, "creator")}` },
+    body: activeUploadForm,
+  });
+  assert.equal(blockedUpload.status, 403);
+  assert.equal(await errCode(blockedUpload), "ACCOUNT_SUSPENDED");
+
+  const blockedDownload = await get(`/models/${PAID_ID}/download`, {
+    Authorization: `Bearer ${token(BUYER)}`,
+  });
+  assert.equal(blockedDownload.status, 403);
+  assert.equal(await errCode(blockedDownload), "ACCOUNT_SUSPENDED");
+
+  // 2. Expired timed suspension in the past (suspended_at still non-null) -> both upload and download succeed
+  users[OWNER].suspended_until = new Date(Date.now() - 60_000);
+  users[BUYER].suspended_until = new Date(Date.now() - 60_000);
+
+  const expiredUploadForm = new FormData();
+  expiredUploadForm.append("file", new Blob([new Uint8Array(glb)], { type: "model/gltf-binary" }), "expired-susp.glb");
+  expiredUploadForm.append("title", "Expired Timed Suspension");
+  const okUpload = await fetch(`${apiBase}/models`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token(OWNER, "creator")}` },
+    body: expiredUploadForm,
+  });
+  assert.equal(okUpload.status, 201);
+
+  const okDownload = await get(`/models/${PAID_ID}/download`, {
+    Authorization: `Bearer ${token(BUYER)}`,
+  });
+  assert.equal(okDownload.status, 200);
+  await okDownload.arrayBuffer();
 });

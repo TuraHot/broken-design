@@ -7,7 +7,7 @@ import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { db } from '../../config/db';
 import { env } from '../../config/env';
-import { requireAuth } from '../../middlewares/auth.middleware';
+import { isSuspended, requireAuth } from '../../middlewares/auth.middleware';
 import { AppError } from '../../middlewares/error.middleware';
 import { liftExpiredSuspensions } from '../admin/suspensionSweeper';
 
@@ -341,14 +341,14 @@ authRouter.patch('/profile', requireAuth, async (req, res) => {
   }
 
   const existing = await db.query(
-    `SELECT id, display_name, suspended_at FROM users WHERE id = $1`,
+    `SELECT id, display_name, suspended_at, suspended_until FROM users WHERE id = $1`,
     [req.user!.id],
   );
   const currentUser = existing.rows[0];
   if (!currentUser) {
     throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
   }
-  if (currentUser.suspended_at) {
+  if (isSuspended(currentUser)) {
     throw new AppError(403, 'ACCOUNT_SUSPENDED', 'This account has been suspended');
   }
 
@@ -365,8 +365,22 @@ authRouter.patch('/profile', requireAuth, async (req, res) => {
     values.push(parsed.data.bio);
   }
   if (parsed.data.featuredModelIds !== undefined) {
+    const uniqueFeaturedIds = Array.from(new Set(parsed.data.featuredModelIds));
+    if (uniqueFeaturedIds.length > 0) {
+      const ownedRes = await db.query<{ id: string }>(
+        `SELECT id FROM models WHERE owner_id = $1 AND id = ANY($2::uuid[]) AND deleted_at IS NULL`,
+        [req.user!.id, uniqueFeaturedIds],
+      );
+      if (ownedRes.rows.length !== uniqueFeaturedIds.length) {
+        throw new AppError(
+          400,
+          'INVALID_FEATURED_MODELS',
+          'All featured models must belong to your account and not be deleted',
+        );
+      }
+    }
     setClauses.push(`featured_model_ids = $${idx++}`);
-    values.push(parsed.data.featuredModelIds);
+    values.push(uniqueFeaturedIds);
   }
 
   values.push(req.user!.id);
@@ -438,7 +452,7 @@ authRouter.post('/forgot-password', passwordResetLimiter, async (req, res) => {
   }
 
   const found = await db.query(
-    `SELECT id, email FROM users WHERE email = $1 AND suspended_at IS NULL`,
+    `SELECT id, email FROM users WHERE email = $1 AND (suspended_at IS NULL OR suspended_until <= NOW())`,
     [parsed.data.email.toLowerCase()],
   );
   const user = found.rows[0];
@@ -477,7 +491,7 @@ authRouter.post('/verify-reset-otp', passwordResetLimiter, async (req, res) => {
   const invalid = () => new AppError(400, 'INVALID_OTP', 'The code is incorrect or has expired');
 
   const found = await db.query(
-    `SELECT id FROM users WHERE email = $1 AND suspended_at IS NULL`,
+    `SELECT id FROM users WHERE email = $1 AND (suspended_at IS NULL OR suspended_until <= NOW())`,
     [parsed.data.email.toLowerCase()],
   );
   const user = found.rows[0];

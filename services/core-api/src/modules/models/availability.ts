@@ -3,6 +3,8 @@
 // suspension whose end has passed no longer counts, even if the sweeper has not cleared `suspended_at` yet; the
 // database clock decides, the same as the sweeper.
 
+import { isSuspended } from '../../middlewares/auth.middleware';
+
 /** SQL for an owner that is neither suspended (an ended timed suspension does not count) nor deleted; `alias` is the users table alias. */
 export function ownerActiveSql(alias: string): string {
   return `(${alias}.suspended_at IS NULL OR ${alias}.suspended_until <= NOW()) AND ${alias}.deleted_at IS NULL`;
@@ -15,8 +17,14 @@ export const MODEL_SELLABLE_SQL = `m.deleted_at IS NULL AND m.hidden_at IS NULL 
 export function isModelUnavailable(row: {
   deleted_at?: unknown;
   hidden_at?: unknown;
-  owner_suspended_at?: unknown;
+  owner_suspended_at?: Date | string | null;
+  owner_suspended_until?: Date | string | null;
   owner_deleted_at?: unknown;
 }): boolean {
-  return Boolean(row.deleted_at || row.hidden_at || row.owner_suspended_at || row.owner_deleted_at);
+  return Boolean(
+    row.deleted_at ||
+      row.hidden_at ||
+      isSuspended({ suspended_at: row.owner_suspended_at, suspended_until: row.owner_suspended_until }) ||
+      row.owner_deleted_at,
+  );
 }

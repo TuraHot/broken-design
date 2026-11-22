@@ -8,7 +8,7 @@ import sharp from 'sharp';
 import { db } from '../../config/db';
 import { env } from '../../config/env';
 import { supabase } from '../../config/supabase';
-import { requireAuth } from '../../middlewares/auth.middleware';
+import { isSuspended, requireAuth } from '../../middlewares/auth.middleware';
 import { AppError } from '../../middlewares/error.middleware';
 import { getAvatarStorage, type StorageAdapter } from '../../storage';
 import { avatarKey } from '../../storage/keys';
@@ -57,13 +57,14 @@ interface UserAvatarRow {
   id: string;
   avatar_hash: string | null;
   suspended_at: Date | string | null;
+  suspended_until?: Date | string | null;
 }
 
 async function findActiveUser(userId: string): Promise<UserAvatarRow> {
   let row: UserAvatarRow | undefined;
   try {
     const res = await db.query<UserAvatarRow>(
-      `SELECT id, avatar_hash, suspended_at FROM users WHERE id = $1`,
+      `SELECT id, avatar_hash, suspended_at, suspended_until FROM users WHERE id = $1`,
       [userId],
     );
     row = res.rows[0];
@@ -71,7 +72,7 @@ async function findActiveUser(userId: string): Promise<UserAvatarRow> {
     if (!supabase) throw err;
     const { data, error } = await supabase
       .from('users')
-      .select('id, avatar_hash, suspended_at')
+      .select('id, avatar_hash, suspended_at, suspended_until')
       .eq('id', userId)
       .maybeSingle();
     if (error) throw err;
@@ -79,10 +80,20 @@ async function findActiveUser(userId: string): Promise<UserAvatarRow> {
   }
 
   if (!row) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
-  if (row.suspended_at !== null) {
+  if (isSuspended(row)) {
     throw new AppError(403, 'ACCOUNT_SUSPENDED', 'Your account has been suspended by an administrator.');
   }
   return row;
+}
+
+async function requireActiveAvatarUser(req: Request, _res: Response, next: NextFunction): Promise<void> {
+  try {
+    const current = await findActiveUser(req.user!.id);
+    (req as any).avatarUser = current;
+    next();
+  } catch (err) {
+    next(err);
+  }
 }
 
 async function saveUserAvatarHash(userId: string, avatarHash: string | null): Promise<void> {
@@ -100,6 +111,7 @@ avatarRouter.post(
   '/me/avatar',
   avatarLimiter,
   requireAuth,
+  requireActiveAvatarUser,
   uploadAvatar,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const file = req.file;
@@ -108,7 +120,7 @@ avatarRouter.post(
 
     try {
       const userId = req.user!.id;
-      const current = await findActiveUser(userId);
+      const current = ((req as any).avatarUser as UserAvatarRow | undefined) ?? (await findActiveUser(userId));
       const oldHash = current.avatar_hash?.trim() || null;
 
       if (!file) {

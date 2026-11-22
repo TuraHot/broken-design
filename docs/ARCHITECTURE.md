@@ -84,13 +84,8 @@ High-I/O upload, multi-layer `.glb` watermarking, and streaming (`upload/upload.
 - Planned hosting: Vercel (`frontend`), Render (`core-api`, `cdn-service`; set `TRUST_PROXY=1`), Supabase (PostgreSQL + `models` bucket). `embed.js` defaults `cdn-base` to `http://localhost:4001`; pass `cdn-base` attribute in production.
 
 ## 5. Known issues to fix before launch
-1. Both services fall back to JWT secret `'dev-secret'`, and `cdn-service` falls back to a fixed `WATERMARK_SECRET` in the repo — fail startup in production when missing.
-2. Shared `requireAdmin` and `requireSeller` in `services/core-api/src/middlewares/auth.middleware.ts` trust JWT claims without querying the DB (`modules/admin/` and `modules/seller/` currently re-check in their own middleware — consolidate in shared middleware per `AGENT.md` §3.2).
-3. `jwt.verify` results are cast to `AuthUser` without schema validation, and `algorithms: ['HS256']` is not pinned (both services).
-4. `cdn-service` configures `cors({ origin: '*' })` globally (including `POST /api/models`); restrict `*` to public `/cdn/*` streaming routes.
-5. No rate limiting on `/api/auth/*` (notably `check-email` allows account enumeration) or `POST /api/models` upload.
-6. Stripe webhook needs raw request body for signature verification, while `app.ts` applies `express.json()` globally first (currently a stub).
-7. Passing `embed_key` in query string (`?key=`) exposes it to access logs and referrers; consider headers or short-lived tokens.
-8. Seed credentials in `schema.sql`, `seedAdmin.ts`, and `README.md` must be rotated/disabled before production.
-9. `frontend/src/app/upload/page.tsx` still embeds a fallback `DEV_CREATOR_TOKEN`; remove it before shipping.
-10. `/pay/mock/[id]` and `PATCH /api/models/:id` are not completed yet (see [`docs/TASKS.md`](TASKS.md)).
+1. Both services fall back to JWT secret `'dev-secret'`, and `cdn-service` falls back to a fixed `WATERMARK_SECRET` in dev/test; startup already throws in `NODE_ENV=production` (`assertProductionSecrets`), so ensure strong production secrets are injected.
+2. Seed credentials in `schema.sql`, `seedAdmin.ts`, and `README.md` must be rotated/disabled before production.
+3. Passing `embed_key` in query string (`?key=`) exposes it to access logs and referrers; consider headers or short-lived tokens for third-party embeds in a future release.
+4. Comments table exists in `schema.sql`, while comment routes/UI are deferred post-v1 (likes are live).
+5. Support email placeholders (`[TO DECIDE]`) in legal documents and `/contact` must be replaced after legal review before processing real payments.

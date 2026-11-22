@@ -7,6 +7,10 @@
 //   GET /cdn/models/:id/poster.webp      poster image
 //
 // Every route supports HEAD, HTTP Range (206/416) and ETag. Hidden models and models of suspended owners return 403.
+import fs from "fs";
+import fsp from "fs/promises";
+import path from "path";
+import { pipeline } from "stream";
 import express, {
   Router,
   type Request,
@@ -18,8 +22,10 @@ import rateLimit from "express-rate-limit";
 import { env } from "../../config/env";
 import { AppError } from "../../middlewares/error.middleware";
 import { isAccountDeleted, verifyJwtToken, type AuthUser } from "../../middlewares/auth.middleware";
+import { touchCacheFile } from "../../storage";
 import { validateGlbHeader } from "../../utils/glbValidator";
 import {
+  computeWatermarkSignature,
   embedLicenseAndWatermark,
   verifyGlbWatermark,
 } from "../../utils/glbWatermark";
@@ -38,6 +44,7 @@ import {
   readAssetBuffer,
   savePurchaseWatermarkHash,
   sendAsset,
+  type CdnModel,
   type PaidDownloadAccess,
 } from "./cdn.service";
 import { avatarKey, candidateKeys } from "../../storage/keys";
@@ -186,6 +193,86 @@ cdnRouter.get("/models/:id/preview.glb", async (req, res) => {
   });
 });
 
+interface WatermarkedAssetInfo {
+  cachedPath: string;
+  totalSize: number;
+  signature: string;
+}
+
+const inFlightWatermarks = new Map<string, Promise<WatermarkedAssetInfo | null>>();
+
+/**
+ * Cache buyer-watermarked GLBs on disk keyed by `(model.file_hash, watermark signature)` and deduplicate
+ * concurrent builds so HTTP Range chunk requests can stream slices without re-embedding the whole file.
+ */
+async function getOrBuildWatermarkedAsset(
+  model: CdnModel,
+  purchaseId: string,
+  licenseToEmbed: string,
+): Promise<WatermarkedAssetInfo | null> {
+  const signature = computeWatermarkSignature({
+    modelId: model.id,
+    ownerId: model.owner_id,
+    license: licenseToEmbed,
+    purchaseId,
+  });
+  const cachedPath = path.join(env.tmpUploadDir, `wm-${model.file_hash}-${signature}.glb`);
+
+  try {
+    const stat = await fsp.stat(cachedPath);
+    if (stat.isFile() && stat.size > 0) {
+      touchCacheFile(cachedPath);
+      return { cachedPath, totalSize: stat.size, signature };
+    }
+  } catch {
+    // Cache miss — build below.
+  }
+
+  let buildPromise = inFlightWatermarks.get(cachedPath);
+  if (!buildPromise) {
+    buildPromise = (async () => {
+      const rawBuffer = await readAssetBuffer(
+        candidateKeys(model.id, "model", model.file_hash),
+      );
+      if (!validateGlbHeader(rawBuffer, rawBuffer.length)) {
+        return null;
+      }
+
+      const { buffer: watermarkedBuffer, signature: embeddedSig } =
+        await embedLicenseAndWatermark(rawBuffer, {
+          modelId: model.id,
+          ownerId: model.owner_id,
+          license: licenseToEmbed,
+          purchaseId,
+        });
+
+      await fsp.mkdir(env.tmpUploadDir, { recursive: true });
+      const tmpPath = `${cachedPath}.tmp.${process.pid}.${Date.now()}`;
+      try {
+        await fsp.writeFile(tmpPath, watermarkedBuffer);
+        await fsp.rename(tmpPath, cachedPath);
+      } catch (err) {
+        await fsp.unlink(tmpPath).catch(() => undefined);
+        throw err;
+      }
+
+      return {
+        cachedPath,
+        totalSize: watermarkedBuffer.length,
+        signature: embeddedSig,
+      };
+    })().finally(() => {
+      if (inFlightWatermarks.get(cachedPath) === buildPromise) {
+        inFlightWatermarks.delete(cachedPath);
+      }
+    });
+
+    inFlightWatermarks.set(cachedPath, buildPromise);
+  }
+
+  return buildPromise;
+}
+
 // ─── GET /cdn/models/:id/download ──────────────────────────────────────────
 cdnRouter.get("/models/:id/download", downloadLimiter, async (req, res) => {
   const user = await optionalUser(req);
@@ -214,26 +301,22 @@ cdnRouter.get("/models/:id/download", downloadLimiter, async (req, res) => {
     assertServable(model);
   }
 
-  // Always embed buyer's purchaseId & license_type for paid downloads (including Range requests so Range cannot bypass watermarking).
+  // Always embed buyer's purchaseId & license_type for paid downloads (cached on disk so Range chunks avoid re-embedding).
   if (purchaseInfo?.purchaseId) {
-    const rawBuffer = await readAssetBuffer(
-      candidateKeys(model.id, "model", model.file_hash),
+    const licenseToEmbed =
+      purchaseInfo.licenseType || model.license || "COMMERCIAL";
+    const watermarked = await getOrBuildWatermarkedAsset(
+      model,
+      purchaseInfo.purchaseId,
+      licenseToEmbed,
     );
-    if (validateGlbHeader(rawBuffer, rawBuffer.length)) {
-      const licenseToEmbed =
-        purchaseInfo.licenseType || model.license || "COMMERCIAL";
-      const { buffer: watermarkedBuffer, signature } =
-        await embedLicenseAndWatermark(rawBuffer, {
-          modelId: model.id,
-          ownerId: model.owner_id,
-          license: licenseToEmbed,
-          purchaseId: purchaseInfo.purchaseId,
-        });
-
-      await savePurchaseWatermarkHash(purchaseInfo.purchaseId, signature);
+    if (watermarked) {
+      const { cachedPath, totalSize, signature } = watermarked;
+      if (purchaseInfo.watermarkHash !== signature) {
+        await savePurchaseWatermarkHash(purchaseInfo.purchaseId, signature);
+      }
 
       const etag = `"${signature}"`;
-      const totalSize = watermarkedBuffer.length;
       const ifRange = req.headers["if-range"];
       const spec =
         ifRange && ifRange !== etag ? null : parseRangeSpec(req.headers.range);
@@ -259,17 +342,13 @@ cdnRouter.get("/models/:id/download", downloadLimiter, async (req, res) => {
       res.setHeader("X-Content-Type-Options", "nosniff");
       res.setHeader("Content-Disposition", contentDisposition(model.title));
 
-      const bodyBuffer = range
-        ? watermarkedBuffer.subarray(range.start, range.end + 1)
-        : watermarkedBuffer;
-
       if (range) {
         res.status(206);
         res.setHeader(
           "Content-Range",
           `bytes ${range.start}-${range.end}/${totalSize}`,
         );
-        res.setHeader("Content-Length", String(bodyBuffer.length));
+        res.setHeader("Content-Length", String(range.end - range.start + 1));
       } else {
         res.status(200);
         res.setHeader("Content-Length", String(totalSize));
@@ -280,14 +359,26 @@ cdnRouter.get("/models/:id/download", downloadLimiter, async (req, res) => {
         return;
       }
 
-      if (!range || range.start === 0) {
+      // Count only complete file transfers (200 or full-file Range 0..end), never probe chunks like bytes=0-0.
+      const isFullDownload =
+        !range || (totalSize > 0 && range.start === 0 && range.end === totalSize - 1);
+      if (isFullDownload) {
         res.once("finish", () => {
           incrementDownloadCount(model.id).catch((err) =>
             console.error("[CDN] download_count update failed:", err.message),
           );
         });
       }
-      res.send(bodyBuffer);
+
+      const stream = fs.createReadStream(
+        cachedPath,
+        range ? { start: range.start, end: range.end } : undefined,
+      );
+      pipeline(stream, res, (err) => {
+        if (err && (err as any).code !== "ERR_STREAM_PREMATURE_CLOSE") {
+          console.error("[CDN] watermarked stream error:", err.message);
+        }
+      });
       return;
     }
   }
@@ -300,8 +391,13 @@ cdnRouter.get("/models/:id/download", downloadLimiter, async (req, res) => {
     downloadName: model.title,
   });
 
-  // Count a download once per completed transfer that starts at byte 0 (resumed chunks don't count).
-  if (req.method === "GET" && (!result.range || result.range.start === 0)) {
+  // Count only complete file transfers (200 or full-file Range 0..end), never partial/probe chunks.
+  const isFullDownload =
+    !result.range ||
+    (result.size > 0 &&
+      result.range.start === 0 &&
+      result.range.end === result.size - 1);
+  if (req.method === "GET" && isFullDownload) {
     res.once("finish", () => {
       incrementDownloadCount(model.id).catch((err) =>
         console.error("[CDN] download_count update failed:", err.message),

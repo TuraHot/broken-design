@@ -19,4 +19,12 @@ test('isModelUnavailable - true for removed, hidden, suspended owner or deleted 
   for (const key of ['deleted_at', 'hidden_at', 'owner_suspended_at', 'owner_deleted_at']) {
     assert.equal(isModelUnavailable({ [key]: new Date() }), true, key);
   }
+  // Expired timed owner suspension no longer makes the model unavailable
+  assert.equal(
+    isModelUnavailable({
+      owner_suspended_at: new Date(Date.now() - 3600_000),
+      owner_suspended_until: new Date(Date.now() - 60_000),
+    }),
+    false,
+  );
 });

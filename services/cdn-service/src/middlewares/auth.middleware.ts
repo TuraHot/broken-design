@@ -45,18 +45,30 @@ export function verifyJwtToken(token: string): AuthUser {
   };
 }
 
+/**
+ * Whether an account is suspended right now. A timed suspension whose end has passed no longer counts,
+ * even though `suspended_at` stays set until the sweeper or the next login clears it (matches core-api).
+ */
+export function isSuspended(
+  row: { suspended_at?: Date | string | null; suspended_until?: Date | string | null } | null | undefined,
+): boolean {
+  if (!row?.suspended_at) return false;
+  return !(row.suspended_until && new Date(row.suspended_until).getTime() <= Date.now());
+}
+
 interface DbUserStatus {
   id: string;
   role: 'user' | 'creator' | 'admin';
   is_seller: boolean;
   suspended_at: Date | string | null;
+  suspended_until?: Date | string | null;
 }
 
 /** Look up live user permissions from PostgreSQL (with Supabase REST fallback). Never fails open. */
 async function loadUserStatus(userId: string): Promise<DbUserStatus | null> {
   try {
     const res = await db.query<DbUserStatus>(
-      `SELECT id, role, is_seller, suspended_at FROM users WHERE id = $1`,
+      `SELECT id, role, is_seller, suspended_at, suspended_until FROM users WHERE id = $1`,
       [userId],
     );
     return res.rows[0] ?? null;
@@ -64,7 +76,7 @@ async function loadUserStatus(userId: string): Promise<DbUserStatus | null> {
     if (!supabase) throw err;
     const { data, error } = await supabase
       .from('users')
-      .select('id, role, is_seller, suspended_at')
+      .select('id, role, is_seller, suspended_at, suspended_until')
       .eq('id', userId)
       .maybeSingle();
     if (error) throw err;
@@ -111,7 +123,7 @@ export async function requireSeller(req: Request, _res: Response, next: NextFunc
   if (!dbUser) {
     throw new AppError(401, 'UNAUTHORIZED', 'Account not found');
   }
-  if (dbUser.suspended_at !== null) {
+  if (isSuspended(dbUser)) {
     throw new AppError(
       403,
       'ACCOUNT_SUSPENDED',

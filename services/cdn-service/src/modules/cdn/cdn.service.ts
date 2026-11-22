@@ -235,6 +235,7 @@ export async function assertValidEmbedKey(
 export interface PaidDownloadAccess {
   purchaseId: string | null;
   licenseType: string | null;
+  watermarkHash?: string | null;
 }
 
 /** Paid-model download: requires a `paid` purchase and an unsuspended downloader (owners are blocked by OWN_MODEL). */
@@ -245,14 +246,17 @@ export async function assertCanDownloadPaid(
   let row:
     | {
         suspended_at: Date | string | null;
+        suspended_until?: Date | string | null;
         purchased: boolean;
         purchase_id?: string | null;
         license_type?: string | null;
+        watermark_hash?: string | null;
       }
     | undefined;
   try {
     const result = await db.query(
       `SELECT u.suspended_at,
+              u.suspended_until,
               EXISTS (
                 SELECT 1 FROM purchases p
                  WHERE p.user_id = u.id AND p.model_id = $2 AND p.status = 'paid'
@@ -266,7 +270,12 @@ export async function assertCanDownloadPaid(
                 SELECT p.license_type FROM purchases p
                  WHERE p.user_id = u.id AND p.model_id = $2 AND p.status = 'paid'
                  LIMIT 1
-              ) AS license_type
+              ) AS license_type,
+              (
+                SELECT p.watermark_hash FROM purchases p
+                 WHERE p.user_id = u.id AND p.model_id = $2 AND p.status = 'paid'
+                 LIMIT 1
+              ) AS watermark_hash
          FROM users u
         WHERE u.id = $1`,
       [userId, model.id],
@@ -276,29 +285,31 @@ export async function assertCanDownloadPaid(
     if (!supabase) throw err;
     const { data: userRow, error: userErr } = await supabase
       .from("users")
-      .select("id, suspended_at")
+      .select("id, suspended_at, suspended_until")
       .eq("id", userId)
       .maybeSingle();
     if (userErr) throw err;
     if (userRow) {
       const { data: purchaseRow } = await supabase
         .from("purchases")
-        .select("id, license_type")
+        .select("id, license_type, watermark_hash")
         .eq("user_id", userId)
         .eq("model_id", model.id)
         .eq("status", "paid")
         .maybeSingle();
       row = {
         suspended_at: userRow.suspended_at,
+        suspended_until: (userRow as any).suspended_until ?? null,
         purchased: Boolean(purchaseRow),
         purchase_id: (purchaseRow as any)?.id ?? null,
         license_type: (purchaseRow as any)?.license_type ?? null,
+        watermark_hash: (purchaseRow as any)?.watermark_hash ?? null,
       };
     }
   }
 
   if (!row) throw new AppError(401, "UNAUTHORIZED", "Account not found");
-  if (row.suspended_at)
+  if (suspensionInForce(row))
     throw new AppError(
       403,
       "ACCOUNT_SUSPENDED",
@@ -315,6 +326,7 @@ export async function assertCanDownloadPaid(
   return {
     purchaseId: row.purchase_id ?? null,
     licenseType: row.license_type ?? model.license ?? "COMMERCIAL",
+    watermarkHash: row.watermark_hash ?? null,
   };
 }
 
@@ -386,6 +398,7 @@ export interface SendAssetOptions {
 export interface SendAssetResult {
   status: 200 | 206 | 304;
   range: ResolvedRange | null;
+  size: number;
 }
 
 function isNotFoundError(err: any): boolean {
@@ -457,7 +470,7 @@ export async function sendAsset(
 
   if (!opts.downloadName && etagMatches(req.headers["if-none-match"], etag)) {
     res.status(304).end();
-    return { status: 304, range: null };
+    return { status: 304, range: null, size: 0 };
   }
 
   // If-Range: only honour Range when the client's cached copy is still current.
@@ -521,7 +534,7 @@ export async function sendAsset(
   if (req.method === "HEAD") {
     stream.destroy();
     res.end();
-    return { status: range ? 206 : 200, range };
+    return { status: range ? 206 : 200, range, size };
   }
 
   pipeline(stream, res, (err) => {
@@ -530,5 +543,5 @@ export async function sendAsset(
       console.error("[CDN] stream error:", err.message);
     }
   });
-  return { status: range ? 206 : 200, range };
+  return { status: range ? 206 : 200, range, size };
 }

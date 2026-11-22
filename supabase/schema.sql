@@ -1,5 +1,6 @@
 -- Lixyte — Comprehensive PostgreSQL Schema (Supabase)
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+CREATE EXTENSION IF NOT EXISTS "pg_trgm";
 
 -- 1. Enums (เพิ่ม 'admin' สำหรับบทบาทแอดมิน)
 DO $$ BEGIN CREATE TYPE user_role AS ENUM ('user', 'creator', 'admin'); EXCEPTION WHEN duplicate_object THEN null; END $$;
@@ -24,6 +25,7 @@ CREATE TABLE IF NOT EXISTS users (
 ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_hash CHAR(64);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT DEFAULT '';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS featured_model_ids UUID[] DEFAULT NULL;
+CREATE INDEX IF NOT EXISTS idx_users_display_name_lower ON users (LOWER(display_name));
 -- Supabase exposes public tables via PostgREST: enabling RLS with no anon policy blocks direct client access
 -- while core-api/cdn-service (DATABASE_URL owner role or service_role/sb_secret_ key) continue working normally.
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
@@ -50,6 +52,7 @@ CREATE TABLE IF NOT EXISTS models (
 );
 
 CREATE INDEX IF NOT EXISTS idx_models_tags ON models USING GIN (tags);
+CREATE INDEX IF NOT EXISTS idx_models_title_trgm ON models USING GIN (title gin_trgm_ops);
 CREATE INDEX IF NOT EXISTS idx_models_owner ON models (owner_id);
 CREATE INDEX IF NOT EXISTS idx_models_active ON models (created_at DESC) WHERE deleted_at IS NULL AND hidden_at IS NULL;
 ALTER TABLE models ENABLE ROW LEVEL SECURITY;

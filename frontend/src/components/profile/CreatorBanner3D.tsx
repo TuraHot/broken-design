@@ -85,10 +85,10 @@ export default function CreatorBanner3D({
               type="button"
               onClick={() => setIsSelectorOpen(true)}
               className="inline-flex items-center gap-1.5 rounded-full border border-line bg-canvas/80 px-3 py-1.5 font-mono text-xs text-ink/80 backdrop-blur-md shadow-sm transition-all hover:border-accent hover:text-ink hover:bg-canvas"
-              title="เลือกโมเดลขึ้นโชว์บนแบนเนอร์"
+              title={t('profile.banner.modalTitle')}
             >
               <Plus className="h-3.5 w-3.5 text-accent" />
-              <span>เลือกโมเดลโชว์ ({displayedModels.length}/{SLOTS_COUNT})</span>
+              <span>{t('profile.banner.selectBtn', { count: displayedModels.length, max: SLOTS_COUNT })}</span>
             </button>
           )}
 
@@ -128,7 +128,7 @@ export default function CreatorBanner3D({
                           onRemoveModel?.(model.id);
                         }}
                         className="absolute top-1 right-1 z-30 flex h-6 w-6 items-center justify-center rounded-full border border-line/80 bg-canvas/90 text-ink/60 shadow-md backdrop-blur-sm transition-all hover:border-red-500/70 hover:bg-red-500 hover:text-white sm:opacity-75 sm:group-hover/slot:opacity-100"
-                        title="เอาโมเดลนี้ออกจากแบนเนอร์"
+                        title={t('profile.banner.removeSlotTooltip')}
                       >
                         <X className="h-3 w-3" />
                       </button>
@@ -185,13 +185,13 @@ export default function CreatorBanner3D({
                       type="button"
                       onClick={() => setIsSelectorOpen(true)}
                       className="group flex h-[65%] w-[85%] flex-col items-center justify-center gap-1.5 rounded-2xl border border-dashed border-line/50 bg-ink/[0.02] p-2 text-ink/40 transition-all hover:border-accent hover:bg-accent/5 hover:text-accent shadow-sm"
-                      title="เลือกโมเดลขึ้นโชว์"
+                      title={t('profile.banner.emptySlot')}
                     >
                       <div className="flex h-7 w-7 items-center justify-center rounded-full bg-ink/5 transition-transform group-hover:scale-110 group-hover:bg-accent/10">
                         <Plus className="h-4 w-4" />
                       </div>
                       <span className="font-mono text-[10px] uppercase tracking-wider text-center">
-                        เลือกโมเดลขึ้นโชว์
+                        {t('profile.banner.emptySlot')}
                       </span>
                     </button>
                   </div>
@@ -219,10 +219,10 @@ export default function CreatorBanner3D({
             <div className="flex items-center justify-between border-b border-line px-5 py-4">
               <div>
                 <h3 className="font-display text-lg uppercase tracking-tight text-ink">
-                  เลือกโมเดลขึ้นโชว์บนแบนเนอร์
+                  {t('profile.banner.modalTitle')}
                 </h3>
                 <p className="mt-0.5 text-xs text-ink-soft">
-                  เลือกโมเดลที่ต้องการนำมาจัดแสดง (สูงสุด 5 ชิ้น) • กำลังโชว์ {displayedModels.length}/{SLOTS_COUNT} ชิ้น
+                  {t('profile.banner.modalSubtitle', { count: displayedModels.length, max: SLOTS_COUNT })}
                 </p>
               </div>
               <button
@@ -242,7 +242,7 @@ export default function CreatorBanner3D({
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="ค้นหาโมเดลของคุณ..."
+                  placeholder={t('profile.banner.searchPlaceholder')}
                   className="w-full rounded-xl border border-line bg-canvas pl-9 pr-3 py-2 text-xs text-ink placeholder:text-ink-soft focus:border-accent focus:outline-none"
                 />
               </div>
@@ -253,8 +253,8 @@ export default function CreatorBanner3D({
               {filteredModels.length === 0 ? (
                 <div className="py-12 text-center text-xs text-ink-soft">
                   {allModels.length === 0
-                    ? 'คุณยังไม่มีโมเดล 3D ในบัญชี'
-                    : 'ไม่พบโมเดลที่ค้นหา'}
+                    ? t('profile.banner.emptyAccount')
+                    : t('profile.banner.emptySearch')}
                 </div>
               ) : (
                 <div className="flex flex-col gap-2">
@@ -309,7 +309,7 @@ export default function CreatorBanner3D({
                               className="inline-flex items-center gap-1 rounded-lg border border-red-500/40 bg-red-500/10 px-2.5 py-1.5 font-mono text-xs font-medium text-red-500 hover:bg-red-500 hover:text-white transition-all shadow-sm"
                             >
                               <X className="h-3 w-3" />
-                              <span>เอาออก</span>
+                              <span>{t('profile.banner.removeAction')}</span>
                             </button>
                           ) : (
                             <button
@@ -319,7 +319,7 @@ export default function CreatorBanner3D({
                               className="inline-flex items-center gap-1 rounded-lg border border-accent bg-accent/10 px-2.5 py-1.5 font-mono text-xs font-medium text-accent hover:bg-accent hover:text-ink disabled:opacity-40 disabled:hover:bg-accent/10 disabled:hover:text-accent transition-all shadow-sm"
                             >
                               <Plus className="h-3 w-3" />
-                              <span>นำขึ้นโชว์</span>
+                              <span>{t('profile.banner.addAction')}</span>
                             </button>
                           )}
                         </div>
@@ -333,14 +333,14 @@ export default function CreatorBanner3D({
             {/* Modal Footer */}
             <div className="flex items-center justify-between border-t border-line px-5 py-3">
               <span className="font-mono text-xs text-ink-soft">
-                เลือกแล้ว {displayedModels.length}/{SLOTS_COUNT} ชิ้น
+                {t('profile.banner.selectedCount', { count: displayedModels.length, max: SLOTS_COUNT })}
               </span>
               <button
                 type="button"
                 onClick={() => setIsSelectorOpen(false)}
                 className="rounded-xl bg-accent px-4 py-2 font-mono text-xs font-medium text-ink hover:opacity-90 transition-opacity"
               >
-                เสร็จสิ้น
+                {t('profile.banner.done')}
               </button>
             </div>
           </div>

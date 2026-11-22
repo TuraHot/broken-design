@@ -158,3 +158,44 @@ test('POST /api/models/:id/like - a token whose user row is missing is 401, not 
     db.query = originalQuery;
   }
 });
+
+test('POST /api/models/:id/like - a like notice repeated within the cooldown is not sent again', async () => {
+  const originalQuery = db.query.bind(db);
+  let insertSql = '';
+  let insertParams: unknown[] = [];
+
+  (db as any).query = async (sql: string, params: unknown[] = []) => {
+    if (sql.includes('SELECT suspended_at, suspended_until FROM users WHERE id = $1')) {
+      return { rowCount: 1, rows: [{ suspended_at: null }] };
+    }
+    if (sql.includes('FROM models m') && sql.includes('u.suspended_at IS NULL')) {
+      return { rowCount: 1, rows: [{ id: MODEL_ID, owner_id: OWNER_ID, title: 'Crystal Sword' }] };
+    }
+    if (sql.includes('INSERT INTO likes')) return { rowCount: 1, rows: [] };
+    if (sql.includes('AS like_count FROM likes')) return { rowCount: 1, rows: [{ like_count: 1 }] };
+    if (sql.includes('SELECT display_name FROM users')) return { rowCount: 1, rows: [{ display_name: 'Alice' }] };
+    if (sql.includes('INSERT INTO notifications')) {
+      insertSql = sql;
+      insertParams = params;
+      return { rowCount: 0, rows: [] }; // NOT EXISTS found a recent notice from the same liker
+    }
+    return { rowCount: 0, rows: [] };
+  };
+
+  const server = app.listen(0);
+  const port = (server.address() as any).port;
+  try {
+    const res = await fetch(`http://localhost:${port}/api/models/${MODEL_ID}/like`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token()}` },
+    });
+    assert.equal(res.status, 200);
+    assert.deepEqual(await res.json(), { liked: true, likeCount: 1 });
+    assert.match(insertSql, /WHERE NOT EXISTS/);
+    assert.equal(insertParams[3], USER_ID); // liker id in the dedupe check
+    assert.equal(insertParams[4], 86_400); // cooldown seconds
+  } finally {
+    server.close();
+    db.query = originalQuery;
+  }
+});

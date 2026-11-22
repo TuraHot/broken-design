@@ -116,6 +116,10 @@ sellerRouter.get('/status', requireAuth, async (req, res) => {
   res.json({ isSeller: result.rows[0].is_seller });
 });
 
+// The wallet is single-currency: only USD sales count toward the balance and payouts are recorded as USD, so a sale in
+// another currency (e.g. THB satang) is never added to the USD total as if it were USD cents.
+const WALLET_CURRENCY = 'USD';
+
 type Queryable = Pick<typeof db, 'query'>;
 
 async function getSellerWalletTotals(sellerId: string, runner: Queryable = db) {
@@ -123,14 +127,15 @@ async function getSellerWalletTotals(sellerId: string, runner: Queryable = db) {
     `SELECT COALESCE(SUM(COALESCE(NULLIF(p.amount_cents, 0), m.price_cents)), 0) AS gross_earned
      FROM purchases p
      JOIN models m ON m.id = p.model_id
-     WHERE m.owner_id = $1 AND p.status = 'paid'`,
-    [sellerId],
+     WHERE m.owner_id = $1 AND p.status = 'paid'
+       AND UPPER(COALESCE(NULLIF(p.currency, ''), m.currency)) = $2`,
+    [sellerId, WALLET_CURRENCY],
   );
   const withdrawnRes = await runner.query(
     `SELECT COALESCE(SUM(gross_amount_cents), 0) AS gross_withdrawn
      FROM creator_withdrawals
-     WHERE seller_id = $1 AND status IN ('pending', 'approved', 'paid')`,
-    [sellerId],
+     WHERE seller_id = $1 AND currency = $2 AND status IN ('pending', 'approved', 'paid')`,
+    [sellerId, WALLET_CURRENCY],
   );
   const grossEarnedCents = Number(earnedRes.rows[0]?.gross_earned ?? 0);
   const withdrawnGrossCents = Number(withdrawnRes.rows[0]?.gross_withdrawn ?? 0);
@@ -239,7 +244,7 @@ sellerRouter.post('/withdraw', requireAuth, requireActiveSeller, async (req, res
     const inserted = await client.query(
       `INSERT INTO creator_withdrawals
          (seller_id, gross_amount_cents, platform_fee_cents, net_amount_cents, fee_rate_bps, currency, payout_method, payout_account, status)
-       VALUES ($1, $2, $3, $4, $5, 'USD', $6, $7, 'pending')
+       VALUES ($1, $2, $3, $4, $5, $8, $6, $7, 'pending')
        RETURNING id, gross_amount_cents, platform_fee_cents, net_amount_cents, fee_rate_bps,
                  currency, payout_method, payout_account, status, created_at`,
       [
@@ -250,6 +255,7 @@ sellerRouter.post('/withdraw', requireAuth, requireActiveSeller, async (req, res
         breakdown.feeRateBps,
         payoutMethod,
         payoutAccount,
+        WALLET_CURRENCY,
       ],
     );
 

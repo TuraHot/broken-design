@@ -5,6 +5,11 @@
 /* Colour tokens as space-separated RGB, so Tailwind opacity modifiers work (text-ink/65, bg-canvas/80).
    Dark is today's look and the default; the light values apply when <html data-theme="light"> (see lib/theme.ts). */
 :root {
+  --font-chakra: 'Chakra Petch', sans-serif;
+  --font-display: 'Michroma', 'Arial Black', sans-serif;
+  --font-mono: 'Share Tech Mono', ui-monospace, monospace;
+  --font-barlow: 'Barlow Condensed', sans-serif;
+  --font-jetbrains: 'JetBrains Mono', monospace;
   --c-canvas: 0 0 0;
   --c-ink: 255 255 255;
   --c-ink-soft: 166 166 166;
@@ -54,6 +59,7 @@ html:not([data-theme='light']) .hero-accent {
 
 html,
 body {
+  font-family: var(--font-chakra);
   min-height: 100%;
   margin: 0;
   background: rgb(var(--c-canvas));

@@ -24,6 +24,7 @@ const config: Config = {
         amber: '#ffb070',
       },
       fontFamily: {
+        sans: ['var(--font-chakra)', 'sans-serif'],
         display: ['var(--font-display)', 'Arial Black', 'sans-serif'],
         mono: ['var(--font-mono)', 'ui-monospace', 'Menlo', 'Consolas', 'monospace'],
       },

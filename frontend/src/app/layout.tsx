@@ -1,6 +1,5 @@
 // Root Layout — Lixyte
 import type { Metadata } from 'next';
-import { Barlow_Condensed, Chakra_Petch, JetBrains_Mono, Michroma, Share_Tech_Mono } from 'next/font/google';
 import AdminOnlyRedirect from '@/components/AdminOnlyRedirect';
 import Footer from '@/components/Footer';
 import Navbar from '@/components/Navbar';
@@ -13,13 +12,6 @@ import { getLocale } from '@/lib/i18n/server';
 import { THEME_READY_ROUTES, themeBootstrapScript } from '@/lib/theme';
 import './globals.css';
 
-const chakra = Chakra_Petch({ subsets: ['latin', 'thai'], weight: ['400', '500', '600'], display: 'swap' });
-const michroma = Michroma({ subsets: ['latin'], weight: '400', display: 'swap', variable: '--font-display' });
-const shareTechMono = Share_Tech_Mono({ subsets: ['latin'], weight: '400', display: 'swap', variable: '--font-mono' });
-// The light theme's display and mono faces (globals.css swaps --font-display / --font-mono under html[data-theme='light']).
-const barlow = Barlow_Condensed({ subsets: ['latin'], weight: '700', display: 'swap', variable: '--font-barlow' });
-const jetbrains = JetBrains_Mono({ subsets: ['latin'], weight: ['400', '500'], display: 'swap', variable: '--font-jetbrains' });
-
 export const metadata: Metadata = {
   title: 'Lixyte',
 };
@@ -29,10 +21,16 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang={locale} suppressHydrationWarning>
       <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700&family=Chakra+Petch:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Michroma&family=Share+Tech+Mono&display=swap"
+        />
         {/* Sets data-theme before the first paint (no flash); see lib/theme.ts. */}
         <script dangerouslySetInnerHTML={{ __html: themeBootstrapScript(THEME_READY_ROUTES) }} />
       </head>
-      <body className={`${chakra.className} ${michroma.variable} ${shareTechMono.variable} ${barlow.variable} ${jetbrains.variable}`}>
+      <body>
         <LocaleProvider locale={locale}>
           <NavigationProgress />
           <ThemeSync />

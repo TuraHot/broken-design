@@ -31,6 +31,8 @@ export const env = {
   // Number of reverse proxies in front of the app (Render = 1). Needed so rate limits see the real client IP.
   trustProxy: Number(process.env.TRUST_PROXY) || 0,
   databaseUrl: process.env.DATABASE_URL || '',
+  // Supabase session pooler (:5432) allows 15 clients across the whole team, so each process keeps few.
+  dbPoolMax: Math.max(1, Number(process.env.DB_POOL_MAX) || 3),
   jwtSecret: process.env.JWT_SECRET || DEFAULT_DEV_JWT_SECRET,
   watermarkSecret: process.env.WATERMARK_SECRET || DEFAULT_DEV_WATERMARK_SECRET,
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',

@@ -348,7 +348,7 @@ broken-design/
 3. **ตั้งค่าไฟล์ Environment (`.env` / `.env.local`):**
    - คัดลอก `.env.example` เป็น `.env` ใน `services/core-api/` และ `services/cdn-service/` และเป็น `.env.local` ใน `frontend/` (`docker-compose.yml` จะโหลด `.env` / `.env.local` ทับ `.env.example` ให้อัตโนมัติ พร้อมส่ง `INTERNAL_CORE_API_URL=http://core-api:4000` ให้ Container `frontend`)
    - กำหนดค่า `DATABASE_URL`, `JWT_SECRET` (ให้ตรงกันทั้ง `core-api` และ `cdn-service`), `WATERMARK_SECRET`, และ `SUPABASE_URL` / `SUPABASE_KEY` (สำหรับ Storage bucket `models` ใน `cdn-service`) — *ห้ามนำไฟล์ `.env` ขึ้น Git*
-   - หากใช้ `docker compose` แนะนำให้ตั้งค่า `DATABASE_URL` เป็น **Supabase IPv4 Session Pooler** (`aws-0-<region>.pooler.supabase.com:5432`) เนื่องจาก Direct Host (`db.<project>.supabase.co`) เป็น IPv6-only ซึ่งเครือข่าย Docker Bridge เริ่มต้นไม่รองรับ
+   - หากใช้ `docker compose` แนะนำให้ตั้งค่า `DATABASE_URL` เป็น **Supabase IPv4 Session Pooler** (`aws-0-<region>.pooler.supabase.com:5432`) เนื่องจาก Direct Host (`db.<project>.supabase.co`) เป็น IPv6-only ซึ่งเครือข่าย Docker Bridge เริ่มต้นไม่รองรับ (ปรับ `DB_POOL_MAX` ได้ ค่าเริ่มต้น `3` เพื่อไม่ให้เกินเพดาน 15 client ของ session pooler เมื่อใช้งานร่วมกันในทีม)
 
 ### 8.2 บัญชีทดสอบเริ่มต้น (Default Seed Accounts)
 - **Admin:** `admin@brokendesign.com` / รหัสผ่าน: `Admin@BrokenDesign2026!`

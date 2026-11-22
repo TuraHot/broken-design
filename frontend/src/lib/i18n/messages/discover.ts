@@ -312,6 +312,9 @@ export const discoverEn = {
   'profile.banner.addAction': 'Feature',
   'profile.banner.selectedCount': 'Selected {count}/{max}',
   'profile.banner.done': 'Done',
+  'profile.dashboardLoading': 'Loading your models…',
+  'profile.dashboardLoadFail': 'Could not load your dashboard data. The server may be busy, please try again.',
+  'profile.dashboardRetry': 'Retry',
 
   // ── watermark verifier (/verify) ──
   'verify.eyebrow': '[ Watermark Inspector ]',
@@ -651,6 +654,9 @@ export const discoverTh: Record<keyof typeof discoverEn, string> = {
   'profile.banner.addAction': 'นำขึ้นโชว์',
   'profile.banner.selectedCount': 'เลือกแล้ว {count}/{max} ชิ้น',
   'profile.banner.done': 'เสร็จสิ้น',
+  'profile.dashboardLoading': 'กำลังโหลดโมเดลของคุณ…',
+  'profile.dashboardLoadFail': 'โหลดข้อมูลแดชบอร์ดไม่สำเร็จ เซิร์ฟเวอร์อาจไม่ว่าง กรุณาลองใหม่อีกครั้ง',
+  'profile.dashboardRetry': 'ลองใหม่',
 
   'verify.eyebrow': '[ ตรวจสอบลายน้ำ 3 มิติ ]',
   'verify.title': 'ตรวจสอบลายน้ำไฟล์ .glb',

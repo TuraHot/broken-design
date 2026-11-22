@@ -27,6 +27,8 @@ export const env = {
   port: Number(process.env.PORT) || 4000,
   trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
   databaseUrl: process.env.DATABASE_URL || '',
+  // Supabase session pooler (:5432) allows 15 clients across the whole team, so each process keeps few.
+  dbPoolMax: Math.max(1, Number(process.env.DB_POOL_MAX) || 3),
   jwtSecret: process.env.JWT_SECRET || DEFAULT_DEV_JWT_SECRET,
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
   cdnServiceUrl: process.env.CDN_SERVICE_URL || 'http://localhost:4001',

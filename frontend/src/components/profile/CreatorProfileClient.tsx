@@ -77,6 +77,7 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
   const [payoutAccount, setPayoutAccount] = useState('');
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  const [dashboardState, setDashboardState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
 
   useEffect(() => {
     if (!statusMsg) return;
@@ -180,19 +181,42 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
   };
 
   const loadDashboardData = async (authToken: string) => {
-    const [modelsList, sales, wallet] = await Promise.all([
-      fetchSellerModels(authToken).catch(() => []),
-      fetchSellerSales(authToken).catch(() => null),
-      fetchSellerWallet(authToken).catch(() => null),
+    setDashboardState('loading');
+    const [modelsRes, salesRes, walletRes] = await Promise.allSettled([
+      fetchSellerModels(authToken),
+      fetchSellerSales(authToken),
+      fetchSellerWallet(authToken),
     ]);
-    setModels(modelsList);
-    setSalesSummary(sales);
-    setWalletData(wallet);
-    if (wallet && wallet.wallet.availableGrossCents > 0) {
-      setWithdrawAmountThb((wallet.wallet.availableGrossCents / 100).toFixed(2));
+
+    if (modelsRes.status === 'fulfilled') {
+      setModels(modelsRes.value);
     } else {
-      setWithdrawAmountThb('');
+      console.error('[CreatorProfileClient] fetchSellerModels failed:', modelsRes.reason);
     }
+
+    if (salesRes.status === 'fulfilled') {
+      setSalesSummary(salesRes.value);
+    } else {
+      console.error('[CreatorProfileClient] fetchSellerSales failed:', salesRes.reason);
+    }
+
+    if (walletRes.status === 'fulfilled') {
+      const wallet = walletRes.value;
+      setWalletData(wallet);
+      if (wallet && wallet.wallet.availableGrossCents > 0) {
+        setWithdrawAmountThb((wallet.wallet.availableGrossCents / 100).toFixed(2));
+      } else {
+        setWithdrawAmountThb('');
+      }
+    } else {
+      console.error('[CreatorProfileClient] fetchSellerWallet failed:', walletRes.reason);
+    }
+
+    const anyFailed =
+      modelsRes.status === 'rejected' ||
+      salesRes.status === 'rejected' ||
+      walletRes.status === 'rejected';
+    setDashboardState(anyFailed ? 'error' : 'ready');
   };
 
   useEffect(() => {
@@ -571,6 +595,27 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
               </section>
             )}
 
+            {showOwnerTabs && dashboardState === 'error' && (currentTab === 'dashboard' || currentTab === 'wallet') && (
+              <div
+                role="alert"
+                className="mt-6 flex items-center justify-between gap-3 rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger"
+              >
+                <div className="flex items-center gap-2.5">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <span>{t('profile.dashboardLoadFail')}</span>
+                </div>
+                <button
+                  type="button"
+                  disabled={!token}
+                  onClick={() => token && loadDashboardData(token)}
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-danger/30 bg-danger/10 px-3 py-1.5 font-mono text-xs font-medium text-danger transition-colors hover:bg-danger/20 disabled:opacity-50"
+                >
+                  <RefreshCw className="h-3 w-3" />
+                  <span>{t('profile.dashboardRetry')}</span>
+                </button>
+              </div>
+            )}
+
             {/* TAB 2: Seller Dashboard (Owner Only) */}
             {currentTab === 'dashboard' && showOwnerTabs && (
               <section className="mt-6 space-y-8">
@@ -626,7 +671,13 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
 
                   {activeSellerModels.length === 0 ? (
                     <div className={`${CARD} mt-4 text-center py-8`}>
-                      <p className="text-sm text-ink-soft">{t('profile.noUploadedModels')}</p>
+                      <p className="text-sm text-ink-soft">
+                        {dashboardState === 'loading' || dashboardState === 'idle'
+                          ? t('profile.dashboardLoading')
+                          : dashboardState === 'error'
+                            ? t('profile.dashboardLoadFail')
+                            : t('profile.noUploadedModels')}
+                      </p>
                     </div>
                   ) : (
                     <div className="mt-4 overflow-x-auto rounded-xl border border-line">

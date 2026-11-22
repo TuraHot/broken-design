@@ -13,9 +13,10 @@ const isCloudPostgres =
 export const db = new Pool({
   connectionString: env.databaseUrl,
   ssl: isCloudPostgres ? { rejectUnauthorized: false } : undefined,
-  max: 10,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
+  // Keep pool small when sharing Supabase session mode (:5432, pool_size=15), release idle slots sooner, and wait briefly in queue.
+  max: env.dbPoolMax,
+  idleTimeoutMillis: 10000,
+  connectionTimeoutMillis: 10000,
 });
 
 // Prevent unhandled errors on idle clients from crashing the server process

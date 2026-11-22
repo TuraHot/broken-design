@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Box, Loader2, Plus, Search, X } from 'lucide-react';
 import { CDN_SERVICE_URL } from '@/lib/api';
+import { formatPrice } from '@/lib/format';
 import { useT } from '@/lib/i18n/client';
 import type { Model, SellerModelItem } from '@/lib/types';
 
@@ -263,8 +264,8 @@ export default function CreatorBanner3D({
                     const posterSrc = item.posterUrl || `${baseCdn}/poster.webp`;
                     const priceFormatted =
                       item.priceCents > 0
-                        ? `$${(item.priceCents / 100).toFixed(item.priceCents % 100 === 0 ? 0 : 2)}`
-                        : 'ฟรี';
+                        ? formatPrice(item.priceCents)
+                        : t('acct.free');
 
                     return (
                       <div

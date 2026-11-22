@@ -90,7 +90,7 @@ export default function NoticeContent({ n }: { n: NoticeItem }) {
     n.kind === 'withdrawal_paid' ||
     n.kind === 'withdrawal_rejected'
   ) {
-    const amount = formatMoney(Number(n.data.netAmountCents ?? 0), n.data.currency || 'USD');
+    const amount = formatMoney(Number(n.data.netAmountCents ?? 0), n.data.currency || 'THB');
     const key =
       n.kind === 'withdrawal_approved'
         ? 'notice.withdrawalApproved'

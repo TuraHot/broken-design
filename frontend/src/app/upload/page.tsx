@@ -12,7 +12,6 @@ import {
   Sparkles,
   Camera,
   Layers,
-  DollarSign,
   Tag,
   ArrowRight,
   RefreshCw,
@@ -94,7 +93,7 @@ export default function UploadPage() {
   const tagDropdownRef = useRef<HTMLDivElement>(null);
   const [license, setLicense] = useState<string>('CC0');
   const [isPaid, setIsPaid] = useState(false);
-  const [priceUsd, setPriceUsd] = useState('5.00');
+  const [priceThb, setPriceThb] = useState('100.00');
 
   // UI & Submission states
   const [isDragging, setIsDragging] = useState(false);
@@ -322,9 +321,9 @@ export default function UploadPage() {
       formData.append('tags', JSON.stringify(tags));
       formData.append('license', license);
 
-      const priceCents = isPaid ? Math.round(parseFloat(priceUsd || '0') * 100) : 0;
+      const priceCents = isPaid ? Math.round(parseFloat(priceThb || '0') * 100) : 0;
       formData.append('price_cents', String(priceCents));
-      formData.append('currency', 'USD');
+      formData.append('currency', 'THB');
 
       const res = await fetch(`${CDN_SERVICE_URL}/api/models`, {
         method: 'POST',
@@ -366,7 +365,7 @@ export default function UploadPage() {
     setTags([]);
     setLicense('CC0');
     setIsPaid(false);
-    setPriceUsd('5.00');
+    setPriceThb('100.00');
     setUploadSuccess(null);
     setSubmitError(null);
     setValidationError(null);
@@ -854,15 +853,15 @@ export default function UploadPage() {
 
                 {isPaid && (
                   <div className="mt-3 border-t border-line pt-3">
-                    <label className="block text-xs text-ink/60 mb-1">{t('upload.priceUsd')}</label>
+                    <label className="block text-xs text-ink/60 mb-1">{t('upload.priceThb')}</label>
                     <div className="relative">
-                      <DollarSign className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink/40" />
+                      <span aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-ink/40">฿</span>
                       <input
                         type="number"
                         step="0.01"
-                        min="0.50"
-                        value={priceUsd}
-                        onChange={(e) => setPriceUsd(e.target.value)}
+                        min="10"
+                        value={priceThb}
+                        onChange={(e) => setPriceThb(e.target.value)}
                         className="w-full rounded-lg border border-line bg-ink/5 pl-9 pr-3 py-2 text-sm text-ink focus:border-ink/50 focus:outline-none"
                       />
                     </div>

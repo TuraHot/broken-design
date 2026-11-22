@@ -154,7 +154,7 @@ uploadRouter.post(
         tags = '[]',
         license = 'CC0',
         price_cents = 0,
-        currency = 'USD',
+        currency = 'THB',
       } = req.body;
 
       if (!title || typeof title !== 'string' || title.trim() === '') {
@@ -294,7 +294,7 @@ uploadRouter.post(
         new Set(parsedTags.filter((t) => t.length > 0 && t.length <= 50)),
       ).slice(0, 20);
 
-      const parsedCurrency = String(currency || 'USD').trim().toUpperCase().slice(0, 3);
+      const parsedCurrency = String(currency || 'THB').trim().toUpperCase().slice(0, 3);
 
       // 6. Insert record into database (with Supabase REST fallback)
       let insertedModel: any;

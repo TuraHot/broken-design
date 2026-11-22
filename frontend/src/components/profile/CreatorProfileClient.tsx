@@ -72,7 +72,7 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
   const [models, setModels] = useState<SellerModelItem[]>([]);
   const [salesSummary, setSalesSummary] = useState<SellerSalesSummary | null>(null);
   const [walletData, setWalletData] = useState<SellerWalletResponse | null>(null);
-  const [withdrawAmountUsd, setWithdrawAmountUsd] = useState('');
+  const [withdrawAmountThb, setWithdrawAmountThb] = useState('');
   const [payoutMethod, setPayoutMethod] = useState<'promptpay' | 'bank'>('promptpay');
   const [payoutAccount, setPayoutAccount] = useState('');
   const [busyAction, setBusyAction] = useState<string | null>(null);
@@ -110,7 +110,7 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
   const [bioInput, setBioInput] = useState('');
   const [savingBio, setSavingBio] = useState(false);
   const [editTitle, setEditTitle] = useState('');
-  const [editPriceUsd, setEditPriceUsd] = useState('0');
+  const [editPriceThb, setEditPriceThb] = useState('0');
   const [editLicense, setEditLicense] = useState('CC0');
   const [editDescription, setEditDescription] = useState('');
   const [editMainFile, setEditMainFile] = useState<File | null>(null);
@@ -120,7 +120,7 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
   const openEditModal = (m: SellerModelItem) => {
     setEditingModel(m);
     setEditTitle(m.title);
-    setEditPriceUsd((m.priceCents / 100).toFixed(m.priceCents % 100 === 0 ? 0 : 2));
+    setEditPriceThb((m.priceCents / 100).toFixed(m.priceCents % 100 === 0 ? 0 : 2));
     setEditLicense(m.license || 'CC0');
     setEditDescription(m.description || '');
     setEditMainFile(null);
@@ -131,7 +131,7 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token || !editingModel) return;
-    const priceCents = Math.max(0, Math.round((Number(editPriceUsd) || 0) * 100));
+    const priceCents = Math.max(0, Math.round((Number(editPriceThb) || 0) * 100));
     try {
       setBusyAction(`edit-${editingModel.id}`);
       setStatusMsg(null);
@@ -189,9 +189,9 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
     setSalesSummary(sales);
     setWalletData(wallet);
     if (wallet && wallet.wallet.availableGrossCents > 0) {
-      setWithdrawAmountUsd((wallet.wallet.availableGrossCents / 100).toFixed(2));
+      setWithdrawAmountThb((wallet.wallet.availableGrossCents / 100).toFixed(2));
     } else {
-      setWithdrawAmountUsd('');
+      setWithdrawAmountThb('');
     }
   };
 
@@ -754,7 +754,7 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                       <span className={LABEL}>{t('seller.held')}</span>
                     </div>
                     <p className="mt-2 font-display text-3xl uppercase text-ink">
-                      {formatMoney(walletData?.wallet.availableGrossCents ?? 0, 'USD')}
+                      {formatMoney(walletData?.wallet.availableGrossCents ?? 0, 'THB')}
                     </p>
                     <p className="mt-1 text-xs text-ink-soft">
                       {t('seller.heldNote')}
@@ -763,7 +763,7 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                     {(() => {
                       const availableCents = walletData?.wallet.availableGrossCents ?? 0;
                       const feeBps = walletData?.wallet.feeRateBps ?? 700;
-                      const parsedInputCents = Math.round((Number(withdrawAmountUsd) || 0) * 100);
+                      const parsedInputCents = Math.round((Number(withdrawAmountThb) || 0) * 100);
                       const previewGross = parsedInputCents > 0 ? parsedInputCents : availableCents;
                       const previewFee = Math.round((previewGross * feeBps) / 10000);
                       const previewNet = Math.max(0, previewGross - previewFee);
@@ -772,15 +772,15 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                         <dl className="mt-5 space-y-2 border-t border-line pt-4 font-mono text-xs">
                           <div className="flex justify-between text-ink/70">
                             <dt>{t('seller.gross')}</dt>
-                            <dd>{formatMoney(previewGross, 'USD')}</dd>
+                            <dd>{formatMoney(previewGross, 'THB')}</dd>
                           </div>
                           <div className="flex justify-between text-warn">
                             <dt>{t('seller.fee', { pct: feeBps / 100 })}</dt>
-                            <dd>-{formatMoney(previewFee, 'USD')}</dd>
+                            <dd>-{formatMoney(previewFee, 'THB')}</dd>
                           </div>
                           <div className="flex justify-between border-t border-line pt-2 text-sm font-semibold text-accent">
                             <dt>{t('seller.net')}</dt>
-                            <dd>{formatMoney(previewNet, 'USD')}</dd>
+                            <dd>{formatMoney(previewNet, 'THB')}</dd>
                           </div>
                         </dl>
                       );
@@ -792,7 +792,7 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                     onSubmit={async (e) => {
                       e.preventDefault();
                       if (!token || !walletData) return;
-                      const amountCents = Math.round((Number(withdrawAmountUsd) || 0) * 100);
+                      const amountCents = Math.round((Number(withdrawAmountThb) || 0) * 100);
                       try {
                         setBusyAction('withdraw');
                         setStatusMsg(null);
@@ -815,15 +815,15 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                     <div className="mt-4 grid gap-4 sm:grid-cols-2">
                       <div>
                         <label htmlFor="profile-withdraw-amount" className="block text-xs text-ink/75">
-                          {t('seller.amountUsd')}
+                          {t('seller.amountThb')}
                         </label>
                         <input
                           id="profile-withdraw-amount"
                           type="number"
                           step="0.01"
                           min="0.01"
-                          value={withdrawAmountUsd}
-                          onChange={(e) => setWithdrawAmountUsd(e.target.value)}
+                          value={withdrawAmountThb}
+                          onChange={(e) => setWithdrawAmountThb(e.target.value)}
                           placeholder="0.00"
                           className="mt-1.5 h-10 w-full rounded-lg border border-line bg-canvas/50 px-3 font-mono text-sm text-ink focus:border-accent/60 focus:outline-none"
                         />
@@ -954,8 +954,8 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                     type="number"
                     min="0"
                     step="0.01"
-                    value={editPriceUsd}
-                    onChange={(e) => setEditPriceUsd(e.target.value)}
+                    value={editPriceThb}
+                    onChange={(e) => setEditPriceThb(e.target.value)}
                     className="mt-1 h-10 w-full rounded-lg border border-line bg-ink/5 px-3 font-mono text-sm text-ink focus:border-accent/60 focus:outline-none"
                   />
                 </div>

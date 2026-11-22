@@ -54,7 +54,7 @@ Model editing in the browser, formats other than `.glb`, real-time collaboration
 
 ## 8. Content rules
 - Licenses: `CC0`, `CC-BY`, `CC-BY-NC`, `COMMERCIAL`.
-- Price in cents with a 3-letter currency (default USD); `0` = free.
+- Price in cents with a 3-letter currency (default THB, amounts in satang); `0` = free.
 - Deleting a model is a **soft delete** (`deleted_at`): it leaves the gallery, but buyers and the owner keep access.
 - A **hidden** model (by an admin) or a model whose owner is **suspended** is blocked for everyone, buyers included.
 - Free models need no login to view, stream or download. Paid models stream the full file only with a valid embed key, and download only for a paying buyer or the owner.

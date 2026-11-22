@@ -5,9 +5,9 @@ import { useId, useState } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { useT } from '@/lib/i18n/client';
 
-const PRESETS = [3, 5, 10];
-const MIN = 1;
-const MAX = 500;
+const PRESETS = [30, 50, 100];
+const MIN = 10;
+const MAX = 5000;
 
 export default function DonateCard({ creator }: { creator: string }) {
   const t = useT();
@@ -59,20 +59,20 @@ export default function DonateCard({ creator }: { creator: string }) {
       {preset === 'custom' && (
         <div className="mt-3">
           <label htmlFor={customId} className="text-sm text-ink-soft">
-            {t('donate.amountUsd')}
+            {t('donate.amountThb')}
           </label>
           <input
             id={customId}
             inputMode="numeric"
             value={custom}
             onChange={(e) => {
-              setCustom(e.target.value.replace(/\D/g, '').slice(0, 3));
+              setCustom(e.target.value.replace(/\D/g, '').slice(0, 4));
               setError(false);
               setNotice(false);
             }}
             aria-invalid={!!error}
             className="mt-1 h-10 w-full rounded-lg border border-line bg-ink/5 px-3 text-sm text-ink placeholder:text-ink/40 focus:border-ink/50 focus:outline-none"
-            placeholder="25"
+            placeholder="250"
           />
         </div>
       )}

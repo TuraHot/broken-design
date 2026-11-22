@@ -157,7 +157,7 @@ export default function CheckoutPage() {
   }
 
   const sellerName = purchase.sellerName || t('pay.creator');
-  const priceText = formatMoney(purchase.amountCents, purchase.currency || 'USD');
+  const priceText = formatMoney(purchase.amountCents, purchase.currency || 'THB');
 
   if (purchase.status === 'paid') {
     return (

@@ -694,10 +694,10 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                         <tbody className="divide-y divide-line">
                           {activeSellerModels.map((m) => (
                             <tr key={m.id} className="hover:bg-ink/[0.02]">
-                              <td className="px-4 py-3 font-medium text-ink">
+                              <td className="max-w-[16rem] px-4 py-3 font-medium text-ink">
                                 <Link
                                   href={`/models/${m.id}`}
-                                  className="group flex items-center gap-3 transition-colors hover:text-accent"
+                                  className="group flex min-w-0 items-center gap-3 transition-colors hover:text-accent"
                                 >
                                   <div className="relative flex h-11 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md border border-line bg-ink/5 group-hover:border-accent/40">
                                     <ImageIcon className="h-4 w-4 text-ink/30" />
@@ -712,7 +712,9 @@ export default function CreatorProfileClient({ handle, initialCreator }: Props) 
                                       className="absolute inset-0 h-full w-full object-cover"
                                     />
                                   </div>
-                                  <span className="truncate group-hover:underline">{m.title}</span>
+                                  <span className="truncate group-hover:underline" title={m.title}>
+                                    {m.title}
+                                  </span>
                                 </Link>
                               </td>
                               <td className="px-4 py-3 font-mono text-xs text-ink/75">
